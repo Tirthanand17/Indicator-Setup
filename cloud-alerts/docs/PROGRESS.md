@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 65%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 66%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 65%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 35%
+Overall engineering progress   [████████████████░░░░░░░░] 66%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 34%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
+| P8 | Walk-forward option backtests & reliability dashboard | 30% | Offline causal replay and restart consistency hashes implemented; no independently captured option quote dataset or live outcomes |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **65.0%, rounded to 65%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **66.0%, rounded to 66%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -165,3 +165,12 @@ Sum of current percentages / 10 = **65.0%, rounded to 65%**. **Actual readiness 
 4. Added 17 new offline regression tests including synthetic full broker→option quote→Telegram suppression of `NaN` option prices. **203/203 local tests passed**. No real Kite, Telegram or hosting actions were used.
 5. P1 increases **80% → 90%**, P3 **80% → 85%**; the ten-phase mean is now **65% implemented, 35% remaining**. P5 hosting and P9 multi-day observed operations remain unchanged.
 6. See [market-data integrity gate](MARKET_DATA_INTEGRITY.md) for explicit scope and remaining live validation.
+
+
+## October 19 Phase 17 — causal replay & restart consistency (66%)
+
+1. Added offline historical 5-minute futures replay using only completed 15-minute confirmation data available at each simulated decision time; it never sends late historical Telegram BUY reviews.
+2. Bound each decision to a SHA-256 chain covering five-minute warmup, completed decision candles and available 15-minute context. A revision before a restart checkpoint causes a mismatch rather than silently overwriting earlier evidence.
+3. Added strict input-schema checks, clock normalization, intra-session gap and duplicate rejection, and a local-only CLI. No credentials, network calls or broker orders.
+4. **224/224 tests passed on the complete local build.** GitHub includes the core modules and essential regression tests; this is synthetic research, not a verified option trading edge.
+5. P8 scaffolding **20% to 30%**; ten-phase engineering mean **66%**, **34% remaining**. P5 (always-on host) and P9 (five observed market sessions) remain unverified.
