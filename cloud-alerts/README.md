@@ -139,3 +139,10 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 - Independent 15-minute confirmation input now rejects corrupt OHLC, duplicate or unordered rows and recent session gaps before an alert can be considered.
 - **203/203** offline tests pass, including broker-to-quote suppression of a corrupted option price. No new live market session, cloud instance, real Telegram message or order. See [integrity test design](docs/MARKET_DATA_INTEGRITY.md).
 - **Overall engineering progress: 65%, remaining: 35%**. Hosting and five-session paper operation are still unverified.
+
+
+## Phase 17 — causal replay checkpoints (66%)
+
+A new [offline historical replay](docs/HISTORICAL_REPLAY.md) reproduces completed-candle futures signal decisions using only information available at each simulated decision time. SHA-256 replay checkpoints detect changed warmup or past 15-minute context before restart continuation. No Telegram messaging, option P&L, Kite credentials or orders are used by this offline tool.
+
+**Local complete suite: 224/224 tests passed.** Estimated engineering progress **66% (34% remaining)**; live cloud hosting, phone receipts and five market sessions remain outstanding.
