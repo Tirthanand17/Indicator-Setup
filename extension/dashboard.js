@@ -22,4 +22,67 @@ $('autoEnabled').addEventListener('change',async e=>{const r=await request({type
 $('armed').addEventListener('change',async e=>{const r=await request({type:'SET_ARMED',armed:e.target.checked});if(r.error)alert(r.error);refresh();});
 $('test').addEventListener('click',async()=>{const r=await request({type:'TEST_NOTICE'});if(r.error)alert('Notification test failed: '+r.error);});
 $('reset').addEventListener('click',async()=>{const r=await request({type:'RESET_MONITOR'});if(r.error)alert(r.error);refresh();});
+
+let activePairCode=null;
+async function renderPhone(){
+ const state=await request({type:'PHONE_STATUS'});
+ if(state.error){$('phoneStatus').textContent='Telegram status error: '+state.error;return;}
+ $('phoneStatus').textContent=state.linked?'Paired to @'+(state.botUsername||'bot')+' (private chat ending '+state.chatTail+'). Telegram alerts '+(state.enabled?'ENABLED':'PAUSED')+'.':'Not paired — phone notifications are OFF.';
+ $('phoneEnabled').disabled=!state.linked;
+ $('phoneEnabled').checked=!!state.enabled;
+ $('phoneTest').disabled=!state.linked;
+ $('phoneForget').disabled=!state.linked;
+ let delivery=state.lastDelivery;
+ $('phoneLastDelivery').textContent=!delivery?'No Telegram delivery attempted.':('Last phone delivery ('+delivery.status+'): '+(delivery.ok?'CONFIRMED by Telegram API':'FAILED: '+(delivery.error||'unknown'))+' at '+time(delivery.at)+'.');
+}
+function phoneFeedback(s){$('phoneSetupResult').textContent=s;}
+$('phoneBegin').addEventListener('click',async()=>{
+ const r=await request({type:'PHONE_BEGIN_PAIR'});
+ if(r.error){phoneFeedback(r.error);return;}
+ activePairCode=r.code;
+ $('phoneCode').textContent=r.code;
+ phoneFeedback('Generated. Message your own Telegram bot with /start '+r.code+'. Pair within 10 minutes.');
+});
+$('phoneCopy').addEventListener('click',async()=>{
+ if(!activePairCode){phoneFeedback('Generate a code first.');return;}
+ try{await navigator.clipboard.writeText('/start '+activePairCode);phoneFeedback('Copied your unique /start code. Paste it into your Telegram bot chat on the phone.');}
+ catch{phoneFeedback('Clipboard unavailable; copy the shown code manually.');}
+});
+$('phonePair').addEventListener('click',async()=>{
+ if(!activePairCode){phoneFeedback('Generate a pairing code and send /start CODE to the new Telegram bot first.');return;}
+ const token=$('phoneToken').value.trim();
+ if(!token){phoneFeedback('Paste your BotFather token in the local dashboard input.');return;}
+ $('phonePair').disabled=true;
+ phoneFeedback('Checking optional Telegram permission, then pairing only to the matching private chat…');
+ try{
+   const granted=await chrome.permissions.request({origins:['https://api.telegram.org/*']});
+   if(!granted){phoneFeedback('Permission denied. Phone notifications remain OFF.');return;}
+   const r=await request({type:'PHONE_PAIR',token,code:activePairCode});
+   if(r.error){phoneFeedback(r.error);return;}
+   $('phoneToken').value='';activePairCode=null;$('phoneCode').textContent='Paired';
+   phoneFeedback('Connected to @'+r.botUsername+'. Check your Telegram app for the confirmation message.');
+   await renderPhone();
+ }catch{phoneFeedback('Browser permission request failed. Phone notifications remain OFF.');}
+ finally{$('phonePair').disabled=false;}
+});
+$('phoneEnabled').addEventListener('change',async e=>{
+ const r=await request({type:'PHONE_TOGGLE',enabled:e.target.checked});
+ if(r.error)phoneFeedback(r.error);
+ await renderPhone();
+});
+$('phoneTest').addEventListener('click',async()=>{
+ $('phoneTest').disabled=true;
+ phoneFeedback('Sending a TEST message to the paired Telegram chat…');
+ const r=await request({type:'PHONE_TEST'});
+ phoneFeedback(r.error?'Telegram TEST failed: '+r.error:'TEST sent. Check your phone and allow notifications for this Telegram chat.');
+ await renderPhone();
+});
+$('phoneForget').addEventListener('click',async()=>{
+ if(!confirm('Disconnect Telegram and permanently erase the locally stored bot token from this Chrome extension?'))return;
+ const r=await request({type:'PHONE_FORGET'});
+ if(r.error)phoneFeedback(r.error);else {phoneFeedback('Phone alerts disconnected.');$('phoneToken').value='';activePairCode=null;$('phoneCode').textContent='Not generated';}
+ await renderPhone();
+});
+
 refresh();setInterval(refresh,3000);
+renderPhone();setInterval(renderPhone,6000);
