@@ -8,7 +8,7 @@ A practical, step-by-step **educational / paper-trading** guide for using **five
 
 This new, separate `cloud-alerts/` project uses the **paid Kite Connect API** to calculate five indicators from actual *completed* 5-minute NIFTY futures candles, confirm the independent 15-minute chart and examine live listed CE/PE option bid/ask quotes. Its signed one-way daily token relay is designed to **READ** an access token from an existing protected trading project's `.env` without editing that folder. A properly configured *always-on* cloud host can continue to notify Telegram after the laptop is switched off **once the daily token has been delivered**.
 
-**Current status:** 33 synthetic/in-process tests passed for core modules; architecture and prototype are in GitHub; **no cloud deployed, no real Kite feed tested, no market-generated Telegram entry signal verified and no new hosting charge approved.** This is read-only paper-review software; it cannot place orders.
+**Current status:** **44% estimated engineering implementation** (`███████████░░░░░░░░░░░░░░`) / **56% remaining**; **51 local tests passed**. A real read-only paid Kite REST test on Nirala confirmed NFO instruments, futures quote/depth and historical 5m/15m candles. **Cloud deployment, live cloud Telegram signals and strategy win rate are NOT verified.** No host deployed, no new charge approved, and no order-placement code included. [Detailed progress board](cloud-alerts/docs/PROGRESS.md) · [Live API evidence](cloud-alerts/docs/LIVE_API_SMOKE_2026-10-19.md).
 
 ## Existing Chrome chart extension (v0.3 — separate legacy approach)
 
