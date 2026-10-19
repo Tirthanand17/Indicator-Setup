@@ -4,6 +4,8 @@
 
 ## 1 — Choose the cloud host first
 
+See [HOSTING_EVALUATION.md](HOSTING_EVALUATION.md) for verified current provider policy, OCI/Google Always Free candidates, specific account eligibility dependencies and zero-additional-charge rules. No cloud host has been approved and provisioned.
+
 For reliable phone alerts **while Nirala is switched off**, use an **always-on cloud instance** with HTTPS and private persistent storage, either a suitable VM you already have/verified credits or a paid long-running worker behind a tiny HTTPS endpoint. A service that idles/sleeps can miss candle boundaries, and a free ephemeral disk can lose the encrypted daily token on restart.
 
 **Do not use GitHub Actions scheduled every five minutes for an intraday WebSocket trading monitor:** schedulers can delay and quotas can exhaust; logs are not secret storage. **Do not assume Render's free web service is always-on**: it can spin down after 15 minutes without *inbound* traffic, restart, and lose local files. For this plan, do not enable billable services or attach payment methods without user approval and verified budget limits.
@@ -19,6 +21,7 @@ For reliable phone alerts **while Nirala is switched off**, use an **always-on c
 | `TOKEN_VAULT_KEY` | Fernet encryption key for token ciphertext on persistent disk | Cloud secret store only |
 | `STATE_DIR` | `/data/nifty-alerts` mounted persistent private volume | Hosting config |
 | `ALERTS_ENABLED` | `false` until all gates pass, then `true` | Hosting config |
+| `KITE_SHADOW_ENABLED` | `false` by default; optional diagnostic WebSocket, never entry authority | Hosting config |
 
 Use local Python to generate two **separate** keys, and enter them directly in protected provider settings, **never a public GitHub file**:
 
@@ -82,9 +85,9 @@ First send a **TEST** message using a separate approved secure integration proce
 
 **After market**: retain audit status and inspect failures. **No auto trades**.
 
-## 7 — Upgrade path to faster feeds
+## 7 — Shadow monitoring and faster-feed research
 
-REST 5m history is dependable for candle-close research but may be slower than a live-tick stream. Next phase: KiteTicker/WebSocket quote packets with exchange timestamps and depth, volume-delta 1m → 5m aggregation, REST reconciliation on close, and tick-based option exit tracking. This is **NOT YET IMPLEMENTED** in this branch. It will need live latency/reconnect tests, especially around startup, exchange interruptions and partial bars.
+REST 5m history is dependable for candle-close research but may be slower than a live-tick stream. A synthetic-tested shadow KiteTicker monitor is **now integrated** behind `KITE_SHADOW_ENABLED=false`, with strict timestamp/volume checks, automatic socket lifecycle and REST candle reconciliation. It does **not** produce trading alerts. An actual paid Kite websocket connection, restart test, live reconciliation coverage, quote-based premium exits and latency metrics are **NOT YET VERIFIED**. Do not enable shadow capture until a reviewed host and secrets configuration are ready.
 
 ## 8 — Rollback and incidents
 

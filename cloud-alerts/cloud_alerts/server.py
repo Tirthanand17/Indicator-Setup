@@ -15,6 +15,7 @@ from .engine import Engine
 from .state import State
 from .security import TokenVault,verify_relay
 from .telegram import Telegram
+from .stream_supervisor import ShadowSupervisor
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -26,6 +27,7 @@ class AppSettings:
         self.vault_key=os.environ.get('TOKEN_VAULT_KEY','')
         self.root=Path(os.environ.get('STATE_DIR','/data/nifty-alerts'))
         self.enabled=os.environ.get('ALERTS_ENABLED','false').strip().lower()=='true'
+        self.shadow_enabled=os.environ.get('KITE_SHADOW_ENABLED','false').strip().lower()=='true'
     def validate(self):
         if not self.api_key or not self.bot_token or not self.chat_id:
             raise RuntimeError('Missing runtime API key or Telegram config')
@@ -39,7 +41,10 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     state=State(str(cfg.root/'alerts.sqlite3'))
     vault=TokenVault(cfg.root/'token.enc',cfg.vault_key)
     vault.load(datetime.now(IST))
-    engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),enabled=cfg.enabled)
+    # Shadow subscriptions are opt-in diagnostics only. Kite REST is authoritative.
+    shadow=ShadowSupervisor(cfg.api_key) if getattr(cfg,'shadow_enabled',False) else None
+    engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
+                  enabled=cfg.enabled,shadow=shadow)
 
     @asynccontextmanager
     async def lifespan(app:FastAPI):
@@ -49,6 +54,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             task.cancel()
             try:await task
             except asyncio.CancelledError:pass
+            if shadow is not None:
+                await shadow.shutdown()
 
     app=FastAPI(title='NIFTY read-only paper alerts',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
     app.state.engine=engine

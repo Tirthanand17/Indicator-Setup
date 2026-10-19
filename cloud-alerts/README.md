@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 44%** — `[███████████░░░░░░░░░░░░░░]` (**56% remaining**).
+**Overall engineering implementation estimate: 48%** — `[██████████░░░░░░░░░░░░]` (**52% remaining**).
 
-The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The newer [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) adds a diagnostic tick aggregator that cannot issue trading alerts until separately tested against Kite REST candles.
+The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 51 local synthetic Python tests passed; a separate **read-only** live paid Kite GET smoke test succeeded on Nirala (no orders), but no live cloud Kite/Telegram session was established. See [live API evidence](docs/LIVE_API_SMOKE_2026-10-19.md).
+**Tests:** 61 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## Start here
 
@@ -18,6 +18,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Daily login, token relay and cloud deployment runbook](docs/DEPLOYMENT.md)
 - [Security and read-only-folder agreement](docs/SECURITY.md)
 - [Testing and acceptance requirements](docs/TEST_PLAN.md)
+- [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
+- [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
 
 ## What is implemented in this prototype
@@ -33,8 +35,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 ## What is NOT done yet
 
 - No public cloud host deployed, no hosting bill authorized, no Kite credentials moved, and no Telegram cloud secrets configured. Nothing is listening on an Internet endpoint yet.
-- A **shadow-only** KiteTicker/WebSocket module exists with synthetic tests, but it is **not integrated into the cloud runtime** or reconciled against live historical candles. REST candle polling remains the only proposed decision source. Real-time option premium monitoring, reconnect/backfill quality evidence, and latency benchmarking remain.
-- Authenticated paid Kite **read-only REST** market data was successfully checked on Nirala. The cloud worker itself, live option bid/ask path, historical strategy validation and an actual market-generated phone candidate alert remain unverified.
+- The optional read-only WebSocket **shadow** connection is integrated, but not live-validated. **REST candle polling** remains the ONLY source that can trigger paper alerts. Per-second option premium monitoring, live reconnect/backfill validation, and delivery-latency benchmarking remain pending.
+- No live Kite subscription authentication test, no real option bid/ask end-to-end test, no historical strategy validation, and no actual market-generated phone candidate alert proof.
 - No promise that any indicator combination has high win probability. This is still **PAPER / SIGNAL REVIEW ONLY**.
 
 ## Quick local checks — no broker data or tokens needed

@@ -1,6 +1,6 @@
 # P6 – KiteTicker WebSocket shadow-data design
 
-**Version:** 2026-10-19 — **implementation status: synthetic-tested, shadow-only and NOT connected to the cloud signal engine.** No real Kite WebSocket connection was opened during these tests. No hosting deployment or charge was made.
+**Version:** 2026-10-19 — **implementation status: integrated with the cloud runtime but disabled by default (`KITE_SHADOW_ENABLED=false`) and synthetic-tested only**. No real Kite WebSocket connection was opened during these tests. No hosting deployment or charge was made.
 
 ## Why add a stream?
 
@@ -13,7 +13,7 @@ The Chrome chart extension depended on near-close screen sampling and could rese
 3. **Tick admission:** require matching instrument token, usable `exchange_timestamp`, sane positive `last_price`, nonnegative **cumulative** `volume_traded`, correct IST session, source age <=10 seconds, monotonic timestamps and non-decreasing cumulative volume. Out-of-order, gaps >45 seconds, reconnects and volume resets invalidate the partial bar.
 4. **Shadow 5-minute aggregation:** accumulate price samples into 5-minute OHLC and derive bar volume by subtracting consecutive cumulative tick volumes. Discard initial partial bucket on startup or reconnect; require a tick within 5 seconds before the interval boundary; do not synthesize missing ticks or patch holes with repeats.
 5. **REST reconciliation:** `reconcile_stream_bar` compares shadow OHLCV to the authoritative historical `5minute` REST candle with timestamp, price and volume tolerances. Log mismatch reasons **without access keys, account details or raw tokens**. The shadow result itself has status `SHADOW_UNRECONCILED` and is NEVER fed to the live-alert decision engine in this phase.
-6. **Only independently confirmed broker REST candles** currently feed the five-indicator strategy, with a separate 15-minute REST confirmation and a fresh real option bid/ask check. Stage the real-time stream behind a **disabled-by-default shadow flag** and collect quality evidence before promotion.
+6. **Only independently confirmed broker REST candles** currently feed the five-indicator strategy, with a separate 15-minute REST confirmation and a fresh real option bid/ask check. The real-time stream is now staged behind the **disabled-by-default `KITE_SHADOW_ENABLED` flag**. It is never promoted to the alert path.
 
 ## State machine
 
@@ -27,10 +27,11 @@ flowchart TD
     E -->|Yes| F[SHADOW_UNRECONCILED]
     F --> G[Match REST confirmed OHLCV]
     G -->|Matched| H[Record matched diagnostic only]
-    G -->|Mismatch| I[WAIT_DATA mismatch + rewarm]
+    G -->|Mismatch| I[Record shadow mismatch only]
     H --> D
-    I --> C
-    D -->|Gap or stale tick| I
+    I --> D
+    J --> C
+    D -->|Gap or stale tick| J[Discard shadow history and rewarm]
     D -->|Socket closed| A
 ```
 
@@ -47,18 +48,29 @@ flowchart TD
 
 ## Synthetic test coverage
 
+`tests/test_stream_supervisor.py` and `tests/test_shadow_worker.py`: async lifecycle, generation fencing, private diagnostic health, matching and missing REST candles, window bounding, rollover, after-hours cleanup and continuation on socket errors.
+
 `tests/test_streaming.py`: initial partial bar dropped, continuous synthetic tick aggregation, out-of-order packets, stale or future tick rejection, gap recovery, cumulative volume reset, duplicate packets, session hours, disconnected state, explicit REST reconciliation mismatch, and mock full-mode subscription.
 
 `tests/test_scheduler.py`: no pre-boundary REST call, bounded three attempts for each 5-minute boundary, late wake does not burst requests, IST and trading-session guards.
 
 `tests/test_stale_delivery.py`: a queued historical BUY alert older than 180 seconds is expired, not delivered late; a fresh alert is delivered only once in the normal success path.
 
+**61/61 tests pass as of this integration.**
+
 **Test limitations:** synthetic simulated data is not evidence that Kite's live WebSocket reproduces exchange OHLCV. A single `.tick` structure is not proof of normal market conditions. The actual Kite paid account, rate-limits, heartbeat, reconnections and phone delivery latency still require separately authorized integration tests.
 
-## Next integration stage (not yet done)
+## Runtime shadow integration (implemented offline)
 
-- Add a **shadow-runner** lifecycle to the cloud service that starts a WebSocket only when a valid daily token and current NFO futures instrument are available, and runs alongside the existing REST worker without influencing notifications.
-- On every completed REST candle, compare timestamp, OHLC and volume to the shadow bar; store reconciliation counts and sample dates in durable state.
+- `cloud_alerts.stream_supervisor.ShadowSupervisor` is instantiated only if `KITE_SHADOW_ENABLED=true` and market alerts are otherwise enabled. It starts a KiteTicker subscription **after** the valid daily token and current futures instrument token have been resolved.
+- The Kite SDK's threaded callback is marshalled into the async event loop; generation numbers invalidate callbacks from old sockets after rollover or token renewal.
+- On each new **completed** REST candle, the worker compares the matching shadow candle and updates bounded in-memory counters in `/healthz`. These counters and last mismatch reasons are diagnostic only, and no mismatch or absent shadow candle is permitted to generate an entry or exit alert.
+- After 15:31 IST, the worker closes the shadow socket for the day. On next-session activation it rewarms and discards the initial partial candle.
+- **Durable quality metrics are still pending:** after a process restart, in-memory quality counters begin again.
+
+## Remaining validation work
+
+- Persist or export per-session reconciliation evidence after reviewing privacy and storage requirements.
 - Test 5+ market sessions, chart holidays, expiry rollover, network interruptions, late starts and token expiration; report percentage matched / discrepancies and p50/p95/p99 tick-to-phone delays.
 - Only after formal data-quality evidence consider a faster tick-driven **candidate notification**, still gated by separate actual-option quote, risk and non-execution rules.
 

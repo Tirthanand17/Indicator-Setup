@@ -16,12 +16,15 @@ from .state import State
 from .signals import decide
 from .telegram import Telegram,format_review
 from .scheduler import CandlePollScheduler
+from .stream_supervisor import ShadowSupervisor
 IST=ZoneInfo('Asia/Kolkata')
 logger=logging.getLogger('cloud_alerts')
 
 class Engine:
-    def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False):
+    def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False,
+                 shadow:ShadowSupervisor|None=None):
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
+        self.shadow=shadow
         self.status='NOT_STARTED' if enabled else 'DISABLED'
         self.status_at=datetime.now(IST)
         self.instrument_rows=None
@@ -41,7 +44,8 @@ class Engine:
           'last_market_data_at':self.last_data_at.isoformat() if self.last_data_at else None,
           'last_phone_accept_at':self.last_alert_at.isoformat() if self.last_alert_at else None,
           'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
-          'mode':'READ_ONLY_PAPER','order_execution':False}
+          'mode':'READ_ONLY_PAPER','order_execution':False,
+          'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'}}
 
     async def _deliver_outbox(self, now:datetime|None=None)->None:
         # Entries older than 180 seconds are informationally stale for intraday
@@ -86,6 +90,14 @@ class Engine:
             self.instrument_rows=await asyncio.to_thread(kite.instruments_nfo)
             self.instrument_date=now.date()
         fut=select_future(self.instrument_rows,now.date())
+        # Optional diagnostic socket: never authorizes trade candidates and
+        # never blocks the existing REST-only candle decision path.
+        shadow_ready=False
+        if self.shadow is not None:
+            try:
+                shadow_ready=bool(await self.shadow.ensure(token,fut.token))
+            except Exception:
+                logger.warning('Optional shadow stream unavailable; continuing REST-only')
         candle_from=now-timedelta(days=12)
         series5,series15=await asyncio.gather(
             asyncio.to_thread(kite.historical,fut.token,'5minute',candle_from,now),
@@ -105,6 +117,13 @@ class Engine:
             # Don't suppress delayed Telegram retry.
             await self._deliver_outbox(now)
             return
+        if shadow_ready:
+            try:
+                self.shadow.reconcile(completed5[-1])
+            except (ValueError,TypeError):
+                # Corrupt shadow evidence is never an excuse to skip an otherwise
+                # validated broker REST candle. It is reported in stream health.
+                logger.warning('Shadow reconciliation rejected malformed evidence')
         decision=decide(completed5,now,completed15)
         self.last_data_at=now
         if decision.status=='WAIT_DATA':
@@ -172,6 +191,11 @@ class Engine:
             # and expire those no longer timely. Limit retry to once a minute.
             if minute!=last_outbox_minute:
                 last_outbox_minute=minute
+                if self.shadow is not None:
+                    try:
+                        await self.shadow.stop_after_session(now)
+                    except Exception:
+                        logger.warning('Shadow socket after-hours cleanup failed')
                 if self.enabled:
                     await self._deliver_outbox()
                 else:
