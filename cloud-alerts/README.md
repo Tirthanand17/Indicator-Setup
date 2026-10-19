@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 41%** — `[████████░░░░░░░░░░░░]` (**59% remaining**).
+**Overall engineering implementation estimate: 44%** — `[███████████░░░░░░░░░░░░░░]` (**56% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The newer [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) adds a diagnostic tick aggregator that cannot issue trading alerts until separately tested against Kite REST candles.
 
-**Tests:** 47 local synthetic Python tests passed; no authenticated Kite REST/WebSocket session or real phone notification was used in this development pass.
+**Tests:** 51 local synthetic Python tests passed; a separate **read-only** live paid Kite GET smoke test succeeded on Nirala (no orders), but no live cloud Kite/Telegram session was established. See [live API evidence](docs/LIVE_API_SMOKE_2026-10-19.md).
 
 ## Start here
 
