@@ -2,6 +2,16 @@
 
 A practical, step-by-step **educational / paper-trading** guide for using **five TradingView studies** on Zerodha Kite, and for evaluating hypothetical CE (call) / PE (put) option-buying setups.
 
+## Chrome notifications prototype (v0.1.0)
+
+**Built and installed on Nirala:** [NIFTY Five-Indicator Paper Alerts extension](extension/README.md) — [source code](extension/), [decision-engine tests](extension/tests/engine.test.cjs).
+
+This ₹0 Chrome MV3 extension detects when the NIFTY Kite chart tab is open, and provides **REVIEW_CE**, **REVIEW_PE**, **NO_TRADE**, **WAIT_DATA**, and manually checked paper stop/target exit alerts. The Chrome alert notification channel and chart detection were checked on Nirala; rule engine has **15 passing tests**.
+
+**Strict limitation:** It cannot yet read reliable indicator values directly from Kite. To evaluate a candidate, open its dashboard and enter **verified values from a completed 5-minute futures candle** (VWAP, EMAs, DMI ADX and DI, ATR, volume, etc.) plus option/15m checks. Keeping the chart open alone does **NOT** produce automatic BUY/SELL signals. No broker execution, account data, credentials, or paid API used. Do not infer strategy win rate from these tests.
+
+To open on Nirala: Chrome toolbar **N** icon → **Open Signal Dashboard**. Extension source on the laptop is at `C:\Users\Dell\Documents\Indicator-Setup\extension`. In Chrome, installing additional releases requires reloading the unpacked extension via `chrome://extensions`.
+
 **Read the full guide:** [Kite five-indicator setup and CE/PE trading playbook](docs/KITE_NIFTY_FIVE_INDICATOR_PLAYBOOK.md)
 
 **Quick practical guide:** [Exactly when to consider CE / PE, when to sell to exit, NO_TRADE rules, ATR stop examples and the timestamped 10:33 AM chart analysis](docs/BUY_SELL_DECISION_GUIDE.md).
