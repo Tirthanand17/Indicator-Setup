@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 65%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 66%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -149,3 +149,12 @@
 - [x] Synthetic broker pipeline rejects a `NaN` option quote without posting Telegram or creating a virtual entry.
 - [x] **203/203** offline tests pass; `compileall` passes.
 - [ ] Compare 15-minute EMA and full option depth against captured live Kite/reference data on an authorized host; validate actual market sessions.
+
+
+## Phase 17 — historical replay checkpoint foundation
+
+- [x] Reconstruct causal futures review signals from completed five-minute candles and independent completed fifteen-minute history.
+- [x] Catch intraday data gaps, duplicate candles, altered warmup bars, changed historical context and malformed replay JSON.
+- [x] Offline-only CLI and synthetic checks; full local suite 224/224.
+- [ ] Independently acquire time-stamped option BID/ASK pairs for defensible after-cost evaluation.
+- [ ] Complete cloud host activation and five real market-session paper trials.
