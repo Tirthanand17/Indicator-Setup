@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 58%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 60%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████░░░░░░░░░] 58%
-Remaining estimated scope      [░░░░░░░░░░░░░░█████████] 42%
+Overall engineering progress   [███████████████░░░░░░░░░] 60%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 40%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -15,7 +15,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 |---|---|---:|---|
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
-| P2 | Daily token relay, HMAC and encrypted vault | 70% | Synthetic tests; no deployed TLS host or live handoff |
+| P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 75% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
@@ -24,7 +24,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **57.5%, rounded to 58%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **59.5%, rounded to 60%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -108,3 +108,13 @@ Sum of percentages / 10 = **57.5%, rounded to 58%**. **Actual readiness for time
 3. Reuses the existing conservative quote-pair cost scorer: **entry ASK, exit BID, depth, slippage and charges**, with simulated source explicitly marked **NOT verified trading performance**.
 4. Added seven tests for embargo and walk-forward ordering, data shuffling, invalid costs/quotes, insufficient evidence, duplicates and synthetic-truth flags. **136/136 tests passed**.
 5. P8 offline research plumbing moves **10% → 20%**; the actual quote-pair dataset, real walk-forward profitability and five-session phone trials are absent. Overall estimate **58% complete, 42% remaining**. See [walk-forward paper validation](WALK_FORWARD_PAPER_VALIDATION.md).
+
+
+## October 19 continuation — secure daily-token transfer and truthful CLI exit (60%)
+
+1. Fixed a **false-success exit bug**: one-shot `--push` now exits nonzero if cloud receipt cannot be verified, including network timeout and wrong endpoint, instead of quietly succeeding.
+2. Sender extracts only Kite API key and daily access token from an existing bounded read-only `.env`; it never loads Kite API secret or unrelated env variables.
+3. Strict URL preflight refuses non-HTTPS/URL-credential/redirect-prone handoff targets and invalid endpoint forms.
+4. Added seven end-to-end synthetic tests through real signed sender payload, actual FastAPI handoff route, encrypted token vault, nonce replay and tamper rejection; confirms protected mock `.env` stays unmodified.
+5. Offline suite **143/143 passed**. No actual credentials, external host, broker calls or Telegram messages were used. **Daily broker validity and cloud delivery still require live tests**.
+6. P2 offline readiness moves **70% → 90%**, raising the ten-phase mean from 57.5% to **59.5%, rounded to 60%**. P5 and P9 remain 0%. See [daily handoff validation](DAILY_TOKEN_HANDOFF_VALIDATION.md).

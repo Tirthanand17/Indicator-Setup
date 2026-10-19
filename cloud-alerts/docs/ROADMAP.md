@@ -81,3 +81,13 @@
 - [x] **136/136 offline tests** passed.
 - [ ] Acquire independent timestamped option bid/ask pairs, source authenticity and session outcomes.
 - [ ] Choose free-credit/approved always-on host and complete real paper-mode Telegram receipt trials.
+
+## 2026-10-19 — P2 signed daily token relay hardening (60%)
+
+- [x] Restrict protected `.env` parsing to API key and daily access token; do not extract API secret.
+- [x] Reject bad or non-HTTPS endpoint configuration before network transmission.
+- [x] Ensure one-shot push returns a nonzero exit code on failed cloud delivery.
+- [x] Verify offline sender → FastAPI route → encrypted vault, including replay/tamper checks.
+- [x] Regression suite **143/143 passed**.
+- [ ] Validate real broker token on approved live host, real daily session rollover, shutdown and recovery.
+- [ ] Deploy only on an explicitly approved always-on host with private secret store and controlled spend.

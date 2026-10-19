@@ -119,3 +119,10 @@ See [PREMIUM_EXIT_MONITOR.md](PREMIUM_EXIT_MONITOR.md). It defaults to OFF and i
 ## Additional P4 operational monitoring (2026-10-19)
 
 Use **`/operationalz`** as a nonsecret operator diagnostic only, never as the Docker restart/liveness probe. It returns HTTP 200 only after the evaluator is enabled, daily token is present, one worker is running, a valid REST `NO_TRADE`/`REVIEW` decision is newer than 420 seconds during the supported session, and no phone messages are queued. It reports `phone_receipt_verified=false` even on success. During weekends, before 09:30, after 15:25 or before the first successful REST decision, HTTP 503 is normal. See [operational readiness reference](OPERATIONAL_READINESS.md).
+
+
+## Daily handoff failure handling (2026-10-19)
+
+The token sender now has reliable process exit status. For `--check-only`, missing keys exit nonzero and no network is accessed. For `--push`, cloud rejection/timeout or config mismatch exits **2**, so PowerShell or Task Scheduler must test `$LASTEXITCODE` and **must not** announce a successful handoff or turn off the laptop on failure. The `--watch` mode retries the *same* token after a transient unsuccessful push. It parses only two Kite fields and never reads the API secret.
+
+See [daily handoff end-to-end validation](DAILY_TOKEN_HANDOFF_VALIDATION.md). Offline tests do not establish that real daily token will work at broker or that server is always on.

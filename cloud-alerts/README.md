@@ -6,13 +6,15 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 54%** — `[██████████░░░░░░░░░░░░]` (**46% remaining**).
+**Overall engineering implementation estimate: 60%** — `[████████████░░░░░░░░]` (**40% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 96 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 143 local synthetic Python tests passed (including signed token-handoff and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## Start here
+
+- [Read-only daily Kite token handoff and offline end-to-end test](docs/DAILY_TOKEN_HANDOFF_VALIDATION.md)
 
 - [Full architecture and dataflow](docs/ARCHITECTURE.md)
 - [Daily login, token relay and cloud deployment runbook](docs/DEPLOYMENT.md)
@@ -94,6 +96,7 @@ python -m compileall -q cloud_alerts
 
 A separate **`GET /operationalz`** checks that completed REST market decisions are recent and Telegram has no pending messages. Unlike `/healthz` (process liveness) and `/readyz` (token presence), it intentionally reports HTTP 503 on stale data and market closure. Its result **never proves that the operator received a Telegram push**, and all alert execution remains disabled until separately configured. See [operational gate and safety notes](docs/OPERATIONAL_READINESS.md). Offline tests: **129 passing**. Overall estimated code readiness **57%**, not live service readiness.
 
-### Chronological research validation (P8, offline only)
 
-`walk_forward_windows()` separates paper evidence by distinct session days into training, embargo and forward test periods. It applies the existing after-cost option quote-pair validator and explicitly refuses to claim a verified real trading win rate from synthetic or unaudited data. See [walk-forward research protocol](docs/WALK_FORWARD_PAPER_VALIDATION.md). **136/136 offline tests** pass. Approximate overall implementation **58%**, with no live cloud server or phone signal receipts yet.
+## October 19 — 60% engineering milestone
+
+Daily token handoff now refuses to report success when a transfer fails, loads only the two necessary Kite values, and passes an in-process signed HTTPS-contract simulation through the genuine cloud handler and encrypted vault. **143/143 offline Python tests pass.** This is not a production cloud test, proof of valid broker authentication, a live Telegram phone receipt, or verified profitability.
