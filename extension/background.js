@@ -1,6 +1,6 @@
 /* Read-only, browser-local, event-driven paper alerts. NO broker API / execution / external network. */
 'use strict';
-importScripts('engine.js','auto-engine.js','auto-runner.js');
+importScripts('engine.js','auto-engine.js','auto-runner.js','telegram.js');
 const ICON='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA6ElEQVR42mMUVLb4zzCAgIlhgMGAO4CFkAJ2y2CKLfl5fC1OOUZcaYAaFhPjECZ6WY7LXCZ6WY7L/MGVC2jhe4seQ7yhQNMQgFmOzRF0jwJcjmCil4UnSs7TzwH4gpzmDsBmOS7f0yUN4LOc6g4gNt4pcgCurEVKvJPtAHTL8eVzYnxPkgNw+ZASy4lqD5AatKRYTjAEcFl+ouQ8yRaR7ABcQYtsMYyNTpMCUFpE6LUhsiOo5WP01hETMfFJbctJygW0tBzDAfhar7RqnA6+jgmtQwHdfCZSOxLU7hcwEuqcDljPaMR0TgF/Pl42IevvlQAAAABJRU5ErkJggg==';
 let queue=Promise.resolve();
 const isFut=s=>/^NIFTY\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT$/.test(s||'');
@@ -21,6 +21,34 @@ async function notifyOnce(key,title,message){
  await chrome.storage.local.set({sentKeys:[...sentKeys,key].slice(-150)});
  try{await chrome.notifications.create(key.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,120),{type:'basic',iconUrl:ICON,title,message,priority:1});return true;}catch{return false;}
 }
+
+/* Phone messages are sent ONLY after local user-pairing and Chrome's explicit
+   api.telegram.org permission grant. No trading/account information is read. */
+async function phoneStatus(){
+ const {phone=null,phoneDelivery=null}=await chrome.storage.local.get(['phone','phoneDelivery']);
+ const linked=!!phone&&PhoneTelegram.validToken(phone.token)&&PhoneTelegram.validChatId(phone.chatId);
+ return {linked,enabled:linked&&phone.enabled===true,
+   botUsername:linked?String(phone.botUsername||''):null,
+   chatTail:linked?String(phone.chatId).slice(-4):null,
+   pairedAt:linked?phone.pairedAt:null,
+   lastDelivery:phoneDelivery||null};
+}
+async function sendPhoneEvent(event){
+ const {phone=null}=await chrome.storage.local.get('phone');
+ if(!phone||phone.enabled!==true||!PhoneTelegram.validChatId(phone.chatId)||!PhoneTelegram.validToken(phone.token))return {skipped:true};
+ const status=String(event.status||'UNKNOWN');
+ const at=Date.now();
+ try{
+  const text=PhoneTelegram.paperSignalText(event);
+  await PhoneTelegram.callTelegram(phone.token,'sendMessage',{chat_id:phone.chatId,text,disable_notification:false,protect_content:true});
+  await chrome.storage.local.set({phoneDelivery:{at,ok:true,status}});
+  return {ok:true};
+ }catch(e){
+  await chrome.storage.local.set({phoneDelivery:{at,ok:false,status,error:String(e?.message||'Telegram delivery failed').slice(0,160)}});
+  return {ok:false};
+ }
+}
+
 function sanitizeSnapshot(x){const out={};for(const k of ['open','high','low','close','volume','vwap','ema9','ema21','plusDI','minusDI','adx','atr'])out[k]=x[k];out.symbol=x.symbol;out.timeframe=x.timeframe;return out;}
 async function onReading(message,sender){
  const expectedSymbol=validChartSender(sender);if(!expectedSymbol)return {error:'not a verified Kite nested chart frame'};
@@ -49,7 +77,8 @@ async function onReading(message,sender){
    const isExit=event.status.startsWith('EXIT_');
    const label=isExit?'Virtual '+event.virtual.direction+' exit review':'Possible '+(event.status==='REVIEW_CE'?'BUY CE':'BUY PE');
    const msg=isExit?`Futures-only virtual level/reversal observed: ${event.reason}. This is NOT a broker position or a sell order.`:`Visible chart aligned near 5m close. Review ACTUAL option bid/ask and risk. No trades placed.`;
-   await notifyOnce([event.bar.symbol,event.bar.end,event.status].join('_'),label,msg);
+   const newlyNotified=await notifyOnce([event.bar.symbol,event.bar.end,event.status].join('_'),label,msg);
+   if(newlyNotified)await sendPhoneEvent(event);
  }
  return {ok:true,accepted:true,signal:s.lastStatus,barCount:s.barCount||0};
 }
@@ -79,6 +108,57 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   }
   if(message.type==='SET_ARMED'){await chrome.storage.local.set({armed:message.armed===true});return {armed:message.armed===true};}
   if(message.type==='SET_AUTOMATIC'){await chrome.storage.local.set({autoEnabled:message.enabled===true});return {autoEnabled:message.enabled===true};}
+
+  if(message.type==='PHONE_STATUS')return await phoneStatus();
+  if(message.type==='PHONE_BEGIN_PAIR'){
+    const code=PhoneTelegram.pairingCode();
+    const issuedAt=Date.now();
+    await chrome.storage.session.set({phonePair:{code,issuedAt}});
+    return {code,expiresAt:issuedAt+10*60000};
+  }
+  if(message.type==='PHONE_PAIR'){
+    const token=String(message.token||'').trim();
+    if(!PhoneTelegram.validToken(token))return {error:'Enter a valid Telegram bot token in this local page.'};
+    const {phonePair=null}=await chrome.storage.session.get('phonePair');
+    if(!phonePair||Date.now()-phonePair.issuedAt>10*60000||message.code!==phonePair.code)return {error:'Pairing code has expired. Generate a fresh code and send it to your bot.'};
+    if(!await chrome.permissions.contains({origins:[PhoneTelegram.PERMISSION]}))return {error:'Telegram network permission is not granted.'};
+    try{
+      const bot=await PhoneTelegram.callTelegram(token,'getMe',{});
+      if(!bot||!bot.is_bot||!bot.username)return {error:'Token did not identify a Telegram bot.'};
+      const updates=await PhoneTelegram.callTelegram(token,'getUpdates',{limit:100,timeout:0,allowed_updates:['message']});
+      const chatId=PhoneTelegram.findPairingChat(updates,phonePair.code,Math.floor(phonePair.issuedAt/1000)-3);
+      if(!chatId)return {error:'Pairing message not found. Send /start '+phonePair.code+' to YOUR new bot on Telegram, then retry here.'};
+      // A successful welcome message proves the bot can reach this private chat.
+      await PhoneTelegram.callTelegram(token,'sendMessage',{chat_id:chatId,text:'NIFTY paper-alert phone connection confirmed. No live orders. Any future CE/PE message means REVIEW the option quote and risk, not automatic execution.',protect_content:true});
+      await chrome.storage.local.set({phone:{token,chatId,enabled:true,botUsername:bot.username,pairedAt:Date.now()},phoneDelivery:{at:Date.now(),ok:true,status:'PAIR_TEST'}});
+      await chrome.storage.session.remove('phonePair');
+      return {ok:true,botUsername:bot.username,chatTail:chatId.slice(-4)};
+    }catch(e){return {error:String(e?.message||'Telegram pairing failed').slice(0,170)};}
+  }
+  if(message.type==='PHONE_TOGGLE'){
+    const {phone=null}=await chrome.storage.local.get('phone');
+    if(!phone||!PhoneTelegram.validToken(phone.token))return {error:'Pair your Telegram bot first.'};
+    phone.enabled=message.enabled===true;
+    await chrome.storage.local.set({phone});
+    return {ok:true,enabled:phone.enabled};
+  }
+  if(message.type==='PHONE_TEST'){
+    const {phone=null}=await chrome.storage.local.get('phone');
+    if(!phone||!PhoneTelegram.validToken(phone.token))return {error:'Pair your Telegram bot first.'};
+    try{
+      await PhoneTelegram.callTelegram(phone.token,'sendMessage',{chat_id:phone.chatId,text:'TEST — NIFTY paper alert phone channel is connected. This is NOT a live trade signal.',protect_content:true});
+      await chrome.storage.local.set({phoneDelivery:{at:Date.now(),ok:true,status:'TEST'}});
+      return {ok:true};
+    }catch(e){
+      await chrome.storage.local.set({phoneDelivery:{at:Date.now(),ok:false,status:'TEST',error:String(e?.message||'Telegram test failed').slice(0,160)}});
+      return {error:String(e?.message||'Telegram test failed').slice(0,170)};
+    }
+  }
+  if(message.type==='PHONE_FORGET'){
+    await chrome.storage.local.remove(['phone','phoneDelivery']);
+    await chrome.storage.session.remove('phonePair');
+    return {ok:true};
+  }
   if(message.type==='RESET_MONITOR'){await chrome.storage.session.set({auto:AutoRunner.blank(),autoSeenAt:0});return {ok:true};}
   if(message.type==='TEST_NOTICE'){await chrome.notifications.create('test_'+Date.now(),{type:'basic',iconUrl:ICON,title:'TEST — NIFTY Paper Alerts',message:'Notification channel works. This is not a live trade signal.'});return {ok:true};}
   return {error:'unknown message'};
