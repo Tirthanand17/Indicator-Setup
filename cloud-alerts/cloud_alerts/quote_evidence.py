@@ -111,18 +111,30 @@ def canonical_snapshot(row: dict) -> tuple[str,str]:
 
 
 def pair_snapshots(rows: Iterable[dict], costs: Costs, *, min_trades: int=30,
-                   min_days: int=5) -> dict:
+                   min_days: int=5, expected_event_ids: Iterable[str] | None=None) -> dict:
     """Score only coherent independently timed ENTRY+EXIT observations.
 
     Partial or invalid pairs remain visible as COUNTS, never silently recast as
     wins. Source tags are unverified, regardless of the hash present in SQLite.
     """
+    # Entry outbox reconciliation is OPTIONAL for historical standalone quote
+    # exports, but REQUIRED to make any statement about sample completeness.
+    # This prevents quoting a perfect win rate while omitting unquoted entries.
+    expected: set[str] | None = None
+    if expected_event_ids is not None:
+        listed = list(expected_event_ids)
+        if any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9:+_.-]{8,220}', x)
+               for x in listed) or len(listed) != len(set(listed)):
+            raise EvidenceError('invalid or repeated source entry notice identifiers')
+        expected = set(listed)
     grouped:dict[str,dict[str,dict]] = defaultdict(dict)
     total=0
     for row in rows:
         clean=validate_snapshot(row)
         total+=1
         event,phase=clean['event_id'],clean['phase']
+        if expected is not None and event not in expected:
+            raise EvidenceError('quote observations without source entry notice')
         if phase in grouped[event]:
             raise EvidenceError('duplicate quote observation stage')
         grouped[event][phase]=clean
@@ -159,12 +171,47 @@ def pair_snapshots(rows: Iterable[dict], costs: Costs, *, min_trades: int=30,
             continue
         scored.append(pair)
     result=summarize(scored,costs,min_trades=min_trades,min_days=min_days)
+    complete_case_rate=result['net_win_rate_pct']
+    missing_entirely = len(expected - grouped.keys()) if expected is not None else None
+    reference_events = len(expected) if expected is not None else len(grouped)
+    coverage = (round(100 * len(scored) / reference_events, 2)
+                if reference_events else None)
+    all_matched = (reference_events > 0 and len(scored) == reference_events
+                   and not incomplete and not rejected and
+                   (missing_entirely is None or missing_entirely == 0))
+    sample_sufficient = (result['paper_trades'] >= min_trades
+                         and result['session_days'] >= min_days)
+    # Even 100% complete records are NOT independently authenticated broker
+    # records. A headline/ranked win rate must remain unavailable.
+    ranking_blockers = []
+    if expected is None:
+        ranking_blockers.append('ENTRY_NOTICE_RECONCILIATION_MISSING')
+    if not all_matched:
+        ranking_blockers.append('MISSING_OR_REJECTED_QUOTE_PAIRS')
+    if not sample_sufficient:
+        ranking_blockers.append('INSUFFICIENT_PAPER_SAMPLE')
+    ranking_blockers.append('BROKER_QUOTE_PROVENANCE_UNVERIFIED')
+    # Don't export a bare "net_win_rate_pct" in the ordinary summary; it
+    # could be mistaken for a complete strategy sample. Conditional rates stay
+    # available under a visibly qualified, explicit field only.
+    result = {**result, 'net_win_rate_pct': None,
+              'win_rate_withheld_reason': 'UNVERIFIED_OR_INCOMPLETE_SOURCE_SAMPLE'}
     return {'mode':'UNVERIFIED_READONLY_QUOTE_EVIDENCE',
             'quote_observations':total,
             'unique_entry_events':len(grouped),
             'incomplete_quote_pairs':incomplete,
             'rejected_quote_pairs':rejected,
             'scorable_quote_pairs':len(scored),
+            'source_entry_events':len(expected) if expected is not None else None,
+            'entry_events_missing_all_quotes':missing_entirely,
+            'entry_notice_reconciliation_performed':expected is not None,
+            'reference_event_count':reference_events,
+            'scorable_event_coverage_pct':coverage,
+            'all_reference_events_scored':all_matched,
+            'complete_case_win_rate_pct':complete_case_rate,
+            'rankable_win_rate_pct':None,
+            'eligible_for_strategy_ranking':False,
+            'ranking_blockers':ranking_blockers,
             'summary':result,
             'broker_provenance_independently_verified':False,
             'telegram_phone_receipt_verified':False,

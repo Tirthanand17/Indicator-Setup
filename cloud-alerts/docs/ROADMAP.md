@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 66%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 68%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -168,3 +168,13 @@
 - [x] Fix timezone-suffixed event IDs and pass 251/251 local synthetic tests.
 - [ ] Obtain independently attested live option data over five market sessions and validate actual Telegram receipts, latency, spread, depth and fee model.
 - [ ] Select and explicitly approve an always-on host before deployment; no paid services, auth secrets or broker orders added.
+
+
+## Phase 19 — complete-case quote-evidence coverage (68%)
+
+- [x] Enumerate all paper REVIEW entry IDs for optionally reconciling quote observations to real alert candidates.
+- [x] Require no orphan quote records in reconciled mode, and explicitly count no-quote/entry-only/invalid-exit events.
+- [x] Withhold unqualified summary/rankable win-rate claims; show only clearly labeled complete-case descriptive paper rates.
+- [x] Add tests for selection bias, SQLite read-only source audit, and missing/invalid evidence; **264/264** local tests.
+- [ ] Capture 5+ market sessions and independently verify real option depth, Telegram handset receipt and realistic costs.
+- [ ] Deploy only on approved always-on cloud infrastructure, after provider/cost eligibility checks.

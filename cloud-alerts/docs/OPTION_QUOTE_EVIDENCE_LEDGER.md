@@ -41,3 +41,8 @@ The report explicitly includes `quote_observations`, `incomplete_quote_pairs`, `
 ## Test evidence
 
 The full synthetic suite passes **251/251** local pytest tests, including replay and prior recovery tests. Phase 18 added schema, depth, provenance, duplicate, tamper, restart, no-filled-quote, and full synthetic broker→entry→premium-BID-exit tests. No market data was fetched from Kite during these tests, no Telegram message sent externally, and no actual order placed.
+
+
+## Phase 19 caveat: avoid survivorship-biased win-rate reporting
+
+A descriptive rate calculated from the valid **paired** quote subset must not be used to rank bots when missing original entry notices or absent EXIT quotes might bias the selection. Run `--reconcile-entry-outbox` on a private SQLite snapshot and review `entry_events_missing_all_quotes`, `scorable_event_coverage_pct` and `ranking_blockers`. The quote report intentionally withholds headline/rankable win percentages; `complete_case_win_rate_pct` remains explicitly conditional on scorable pairs and **does not** certify profitability. See [full coverage audit](QUOTE_COVERAGE_AUDIT.md).

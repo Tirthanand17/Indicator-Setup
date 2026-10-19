@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 67%** — `[████████████████░░░░░░░░]` (**33% remaining**).
+**Overall engineering implementation estimate: 68%** — `[████████████████░░░░░░░░]` (**32% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 251 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 264 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -151,3 +151,16 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 The new [causal historical replay utility](docs/HISTORICAL_REPLAY.md) reconstructs completed-futures-candle decisions without future 15-minute data, uses a SHA-256 chained checkpoint that detects revised warmup history after a restart, and rejects incomplete intraday candle sequences. A local-only CLI reads exported 5m/15m OHLCV JSON; it never reads account credentials, sends Telegram notifications, or places orders. **224/224 offline tests passed**.
 
 **Overall estimated implementation: 66%, 34% remaining.** Real option quote archives, approved always-on cloud hosting, cloud Telegram receipts and five-session market trials remain outstanding.
+
+
+## Phase 19 — option-evidence completeness and ranking guard (68%)
+
+The quote-evidence report can now reconcile **all** claimed `REVIEW_CE` / `REVIEW_PE` outbox entries, including those lacking any exit quote. A conditional complete-case paper win percentage is deliberately distinguished from a rankable verified strategy metric, which remains unavailable until sufficient, complete, independently verified data is collected. Use the non-mutating report on a **private snapshot** of the cloud SQLite database:
+
+```bash
+python -m cloud_alerts.evidence_cli --state-db /private/snapshot/alerts.sqlite3 \
+  --slippage-bps 8 --roundtrip-charges-rs 50 \
+  --min-trades 30 --min-days 5 --reconcile-entry-outbox
+```
+
+Rates/costs above are *illustrative assumptions*, not current verified fee estimates. [Coverage audit and interpretation](docs/QUOTE_COVERAGE_AUDIT.md). **Overall: 68% implementation estimate; 32% remaining.** Cloud is **not** active.

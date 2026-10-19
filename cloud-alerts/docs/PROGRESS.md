@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 67%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 68%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 67%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 33%
+Overall engineering progress   [████████████████░░░░░░░░] 68%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 32%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 40% | Immutable sanitized entry/exit option quote ledger, offline after-cost report, causal replay; actual cloud quote dataset and independent provenance absent |
+| P8 | Walk-forward option backtests & reliability dashboard | 50% | Includes entry-notice coverage reconciliation, excluded-pair accounting and deliberately withheld rankable win rate; real quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **67.0%, rounded to 67%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **68.0%, rounded to 68%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -184,3 +184,13 @@ Sum of current percentages / 10 = **67.0%, rounded to 67%**. **Actual readiness 
 4. Fixed the evaluator's event-ID validation, which previously rejected the actual `+05:30` timezone suffix in paper entry event IDs. Added a regression test for that case and full synthetic entry→virtual exit→P&L evidence integration.
 5. **251/251 local offline tests passed**, modules compile; no real broker quote data, Telegram phone receipt, live host, quote-origin audit, trades or profit edge was proven. Source hashes are not signatures and synthetic wins are not verified accuracy.
 6. P8 offline research/evidence tooling moves **30% → 40%**; overall phase-weighted estimate **66% → 67%**, with 33% estimated scope remaining. Cloud host and five-session operational validation remain outstanding. See [option quote ledger documentation](OPTION_QUOTE_EVIDENCE_LEDGER.md).
+
+
+## October 19 Phase 19 — complete-case / survivorship-bias guard (68%)
+
+1. Corrected an evidence-selection risk: a report based on one profitable paired quote could previously display a 100% `net_win_rate_pct` while omitting nine entry notices with no recorded exit/option quote. This is **not** a demonstrated strategy win rate.
+2. The quote report now explicitly separates a **descriptive `complete_case_win_rate_pct`** (conditional on scorable paired quotes) from `rankable_win_rate_pct` and the ordinary summary `net_win_rate_pct`, which remain **null** without independently authenticated, complete, sufficient samples.
+3. Added an opt-in `--reconcile-entry-outbox` switch that counts every original SQLite `REVIEW_CE` / `REVIEW_PE` event, including events without any quote observations; strict reconciliation rejects orphan option records. Only aggregate counts and safe review states are printed, never alert text or identifiers.
+4. Adds `scorable_event_coverage_pct`, `entry_events_missing_all_quotes`, `incomplete_quote_pairs`, `rejected_quote_pairs`, and explicit `ranking_blockers`. None are model accuracy claims; no signals are issued by this offline CLI.
+5. Full offline suite **264/264 passed**; tests include one win out of ten claimed entries, no observations, conflicting quote contracts, unsafe unregistered quote observations and read-only SQLite audits. No live market sampling, hosting, Telegram receipt or order execution.
+6. P8 synthetic tooling estimated **40% → 50%**, ten-phase average **67% → 68%**, **32% remaining**. P5 host activation and P9 market-session evidence remain **0% observed**. See [coverage audit](QUOTE_COVERAGE_AUDIT.md).

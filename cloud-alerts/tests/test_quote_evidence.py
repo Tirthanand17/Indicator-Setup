@@ -47,7 +47,9 @@ def test_one_timed_quote_pair_is_hypothetical_and_unverified():
     assert report['quote_observations']==2
     assert report['scorable_quote_pairs']==1
     assert report['incomplete_quote_pairs']==0
-    assert report['summary']['net_win_rate_pct']==100
+    assert report['complete_case_win_rate_pct']==100
+    assert report['summary']['net_win_rate_pct'] is None
+    assert not report['eligible_for_strategy_ranking']
     assert report['summary']['status']=='UNVERIFIED_SOURCE'
     assert report['summary']['real_fills_verified'] is False
     assert report['summary']['net_pnl_rs']<65*(109.5-100.5)
