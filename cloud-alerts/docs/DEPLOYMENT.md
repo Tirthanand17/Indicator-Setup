@@ -22,6 +22,7 @@ For reliable phone alerts **while Nirala is switched off**, use an **always-on c
 | `STATE_DIR` | `/data/nifty-alerts` mounted persistent private volume | Hosting config |
 | `ALERTS_ENABLED` | `false` until all gates pass, then `true` | Hosting config |
 | `KITE_SHADOW_ENABLED` | `false` by default; optional diagnostic WebSocket, never entry authority | Hosting config |
+| `PAPER_PREMIUM_TRACKING_ENABLED` | `false` by default; optional virtual BID stop/target review polling, **not holdings** | Hosting config |
 
 Use local Python to generate two **separate** keys, and enter them directly in protected provider settings, **never a public GitHub file**:
 
@@ -110,3 +111,7 @@ REST 5m history is dependable for candle-close research but may be slower than a
 - [ ] Test Telegram message appears on phone; at least one **synthetic simulated candidate** checks message pipeline without misleading live trade labeling.
 - [ ] At least five full live sessions tested with missed-bar and end-to-end latency metrics; completed-bar integrity verified.
 - [ ] Separate out-of-sample OPTION backtest supports an economically meaningful, after-cost hypothesis. Until then **paper only**.
+
+## Optional P7 premium review (no deployment yet)
+
+See [PREMIUM_EXIT_MONITOR.md](PREMIUM_EXIT_MONITOR.md). It defaults to OFF and is strictly virtual: a signal-time ASK is not a purchase fill, and later BID observations are not realized P&L. Host operators should only enable `PAPER_PREMIUM_TRACKING_ENABLED=true` after real-data freshness, Telegram confirmation and acceptable polling quotas have been tested. It never places an order or reads holdings.
