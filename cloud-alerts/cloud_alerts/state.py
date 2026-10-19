@@ -28,6 +28,18 @@ class State:
     def pending_events(self)->list[tuple[str,str]]:
         with self._connect() as db:
             return db.execute('SELECT event_id,payload FROM events WHERE delivered=0 ORDER BY at LIMIT 10').fetchall()
+    def expire_events_before(self, cutoff:datetime)->int:
+        """Never deliver a stale entry review after an outage or restart.
+
+        delivered state: 0 queued, 1 Telegram accepted, 2 expired unsent.
+        """
+        with self._connect() as db:
+            cur=db.execute('UPDATE events SET delivered=2 WHERE delivered=0 AND at < ?',
+                           (cutoff.isoformat(),))
+            return cur.rowcount
+    def count_expired(self)->int:
+        with self._connect() as db:
+            return int(db.execute('SELECT COUNT(*) FROM events WHERE delivered=2').fetchone()[0])
     def claim_nonce(self,nonce:str,now_unix:int)->bool:
         with self._connect() as db:
             db.execute('DELETE FROM nonces WHERE received_at<?',(now_unix-300,))
