@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIFTY Automatic Paper Alerts</title><link rel="stylesheet" href="style.css"></head><body>
-<h1>NIFTY Automatic Five-Indicator Alerts <small>v0.2</small></h1>
+<h1>NIFTY Automatic Five-Indicator Alerts <small>v0.3</small></h1>
 <p class="notice"><strong>Automatic screen-reading beta, not an execution bot.</strong> Reads only the displayed NIFTY futures chart legend within Kite. No manual indicator input, no trading API, no payment, and no orders. Near-close chart samples are <strong>not exchange-confirmed closed candles</strong>; every alert means <strong>REVIEW</strong>, not buy immediately. Actual option quotes, IV and your holdings are not accessible from a futures-only chart.</p>
 <section class="panel"><h2>1 · Connection & notifications</h2>
 <p id="chart">Connecting to chart…</p>
@@ -7,19 +7,42 @@
 <label class="check"><input type="checkbox" id="armed">Show desktop notifications for candidate CE/PE and virtual exit reviews</label>
 <button id="test">Send TEST notification</button><button class="secondary" id="reset">Reset automatic monitor's candle history</button>
 <p class="caption">For reliable boundary sampling, leave the Kite tab open in Chrome. Browser background throttling can pause collection, in which case this tool reports WAIT_DATA. It does not run when the browser/laptop is closed.</p></section>
-<section class="panel"><h2>2 · Live values automatically read from the chart</h2>
+<section class="panel" id="telegram-panel">
+<h2>2 · Phone notifications — Telegram (optional)</h2>
+<p class="caption"><strong>Not connected until you choose to pair.</strong> No trading orders, no personal Kite credentials, no paid service. Signals are provisional futures-chart reviews, not precise option entry prices. Telegram receives only an alert summary after a candidate has been detected. Chrome and the Kite tab must stay running.</p>
+<p>On your phone, install Telegram. Open <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">Telegram's official @BotFather</a> and send <code>/newbot</code>. Create your own bot and keep the bot token private.</p>
+<p>Click <strong>Generate code</strong>. Then open the new bot in Telegram and send exactly <code>/start CODE</code>, substituting the code below. You do not need to find or type your Telegram chat ID.</p>
+<div class="pair-code">
+  <button id="phoneBegin" type="button" class="secondary">Generate pairing code</button>
+  <strong id="phoneCode">Not generated</strong>
+  <button type="button" class="secondary" id="phoneCopy">Copy /start message</button>
+</div>
+<label for="phoneToken">BotFather token (stored locally on this Chrome profile after successful pairing)</label>
+<input id="phoneToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste bot token ONLY here — never into GitHub or chat">
+<button id="phonePair" type="button">Pair bot and send confirmation to phone</button>
+<p id="phoneSetupResult" class="caption" aria-live="polite"></p>
+<div id="phoneLinked" class="subpanel">
+  <p id="phoneStatus">Phone is not paired.</p>
+  <label class="check"><input type="checkbox" id="phoneEnabled" disabled> Send potential CE/PE and virtual exit alerts to Telegram</label>
+  <button id="phoneTest" type="button" disabled>Send phone TEST message</button>
+  <button id="phoneForget" type="button" class="warn" disabled>Disconnect & erase bot token</button>
+  <p class="caption" id="phoneLastDelivery">No Telegram delivery attempted.</p>
+</div>
+<p class="caption">Chrome will ask for permission to contact only <code>api.telegram.org</code> when you pair. The bot token stays in local Chrome extension storage. Do not share it, and avoid using a shared computer. Telegram is a third-party service; messages are delivered via its servers and may be delayed.</p>
+</section>
+<section class="panel"><h2>3 · Live values automatically read from the chart</h2>
 <p class="caption" id="updated">No valid chart frame reading yet.</p>
 <div class="grid" id="values"></div>
 <p class="caption">The values above normally belong to the <strong>forming</strong> candle. They are displayed to inspect the read-only extraction, not as entry signals.</p></section>
-<section class="panel"><h2>3 · Paper-signal evaluation at 5-minute boundaries</h2>
+<section class="panel"><h2>4 · Paper-signal evaluation at 5-minute boundaries</h2>
 <div id="result" class="result">WAIT_DATA</div>
 <div id="reasons" class="caption"></div>
 <p id="closedBar" class="caption">No near-close sample yet.</p>
 <p class="caption">Alerts require a snapshot from the last 3.5 seconds before the next bar, observation of the next bar shortly after the boundary, four consecutive near-close bars, ADX≥25 and rising, aligned VWAP/EMA/DMI, and a break of the recent 3-bar price range. Signals also use a 15-minute trend <strong>proxy</strong> from 5-minute price history; this is not an independent 15-minute chart calculation.</p>
 </section>
-<section class="panel"><h2>4 · Virtual exit alert tracker (NOT Kite holdings)</h2>
+<section class="panel"><h2>5 · Virtual exit alert tracker (NOT Kite holdings)</h2>
 <p id="virtual" class="caption">No prior candidate is being tracked.</p>
 <p class="caption">After a candidate CE/PE alert, the system automatically tracks a <strong>virtual underlying futures</strong> stop/target/reversal and can notify EXIT CE or EXIT PE. It does not know whether you bought an option, what premium you paid, or the real option BID. It cannot close your actual position.</p></section>
-<section class="panel"><h2>5 · Recent evaluation journal</h2><ol class="logs" id="logs"></ol><p class="caption">Local to this browser. No broker authentication material or raw page URLs stored. Maximum 150 events.</p></section>
+<section class="panel"><h2>6 · Recent evaluation journal</h2><ol class="logs" id="logs"></ol><p class="caption">Local to this browser. No broker authentication material or raw page URLs stored. Maximum 150 events.</p></section>
 <p><a href="https://github.com/Tirthanand17/Indicator-Setup/blob/main/docs/BUY_SELL_DECISION_GUIDE.md" target="_blank" rel="noopener noreferrer">Read CE / PE / NO_TRADE / exit rules on GitHub</a></p>
 <script src="dashboard.js"></script></body></html>
