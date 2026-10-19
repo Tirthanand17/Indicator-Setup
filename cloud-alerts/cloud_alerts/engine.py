@@ -17,14 +17,21 @@ from .signals import decide
 from .telegram import Telegram,format_review
 from .scheduler import CandlePollScheduler
 from .stream_supervisor import ShadowSupervisor
+from .premium import (PremiumHypothesis,reference_from_quote,parse_reference,
+                      reference_contract,evaluate_bid,exit_text)
 IST=ZoneInfo('Asia/Kolkata')
 logger=logging.getLogger('cloud_alerts')
 
 class Engine:
     def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False,
-                 shadow:ShadowSupervisor|None=None):
+                 shadow:ShadowSupervisor|None=None, paper_premium_tracking:bool=False,
+                 premium_hypothesis:PremiumHypothesis|None=None):
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
         self.shadow=shadow
+        self.paper_premium_tracking=paper_premium_tracking
+        self.premium_hypothesis=premium_hypothesis or PremiumHypothesis()
+        self.premium_status="DISABLED" if not paper_premium_tracking else "IDLE"
+        self.last_premium_quote_at=None
         self.status='NOT_STARTED' if enabled else 'DISABLED'
         self.status_at=datetime.now(IST)
         self.instrument_rows=None
@@ -45,6 +52,8 @@ class Engine:
           'last_phone_accept_at':self.last_alert_at.isoformat() if self.last_alert_at else None,
           'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
           'mode':'READ_ONLY_PAPER','order_execution':False,
+          'paper_premium_tracking':self.paper_premium_tracking,'premium_status':self.premium_status,
+          'premium_quote_at':self.last_premium_quote_at.isoformat() if self.last_premium_quote_at else None,
           'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
 
@@ -145,6 +154,20 @@ class Engine:
             self.set_status('NO_TRADE',decision.reason)
             await self._deliver_outbox(now)
             return
+        # Only one explicitly virtual candidate at a time. A later apparent entry
+        # must never silently replace an older pending paper-exit reference.
+        previous_virtual=self.db.get_runtime('virtual_candidate')
+        if previous_virtual:
+            try:
+                active=json.loads(previous_virtual)
+                if active.get('expiry_date')==now.date().isoformat():
+                    self.set_status('NO_TRADE','Existing virtual candidate awaiting exit review')
+                    await self._deliver_outbox(now)
+                    return
+            except (ValueError,TypeError,AttributeError):
+                # Fail closed: unparseable tracked candidate must not be overwritten.
+                self.set_status('WAIT_DATA','Virtual candidate state malformed; no new alert')
+                return
         side=decision.status[-2:]
         try:
             opt=select_option(self.instrument_rows,now.date(),side,decision.candle.close,avoid_expiry_day=True)
@@ -161,10 +184,78 @@ class Engine:
         event_id=stamp+':'+decision.status
         await self._send_event(event_id,decision.status,now,body)
         self.set_status(decision.status,'Futures + option market-depth review sent or queued')
-        self.db.set_runtime('virtual_candidate',json.dumps({
+        candidate={
             'direction':side,'symbol':fut.symbol,'signal_candle':decision.candle.start.isoformat(),
             'entry':decision.candle.close,'stop':decision.stop_underlying,
-            'target':decision.target_underlying,'expiry_date':now.date().isoformat()},separators=(',',':')))
+            'target':decision.target_underlying,'expiry_date':now.date().isoformat()}
+        if self.paper_premium_tracking:
+            candidate['premium']=reference_from_quote(
+                oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
+                created_at=now,hypothesis=self.premium_hypothesis)
+        self.db.set_runtime('virtual_candidate',json.dumps(candidate,separators=(',',':')))
+
+    async def poll_virtual_premium(self,now:datetime|None=None)->None:
+        """Read-only candidate BID watcher. Never assumes user actually bought CE/PE.
+
+        Monitoring is explicitly disabled until the operator opts in after reviewing
+        research stop/target fractions. Kite quote timestamps must be fresh and
+        the exact same listed contract as the paper candidate.
+        """
+        if not self.paper_premium_tracking or not self.enabled:return
+        now=(now or datetime.now(IST)).astimezone(IST)
+        if now.weekday()>=5 or now.time()<time(9,30) or now.time()>time(15,25):return
+        raw=self.db.get_runtime('virtual_candidate')
+        if not raw:
+            self.premium_status='IDLE';return
+        try:
+            position=json.loads(raw)
+            if not isinstance(position,dict):raise ValueError('invalid state')
+        except (TypeError,ValueError):
+            self.premium_status='INVALID_VIRTUAL_STATE'
+            return
+        if position.get('expiry_date')!=now.date().isoformat():
+            self.db.set_runtime('virtual_candidate','')
+            self.premium_status='EXPIRED_CANDIDATE_CLEARED'
+            return
+        premium=position.get('premium')
+        if not isinstance(premium,dict):
+            self.premium_status='LEGACY_CANDIDATE_NO_PREMIUM'
+            return
+        reference=parse_reference(json.dumps(premium),now)
+        if reference is None:
+            self.premium_status='INVALID_PREMIUM_REFERENCE'
+            return
+        # Time-based exit review can be sent even when market quotes are missing;
+        # the message explicitly says NO executable bid was observed.
+        if now.time()>=time(15,15):
+            reason='TIME'
+            quote=None
+        else:
+            token=self.vault.get(now)
+            if not token:
+                self.premium_status='WAIT_TOKEN';return
+            try:
+                contract=reference_contract(reference)
+                kite=KiteReadOnly(self.api_key,token)
+                raw_quote=await asyncio.wait_for(
+                    asyncio.to_thread(kite.full_quote,contract.symbol),timeout=8)
+                quote=validate_quote(contract,raw_quote,now,max_age_seconds=15,max_spread_pct=2)
+                reason=evaluate_bid(reference,quote,now)
+                self.last_premium_quote_at=now
+            except (ValueError,TypeError,KeyError,asyncio.TimeoutError):
+                self.premium_status='WAIT_FRESH_PREMIUM_QUOTE';return
+            except Exception:
+                self.premium_status='PREMIUM_QUOTE_UNAVAILABLE';return
+        if reason=='HOLD':
+            self.premium_status='MONITORING'
+            return
+        event_id='VIRTUAL_OPTION_EXIT:'+position['signal_candle']+':'+reason
+        msg=exit_text(reference,reason,now,quote)
+        await self._send_event(event_id,'VIRTUAL_OPTION_EXIT_'+reason,now,msg)
+        # Durable claim occurs before clearing virtual candidate; on Telegram failure,
+        # the pre-existing outbox can still retry until its short expiry.
+        self.db.set_runtime('virtual_candidate','')
+        self.premium_status='EXIT_REVIEW_'+reason
 
     async def _check_virtual_exit(self,candle,symbol:str,now:datetime)->None:
         raw=self.db.get_runtime('virtual_candidate')
@@ -192,6 +283,7 @@ class Engine:
     async def run_forever(self)->None:
         scheduler=CandlePollScheduler()
         last_outbox_minute=None
+        last_premium_poll_slot=None
         while True:
             now=datetime.now(IST)
             minute=now.replace(second=0,microsecond=0)
@@ -208,6 +300,13 @@ class Engine:
                     await self._deliver_outbox()
                 else:
                     self.db.expire_events_before(now-timedelta(seconds=180))
+            # Lightweight read-only BID polls, at most one per 20-second slot.
+            # Run in the same single worker to avoid concurrency with candle exits.
+            if self.paper_premium_tracking and self.enabled:
+                slot=(now.date().isoformat(),now.hour,now.minute,now.second//20)
+                if slot!=last_premium_poll_slot:
+                    last_premium_poll_slot=slot
+                    await self.poll_virtual_premium(now)
             if scheduler.claim(now):
                 await self.run_once(now)
             await asyncio.sleep(2)
