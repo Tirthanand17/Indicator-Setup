@@ -6,11 +6,18 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 60%** — `[████████████░░░░░░░░]` (**40% remaining**).
+**Overall engineering implementation estimate: 61%** — `[████████████░░░░░░░░]` (**39% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 143 local synthetic Python tests passed (including signed token-handoff and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 151 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+## October 19 Phase 12 — offline cloud deployment safety
+
+- **151/151 offline tests passed** including deployment preflight, private volume checks and startup guards.
+- Added a fail-closed `cloud_alerts.preflight` and a single-worker hardened Docker Compose template (`deploy/compose.yml`). The container refuses to start if critical secrets, a private writable persistent mount, or minimum free space are missing.
+- This is **structural readiness only**. It does not deploy a host, install credentials, transmit Telegram messages, or validate a live trade signal.
+- See [cloud deployment preflight](docs/CLOUD_DEPLOYMENT_PREFLIGHT.md).
 
 ## Start here
 

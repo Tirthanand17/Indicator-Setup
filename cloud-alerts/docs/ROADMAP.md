@@ -91,3 +91,14 @@
 - [x] Regression suite **143/143 passed**.
 - [ ] Validate real broker token on approved live host, real daily session rollover, shutdown and recovery.
 - [ ] Deploy only on an explicitly approved always-on host with private secret store and controlled spend.
+
+
+## Phase 12 — cloud deployment safety added (2026-10-19)
+
+- [x] Read-only deployment preflight with secret-presence-only reports, per-file path checks, private worker-owned state and durable-mount inspection
+- [x] Fail closed on unverified root/overlay/tmpfs state, insufficient disk, symlinked token store and missing secrets
+- [x] Single-worker Compose skeleton, localhost-only application port, read-only root, bounded logs and limited container privileges
+- [x] Eight synthetic tests; **151/151 local suite passes**
+- [ ] Obtain **specific** operator approval for an eligible ₹0 always-on VM; verify quotas/cost and storage persistence
+- [ ] Install TLS reverse proxy, secure DNS and rate limiting; configure private secrets in cloud only
+- [ ] Demonstrate real daily Kite login handoff, phone receipt and multi-day paper monitoring with Nirala switched off

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 60%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 61%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████░░░░░░░░░] 60%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 40%
+Overall engineering progress   [███████████████░░░░░░░░░] 61%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 39%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -18,13 +18,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 75% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 10% | Private-volume preflight and local Compose template tested; **host not deployed** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **59.5%, rounded to 60%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **60.5%, rounded to 61%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -118,3 +118,11 @@ Sum of percentages / 10 = **59.5%, rounded to 60%**. **Actual readiness for time
 4. Added seven end-to-end synthetic tests through real signed sender payload, actual FastAPI handoff route, encrypted token vault, nonce replay and tamper rejection; confirms protected mock `.env` stays unmodified.
 5. Offline suite **143/143 passed**. No actual credentials, external host, broker calls or Telegram messages were used. **Daily broker validity and cloud delivery still require live tests**.
 6. P2 offline readiness moves **70% → 90%**, raising the ten-phase mean from 57.5% to **59.5%, rounded to 60%**. P5 and P9 remain 0%. See [daily handoff validation](DAILY_TOKEN_HANDOFF_VALIDATION.md).
+
+## October 19 Phase 12 — fail-closed cloud deployment preflight (61%)
+
+1. Implemented `cloud_alerts/preflight.py` to reject absent/invalid essential secret settings without logging any value; reject missing, non-owned or too-permissive dedicated cloud state directories.
+2. Reject container overlay/tmpfs/root mounts in place of a private persistent volume and require at least 100 MiB free; test temporary local write/fsync/delete before startup. **A detected mount is not proof of long-term host-level persistence**.
+3. Docker now executes the preflight before starting a **single** Uvicorn worker; added operator-reviewed `deploy/compose.yml` with localhost-only port binding, private named volume, read-only root, dropped Linux capabilities, restricted process count and bounded logs. No HTTPS ingress is provisioned by this code.
+4. Added eight synthetic preflight tests; complete suite **151/151 passed** locally. Existing protected Windows trading folder remains read-only and was not used in these tests. No broker or Telegram calls.
+5. P5 implementation plan rises **0% to 10%** because a deployment template and preflight exist, but **host activation and laptop-off testing remain 0%**. Overall phase mean becomes **60.5%, rounded to 61%**. Existing P0–P9 figures unchanged otherwise. **Live cloud alerts are NOT enabled**.

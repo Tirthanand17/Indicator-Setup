@@ -1,0 +1,44 @@
+# Private operator VM only. This manifest DOES NOT provision or bill for hosting.
+# Operator must create /private/nifty-alerts/worker.env outside GitHub.
+services:
+  nifty-paper-alerts:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: nifty-paper-alerts:local
+    init: true
+    restart: unless-stopped
+    # Strictly ONE instance. Do not scale this service horizontally.
+    env_file:
+      - /private/nifty-alerts/worker.env
+    environment:
+      STATE_DIR: /data/nifty-alerts
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - nifty_alerts_state:/data/nifty-alerts
+    ports:
+      # No raw public broker-token receiver; use approved HTTPS reverse proxy.
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    stop_grace_period: 30s
+volumes:
+  nifty_alerts_state:
