@@ -28,6 +28,7 @@ class AppSettings:
         self.root=Path(os.environ.get('STATE_DIR','/data/nifty-alerts'))
         self.enabled=os.environ.get('ALERTS_ENABLED','false').strip().lower()=='true'
         self.shadow_enabled=os.environ.get('KITE_SHADOW_ENABLED','false').strip().lower()=='true'
+        self.paper_premium_tracking=os.environ.get('PAPER_PREMIUM_TRACKING_ENABLED','false').strip().lower()=='true'
     def validate(self):
         if not self.api_key or not self.bot_token or not self.chat_id:
             raise RuntimeError('Missing runtime API key or Telegram config')
@@ -44,7 +45,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     # Shadow subscriptions are opt-in diagnostics only. Kite REST is authoritative.
     shadow=ShadowSupervisor(cfg.api_key) if getattr(cfg,'shadow_enabled',False) else None
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
-                  enabled=cfg.enabled,shadow=shadow)
+                  enabled=cfg.enabled,shadow=shadow,
+                  paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False))
 
     @asynccontextmanager
     async def lifespan(app:FastAPI):
