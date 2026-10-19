@@ -4,6 +4,14 @@
 
 The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) repository also includes a separate, older **screen-reading Chrome extension**. This folder is a **different architecture**: it uses the officially supported paid Kite Connect market-data API, with complete exchange-timestamped candles and actual bid/ask depth.
 
+## Development progress (2026-10-19)
+
+**Overall engineering implementation estimate: 41%** — `[████████░░░░░░░░░░░░]` (**59% remaining**).
+
+The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The newer [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) adds a diagnostic tick aggregator that cannot issue trading alerts until separately tested against Kite REST candles.
+
+**Tests:** 47 local synthetic Python tests passed; no authenticated Kite REST/WebSocket session or real phone notification was used in this development pass.
+
 ## Start here
 
 - [Full architecture and dataflow](docs/ARCHITECTURE.md)
