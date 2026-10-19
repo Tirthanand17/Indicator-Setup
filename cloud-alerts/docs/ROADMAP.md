@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 57%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 58%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -72,3 +72,12 @@
 - [x] Preserve `/internal/token` and tests for replay, request size, and signed submission.
 - [x] **129/129** synthetic/offline tests passing.
 - [ ] Deploy only after verified free/approved always-on host; test actual phone receipt and hardware-off operation.
+
+## 2026-10-19 — chronological P8 paper evaluation (58%)
+
+- [x] Day-segregated TRAIN/EMBARGO/TEST fold planner and ASK/BID after-cost paper scoring.
+- [x] Ensure no test-day observations leak into earlier training windows.
+- [x] Synthetic records never presented as real win rate, verified fills or trading edge.
+- [x] **136/136 offline tests** passed.
+- [ ] Acquire independent timestamped option bid/ask pairs, source authenticity and session outcomes.
+- [ ] Choose free-credit/approved always-on host and complete real paper-mode Telegram receipt trials.

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 57%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 58%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████░░░░░░░░░░] 57%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 43%
+Overall engineering progress   [███████████████░░░░░░░░░] 58%
+Remaining estimated scope      [░░░░░░░░░░░░░░█████████] 42%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 10% | No independent option historical bid/ask dataset or out-of-sample evidence |
+| P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **56.5%, rounded to 57%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **57.5%, rounded to 58%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -100,3 +100,11 @@ Sum of percentages / 10 = **56.5%, rounded to 57%**. **Actual readiness for time
 4. Preserved `/healthz` for Docker liveness and `/readyz` for token availability; neither is a substitute for full market-trial evidence.
 5. Ran **129/129 offline tests** after preserving the signed `/internal/token` route and its auth/replay/size protection tests. See [operational readiness details](OPERATIONAL_READINESS.md). No live cloud host was created and no account credentials entered.
 6. P4 offline completion moves **65% → 75%**; P5 and P9 remain **0%** until genuinely deployed and tested. Overall estimated scope **57% implemented, 43% remaining**.
+
+## October 19 follow-up — chronological paper walk-forward (58%)
+
+1. Added [`walkforward.py`](../cloud_alerts/walkforward.py) for non-overlapping training/embargo/test sessions and strictly chronological evaluations. No strategy parameters are automatically fitted to future observations.
+2. Fails closed on duplicate event IDs, insufficient session history, invalid bid/ask or provenance, timestamps that reverse causality, and illegal partition sizes.
+3. Reuses the existing conservative quote-pair cost scorer: **entry ASK, exit BID, depth, slippage and charges**, with simulated source explicitly marked **NOT verified trading performance**.
+4. Added seven tests for embargo and walk-forward ordering, data shuffling, invalid costs/quotes, insufficient evidence, duplicates and synthetic-truth flags. **136/136 tests passed**.
+5. P8 offline research plumbing moves **10% → 20%**; the actual quote-pair dataset, real walk-forward profitability and five-session phone trials are absent. Overall estimate **58% complete, 42% remaining**. See [walk-forward paper validation](WALK_FORWARD_PAPER_VALIDATION.md).

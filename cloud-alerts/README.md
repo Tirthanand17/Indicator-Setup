@@ -93,3 +93,7 @@ python -m compileall -q cloud_alerts
 ### Cloud operational readiness (Phase 8 continuation)
 
 A separate **`GET /operationalz`** checks that completed REST market decisions are recent and Telegram has no pending messages. Unlike `/healthz` (process liveness) and `/readyz` (token presence), it intentionally reports HTTP 503 on stale data and market closure. Its result **never proves that the operator received a Telegram push**, and all alert execution remains disabled until separately configured. See [operational gate and safety notes](docs/OPERATIONAL_READINESS.md). Offline tests: **129 passing**. Overall estimated code readiness **57%**, not live service readiness.
+
+### Chronological research validation (P8, offline only)
+
+`walk_forward_windows()` separates paper evidence by distinct session days into training, embargo and forward test periods. It applies the existing after-cost option quote-pair validator and explicitly refuses to claim a verified real trading win rate from synthetic or unaudited data. See [walk-forward research protocol](docs/WALK_FORWARD_PAPER_VALIDATION.md). **136/136 offline tests** pass. Approximate overall implementation **58%**, with no live cloud server or phone signal receipts yet.
