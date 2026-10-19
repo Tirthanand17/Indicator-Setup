@@ -2,15 +2,17 @@
 
 A practical, step-by-step **educational / paper-trading** guide for using **five TradingView studies** on Zerodha Kite, and for evaluating hypothetical CE (call) / PE (put) option-buying setups.
 
-## Chrome notifications prototype (v0.1.0)
+## New: Official Kite Connect cloud alerts architecture (2026-10-19)
 
-**Built and installed on Nirala:** [NIFTY Five-Indicator Paper Alerts extension](extension/README.md) — [source code](extension/), [decision-engine tests](extension/tests/engine.test.cjs).
+**[Open the full laptop-independent API design and prototype](cloud-alerts/README.md)** — [System architecture](cloud-alerts/docs/ARCHITECTURE.md), [daily token & cloud deployment runbook](cloud-alerts/docs/DEPLOYMENT.md), [security boundary](cloud-alerts/docs/SECURITY.md), and [phase-by-phase status](cloud-alerts/docs/ROADMAP.md).
 
-This ₹0 Chrome MV3 extension detects when the NIFTY Kite chart tab is open, and provides **REVIEW_CE**, **REVIEW_PE**, **NO_TRADE**, **WAIT_DATA**, and manually checked paper stop/target exit alerts. The Chrome alert notification channel and chart detection were checked on Nirala; rule engine has **15 passing tests**.
+This new, separate `cloud-alerts/` project uses the **paid Kite Connect API** to calculate five indicators from actual *completed* 5-minute NIFTY futures candles, confirm the independent 15-minute chart and examine live listed CE/PE option bid/ask quotes. Its signed one-way daily token relay is designed to **READ** an access token from an existing protected trading project's `.env` without editing that folder. A properly configured *always-on* cloud host can continue to notify Telegram after the laptop is switched off **once the daily token has been delivered**.
 
-**Strict limitation:** It cannot yet read reliable indicator values directly from Kite. To evaluate a candidate, open its dashboard and enter **verified values from a completed 5-minute futures candle** (VWAP, EMAs, DMI ADX and DI, ATR, volume, etc.) plus option/15m checks. Keeping the chart open alone does **NOT** produce automatic BUY/SELL signals. No broker execution, account data, credentials, or paid API used. Do not infer strategy win rate from these tests.
+**Current status:** 33 synthetic/in-process tests passed for core modules; architecture and prototype are in GitHub; **no cloud deployed, no real Kite feed tested, no market-generated Telegram entry signal verified and no new hosting charge approved.** This is read-only paper-review software; it cannot place orders.
 
-To open on Nirala: Chrome toolbar **N** icon → **Open Signal Dashboard**. Extension source on the laptop is at `C:\Users\Dell\Documents\Indicator-Setup\extension`. In Chrome, installing additional releases requires reloading the unpacked extension via `chrome://extensions`.
+## Existing Chrome chart extension (v0.3 — separate legacy approach)
+
+[Original five-indicator Chrome extension](extension/README.md) reads the displayed Kite TradingView chart values and can send opt-in Telegram reviews when the browser and chart stay open. Telegram pairing and a TEST message were verified, but repeated stale-data resets mean **its time-sensitive CE/PE market alerts are not dependable yet**. The new official Kite API architecture is intended to replace the fragile chart-reading dependency.
 
 **Read the full guide:** [Kite five-indicator setup and CE/PE trading playbook](docs/KITE_NIFTY_FIVE_INDICATOR_PLAYBOOK.md)
 
