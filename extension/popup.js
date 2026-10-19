@@ -1,8 +1,10 @@
 'use strict';
-const badge = document.querySelector('#badge'), description = document.querySelector('#description');
-chrome.runtime.sendMessage({ type:'GET_STATE' }, response => {
-  if (chrome.runtime.lastError || !response || response.error) { badge.textContent='Unable to read status'; return; }
-  badge.textContent=response.chartOpen ? 'Kite chart detected' : 'WAIT_DATA — Kite chart not detected';
-  description.textContent=response.chartOpen ? 'Chart open. Enter manually verified CLOSED five-minute candle values in the dashboard. No automatic price feed is connected.' : 'Open the NIFTY futures chart in Kite. This extension cannot inspect private chart internals or assume a valid quote.';
+const badge=document.getElementById('badge'),desc=document.getElementById('description');
+chrome.runtime.sendMessage({type:'GET_STATE'},r=>{
+ if(chrome.runtime.lastError||!r||r.error){badge.textContent='WAIT_DATA';desc.textContent='Extension service worker unavailable.';return;}
+ badge.textContent=r.status||'WAIT_DATA';
+ if(!r.chartOpen)desc.textContent='Open the current-month NIFTY futures 5-minute Kite chart.';
+ else if(!r.lastReadAt||Date.now()-r.lastReadAt>15000)desc.textContent='Kite chart open, but automatic values are not arriving. Refresh the Kite tab and verify five indicators.';
+ else desc.textContent='Auto-reading '+r.chartSymbol+'. Futures '+r.latest?.close+'; VWAP '+r.latest?.vwap+'; EMA9 '+r.latest?.ema9+'; EMA21 '+r.latest?.ema21+'. Status: '+r.status+'.';
 });
-document.querySelector('#open').addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('dashboard.html')}));
+document.getElementById('open').addEventListener('click',()=>chrome.tabs.create({url:chrome.runtime.getURL('dashboard.html')}));
