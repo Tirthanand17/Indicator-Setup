@@ -19,7 +19,9 @@ async function notifyOnce(key,title,message){
  const {sentKeys=[]}=await chrome.storage.local.get('sentKeys');if(sentKeys.includes(key))return false;
  // Mark before notifying. Failure leaves an audit trail without retry-spam.
  await chrome.storage.local.set({sentKeys:[...sentKeys,key].slice(-150)});
- try{await chrome.notifications.create(key.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,120),{type:'basic',iconUrl:ICON,title,message,priority:1});return true;}catch{return false;}
+ try{await chrome.notifications.create(key.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,120),{type:'basic',iconUrl:ICON,title,message,priority:1});}
+ catch{ /* Phone delivery still proceeds if Windows suppresses desktop popups. */ }
+ return true;
 }
 
 /* Phone messages are sent ONLY after local user-pairing and Chrome's explicit
