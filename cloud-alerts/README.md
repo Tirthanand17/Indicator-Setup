@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 49%** — `[██████████░░░░░░░░░░░░]` (**51% remaining**).
+**Overall engineering implementation estimate: 48%** — `[██████████░░░░░░░░░░░░]` (**52% remaining**).
 
-The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles, saves redacted 45-day reconciliation outcomes in the existing SQLite state, and **never drives buy/sell alerts**.
+The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 67 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 61 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## Start here
 
@@ -69,3 +69,7 @@ python -m compileall -q cloud_alerts
 - [Render free web-service limits (not suitable for time-critical production)](https://render.com/docs/free)
 
 **Last updated:** 2026-10-19. **Cloud deployment:** OFF. **Live order execution:** DISABLED / NOT IMPLEMENTED.
+
+## Cloud worker progress
+
+**Engineering readiness: 53% (estimated)**. [Progress board](docs/PROGRESS.md), [virtual premium monitoring](docs/PREMIUM_EXIT_MONITOR.md). 88 synthetic Python tests passing. Not cloud deployed; no orders.
