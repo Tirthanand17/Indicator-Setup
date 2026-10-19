@@ -20,7 +20,7 @@ async function chartState() {
       detected = true;
       const parts = path.split('/');
       const value = parts[parts.length - 2];
-      if (/^NIFTY\\d{2}[A-Z]{3}FUT$/.test(value)) detectedSymbol = value;
+      if (/^NIFTY\d{2}[A-Z]{3}FUT$/.test(value)) detectedSymbol = value;
     }
   } catch { /* Older Chrome or disallowed tab enumeration; rely on heartbeat. */ }
   return {
