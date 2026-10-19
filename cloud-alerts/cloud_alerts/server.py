@@ -18,6 +18,7 @@ from .telegram import Telegram
 from .stream_supervisor import ShadowSupervisor
 from .runtime_guard import single_worker
 from .operational import assess_operational
+from .config_guard import configuration_blockers
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -32,10 +33,16 @@ class AppSettings:
         self.shadow_enabled=os.environ.get('KITE_SHADOW_ENABLED','false').strip().lower()=='true'
         self.paper_premium_tracking=os.environ.get('PAPER_PREMIUM_TRACKING_ENABLED','false').strip().lower()=='true'
     def validate(self):
-        if not self.api_key or not self.bot_token or not self.chat_id:
-            raise RuntimeError('Missing runtime API key or Telegram config')
-        if len(self.relay_key)<32 or not self.vault_key:
-            raise RuntimeError('Missing secure relay/vault keys')
+        # Mirror deployment preflight: a direct Uvicorn invocation must not
+        # bypass secret placeholders/format checks when preflight is skipped.
+        config={'KITE_API_KEY':self.api_key, 'TELEGRAM_BOT_TOKEN':self.bot_token,
+                'TELEGRAM_CHAT_ID':self.chat_id,'TOKEN_RELAY_HMAC_KEY':self.relay_key,
+                'TOKEN_VAULT_KEY':self.vault_key,
+                'ALERTS_ENABLED': 'true' if self.enabled else 'false',
+                'KITE_SHADOW_ENABLED':'true' if self.shadow_enabled else 'false',
+                'PAPER_PREMIUM_TRACKING_ENABLED':'true' if self.paper_premium_tracking else 'false'}
+        if configuration_blockers(config):
+            raise RuntimeError('Invalid cloud configuration; use offline preflight for safe blocker codes')
 
 
 def build_app(settings:AppSettings|None=None)->FastAPI:

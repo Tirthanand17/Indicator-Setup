@@ -62,3 +62,11 @@ Disable `ALERTS_ENABLED`, stop the worker, and **retain volume encrypted** for p
 - This manifest binds application port only to `127.0.0.1`; it **does not provide an HTTPS reverse proxy, DNS, firewall policy, outbound network assurance or hosting account**.
 - The Windows daily login and token-handoff process still requires the user's authorized action; the host cannot read the PC `.env` after shutdown.
 - Free Render web services are not an assured always-on service. An Oracle or Google Always Free VM still requires verified eligibility, account setup and quota, and may have capacity limits.
+
+
+### Phase 13 — hardened secret and sensitive-file checks
+
+- Do **not** use values copied literally from `.env.example`; placeholder values are blocked. When `ALERTS_ENABLED=true`, Kite key format, Telegram bot/chat syntax and relay key entropy are checked, but passing them does NOT prove access is valid.
+- All existing state artifacts (`token.enc`, `alerts.sqlite3`, `alerts.sqlite3-wal`, `alerts.sqlite3-shm`, `.single-worker.lock`) must be regular, worker-owned and **mode 0600 or tighter**. The directory must be private (0700). A failed check is a blocker; do not automatically relax permissions or delete artifacts. Have the authorized VM operator investigate and remediate safely.
+- Docker's entrypoint explicitly runs with `umask 077` so newly created private files remain private. This is not evidence of a deployed or persistent cloud host.
+- `python -m cloud_alerts.preflight --json` emits safe blocker **codes only**; do not paste the private environment file into ChatGPT, logs, GitHub or bug reports.

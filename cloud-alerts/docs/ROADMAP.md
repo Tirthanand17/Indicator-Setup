@@ -102,3 +102,16 @@
 - [ ] Obtain **specific** operator approval for an eligible ₹0 always-on VM; verify quotas/cost and storage persistence
 - [ ] Install TLS reverse proxy, secure DNS and rate limiting; configure private secrets in cloud only
 - [ ] Demonstrate real daily Kite login handoff, phone receipt and multi-day paper monitoring with Nirala switched off
+
+
+## Phase 13 safety checkpoint (2026-10-19)
+
+- [x] Reject example secret placeholders in cloud preflight **and** runtime, without printing secret values.
+- [x] Reject malformed active Kite/Telegram settings and trivial relay keys; format checks are not identity checks.
+- [x] Check existing SQLite, WAL, SHM, token and worker lock permissions/owner; fail closed, never mutate.
+- [x] Use `umask 077` before container worker initialization and statically verify runtime isolation.
+- [ ] Deploy an explicitly approved ₹0 incremental-cost, genuinely always-on host with a persistent volume.
+- [ ] Test authenticated daily token relay to that host and confirm vault survives VM restart.
+- [ ] Confirm actual Telegram TEST receipt on the phone, and collect market-session signal / delay evidence.
+
+**Engineering progress estimate: 62%; live-host activation: 0%; additional broker orders: none.**

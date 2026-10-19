@@ -16,11 +16,11 @@ import stat
 import tempfile
 from typing import Mapping
 
-from cryptography.fernet import Fernet
+from .config_guard import configuration_blockers
 
 
 MIN_FREE_BYTES = 100 * 1024 * 1024
-SENSITIVE_FILES = ('token.enc', 'alerts.sqlite3')
+SENSITIVE_FILES = ('token.enc', 'alerts.sqlite3', 'alerts.sqlite3-wal', 'alerts.sqlite3-shm', '.single-worker.lock')
 
 
 @dataclass(frozen=True)
@@ -67,23 +67,8 @@ def persistent_mount(path: Path, mountinfo: str) -> bool:
 
 
 def _valid_secrets(env: Mapping[str, str]) -> list[str]:
-    problems: list[str] = []
-    if not env.get('KITE_API_KEY', '').strip():
-        problems.append('MISSING_KITE_API_KEY')
-    if not env.get('TELEGRAM_BOT_TOKEN', '').strip():
-        problems.append('MISSING_TELEGRAM_BOT_TOKEN')
-    if not env.get('TELEGRAM_CHAT_ID', '').strip():
-        problems.append('MISSING_TELEGRAM_CHAT_ID')
-    if len(env.get('TOKEN_RELAY_HMAC_KEY', '')) < 32:
-        problems.append('INVALID_TOKEN_RELAY_HMAC_KEY')
-    try:
-        Fernet(env.get('TOKEN_VAULT_KEY', '').encode('ascii'))
-    except (ValueError, TypeError, UnicodeError):
-        problems.append('INVALID_TOKEN_VAULT_KEY')
-    for name in ('ALERTS_ENABLED', 'KITE_SHADOW_ENABLED', 'PAPER_PREMIUM_TRACKING_ENABLED'):
-        if env.get(name, 'false').strip().lower() not in {'true', 'false'}:
-            problems.append('INVALID_BOOLEAN_' + name)
-    return problems
+    """Compatibility wrapper for sanitized validation codes."""
+    return list(configuration_blockers(env))
 
 
 def check_deployment(env: Mapping[str, str], *, mountinfo: str | None = None,
@@ -96,7 +81,7 @@ def check_deployment(env: Mapping[str, str], *, mountinfo: str | None = None,
     """
     blockers = _valid_secrets(env)
     passed: list[str] = []
-    if not _valid_secrets(env):
+    if not blockers:
         passed.append('SECRET_NAMES_AND_FORMATS')
     path = Path(env.get('STATE_DIR') or '/data/nifty-alerts')
     if not path.is_absolute():
@@ -125,8 +110,18 @@ def check_deployment(env: Mapping[str, str], *, mountinfo: str | None = None,
         secret_path = path / filename
         if secret_path.is_symlink():
             blockers.append('SENSITIVE_FILE_SYMLINK_' + filename.upper().replace('.', '_'))
-        elif secret_path.exists() and not secret_path.is_file():
-            blockers.append('SENSITIVE_FILE_NOT_REGULAR_' + filename.upper().replace('.', '_'))
+        elif secret_path.exists():
+            code = filename.upper().replace('.', '_').replace('-', '_')
+            try:
+                secret_stat = secret_path.stat()
+                if not stat.S_ISREG(secret_stat.st_mode):
+                    blockers.append('SENSITIVE_FILE_NOT_REGULAR_' + code)
+                elif secret_stat.st_uid != os.geteuid():
+                    blockers.append('SENSITIVE_FILE_WRONG_OWNER_' + code)
+                elif stat.S_IMODE(secret_stat.st_mode) & 0o077:
+                    blockers.append('SENSITIVE_FILE_PERMISSIONS_TOO_OPEN_' + code)
+            except OSError:
+                blockers.append('SENSITIVE_FILE_NOT_ACCESSIBLE_' + code)
 
     if mountinfo is None:
         try:

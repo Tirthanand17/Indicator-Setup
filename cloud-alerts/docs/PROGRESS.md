@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 61%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 62%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████░░░░░░░░░] 61%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 39%
+Overall engineering progress   [███████████████░░░░░░░░░] 62%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 38%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -18,13 +18,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 75% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 10% | Private-volume preflight and local Compose template tested; **host not deployed** |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 20% | Fail-closed bootstrap and private volume policies implemented/tests; **host activation and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **60.5%, rounded to 61%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **61.5%, rounded to 62%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -126,3 +126,13 @@ Sum of current percentages / 10 = **60.5%, rounded to 61%**. **Actual readiness 
 3. Docker now executes the preflight before starting a **single** Uvicorn worker; added operator-reviewed `deploy/compose.yml` with localhost-only port binding, private named volume, read-only root, dropped Linux capabilities, restricted process count and bounded logs. No HTTPS ingress is provisioned by this code.
 4. Added eight synthetic preflight tests; complete suite **151/151 passed** locally. Existing protected Windows trading folder remains read-only and was not used in these tests. No broker or Telegram calls.
 5. P5 implementation plan rises **0% to 10%** because a deployment template and preflight exist, but **host activation and laptop-off testing remain 0%**. Overall phase mean becomes **60.5%, rounded to 61%**. Existing P0–P9 figures unchanged otherwise. **Live cloud alerts are NOT enabled**.
+
+
+## October 19 Phase 13 — reject placeholder secrets and secure persistent files (62%)
+
+1. Added `cloud_alerts/config_guard.py`: a shared, **secret-redacting** configuration validator, used by both the fail-closed cloud preflight and direct ASGI runtime setup. A direct Uvicorn startup cannot silently bypass placeholder checks.
+2. Rejects `.env.example` placeholder keys, invalid boolean values and bad Fernet keys. When alerts are enabled, rejects malformed Kite API-key format, Telegram bot/chat formats and trivially repeated HMAC strings. This is only format validation, **not proof that credentials work**.
+3. Existing sensitive state files (`token.enc`, SQLite database, WAL, SHM and single-worker lock) must be regular, worker-owned and private. Symlinks and world/group-readable sensitive files block startup; they are **not** silently rewritten or deleted.
+4. Docker startup explicitly sets `umask 077` before the preflight and Uvicorn execution. Offline static checks enforce a single worker, localhost-bound ingress, a mounted private state volume and no credential COPY instructions.
+5. Full **168/168 offline tests** pass. No cloud infrastructure, broker requests, Telegram messages or real trades were used. The original protected Windows trading directory was not accessed or changed in this phase.
+6. Only **P5 preparatory infrastructure scope 10% → 20%**, bringing ten-phase mean to **61.5%, rounded to 62%**. The continuously running host, live token handoff and phone receipt remain **not verified**. See [fail-closed configuration and state guide](FAIL_CLOSED_CONFIG.md).

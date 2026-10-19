@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 61%** — `[████████████░░░░░░░░]` (**39% remaining**).
+**Overall engineering implementation estimate: 62%** — `[████████████░░░░░░░░]` (**38% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 151 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 168 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -79,9 +79,9 @@ python -m compileall -q cloud_alerts
 
 **Last updated:** 2026-10-19. **Cloud deployment:** OFF. **Live order execution:** DISABLED / NOT IMPLEMENTED.
 
-## Cloud worker progress
+## Historical cloud worker milestone (54% at the time)
 
-**Engineering readiness: 54% (estimated)**. [Progress board](docs/PROGRESS.md), [virtual premium monitoring](docs/PREMIUM_EXIT_MONITOR.md). 96 synthetic Python tests passing. Not cloud deployed; no orders.
+At an earlier milestone, progress was estimated at **54%** with 96 tests. Current progress is reported at the top and in [the up-to-date progress board](docs/PROGRESS.md). Cloud hosting remains inactive; no orders.
 
 ## Latest reliability patch — 19 October 2026
 
@@ -107,3 +107,10 @@ A separate **`GET /operationalz`** checks that completed REST market decisions a
 ## October 19 — 60% engineering milestone
 
 Daily token handoff now refuses to report success when a transfer fails, loads only the two necessary Kite values, and passes an in-process signed HTTPS-contract simulation through the genuine cloud handler and encrypted vault. **143/143 offline Python tests pass.** This is not a production cloud test, proof of valid broker authentication, a live Telegram phone receipt, or verified profitability.
+
+
+## Phase 13 (62%) — additional cloud startup hardening
+
+The server and standalone preflight now share secret-redacting checks that reject example placeholders; **enabled** alerts require syntactically valid Kite API and Telegram settings. Existing sensitive state artifacts must be private and worker-owned, and the Docker entrypoint sets `umask 077` before creating database or lock files. **168/168 offline tests** pass. This is not proof of real credential validity, cloud uptime, or message delivery.
+
+See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overall progress ledger](docs/PROGRESS.md). No always-on host has been approved or activated; alerts stay disabled by default.

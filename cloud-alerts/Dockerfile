@@ -12,4 +12,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).read()" || exit 1
 EXPOSE 8080
 # Fail before startup if the mounted volume/secrets are unsafe; no external requests.
-CMD ["sh", "-c", "python -m cloud_alerts.preflight --json && exec uvicorn cloud_alerts.main:app --host 0.0.0.0 --port 8080 --workers 1 --no-access-log"]
+CMD ["sh", "-c", "umask 077 && python -m cloud_alerts.preflight --json && exec uvicorn cloud_alerts.main:app --host 0.0.0.0 --port 8080 --workers 1 --no-access-log"]
