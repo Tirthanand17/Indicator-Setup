@@ -24,6 +24,27 @@ def decide(candles:list[Candle],now:datetime,confirm_15m:list[Candle], *, adx_mi
         return Decision('WAIT_DATA','recent five-minute candle gaps')
     if any(b.volume<=0 for b in candles[-4:]):
         return Decision('WAIT_DATA','missing recent futures traded volume')
+    # Higher-timeframe EMA is an independent confirmation input, not trusted
+    # solely because its final timestamp looks recent. Corrupt/duplicate bars
+    # or intraday gaps must not silently shift EMA context into a BUY review.
+    try:
+        for bar in confirm_15m:
+            bar.validate()
+        if any(a.start >= b.start for a,b in zip(confirm_15m, confirm_15m[1:])):
+            raise ValueError('15-minute candles not strictly ordered')
+    except ValueError as exc:
+        return Decision('WAIT_DATA',f'invalid 15-minute history: {exc}')
+    local_15m=[b for b in confirm_15m if b.start.astimezone(IST).date()==local.date()]
+    if not local_15m or local_15m[-1] != confirm_15m[-1]:
+        return Decision('WAIT_DATA','15-minute confirmation not from current session')
+    if any(b.start.astimezone(IST).time() < time(9,15) or
+           b.start.astimezone(IST).time() > time(15,15) or
+           ((b.start.astimezone(IST).minute-15) % 15)!=0
+           for b in local_15m):
+        return Decision('WAIT_DATA','invalid 15-minute session candle boundary')
+    if any(b.start-a.start!=timedelta(minutes=15)
+           for a,b in zip(local_15m[-3:],local_15m[-2:])):
+        return Decision('WAIT_DATA','recent 15-minute confirmation candle gaps')
     try:
         ind=compute(candles)
         closes=[b.close for b in confirm_15m]

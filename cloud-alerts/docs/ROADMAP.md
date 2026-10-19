@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 64%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 65%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -140,3 +140,12 @@
 - [ ] Validate actual phone receipt and option-level paper evidence across five trading sessions on an approved always-on host.
 
 **Overall engineering estimate: 64%. Live cloud service still OFF.**
+
+## October 19 Phase 16 — quote and higher-timeframe integrity (65%)
+
+- [x] Reject non-finite BID/ASK and contract-token mismatches before making a paper option review.
+- [x] Normalize naive Kite quote exchange timestamps as IST, independent of UTC cloud host timezone.
+- [x] Validate 15-minute OHLC, ordering, current-session alignment, and recent same-day contiguous history.
+- [x] Synthetic broker pipeline rejects a `NaN` option quote without posting Telegram or creating a virtual entry.
+- [x] **203/203** offline tests pass; `compileall` passes.
+- [ ] Compare 15-minute EMA and full option depth against captured live Kite/reference data on an authorized host; validate actual market sessions.

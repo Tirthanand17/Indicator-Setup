@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 64%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 65%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 64%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 36%
+Overall engineering progress   [████████████████░░░░░░░░] 65%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 35%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -14,9 +14,9 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | Phase | Scope | Estimated implementation | Evidence / blocker |
 |---|---|---:|---|
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
-| P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
+| P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
-| P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
+| P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 80% | Explicit cloud Telegram TEST-only CLI with safe API-acceptance reporting; no physical-phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
@@ -24,7 +24,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **63.5%, rounded to 64%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **65.0%, rounded to 65%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -155,3 +155,13 @@ Sum of current percentages / 10 = **63.5%, rounded to 64%**. **Actual readiness 
 4. Pre-existing legacy virtual candidates without an `entry_event_id` retain research-only compatibility; no host has been deployed to contain legacy real entries. New candidates always use the linked safety gate.
 5. Added **9 tests** for queued/expired/accepted entries, optional premium watcher network avoidance, crash/restart persistence, automatic SQLite event linkage and foreign event-ID rejection; **186/186 offline tests pass**. No real broker/Telegram requests or cloud deployment.
 6. P7 engineering estimate **65% → 75%**. Overall estimated engineering scope **63% → 64%**; live host activation and five-session proof remain **0%**. See [entry-notice gate](ENTRY_NOTICE_EXIT_SAFETY.md).
+
+
+## October 19 Phase 16 — fail-closed option quotes and 15-minute context (65%)
+
+1. Reject non-finite (`NaN`, positive/negative infinity) option BID/ASK before Telegram formatting, virtual premium monitoring, or performance calculations. Reject an optional Kite `instrument_token` that disagrees with the selected option; quotes missing this optional field remain compatible.
+2. Interpret naive Kite exchange quote timestamps explicitly in **Asia/Kolkata**, even if the cloud worker's supplied clock uses UTC; reject a naive validation clock. Stale/future-dated checks remain enforced.
+3. Validate **every** independent 15-minute confirmation candle's OHLC and timestamp ordering, and check recent same-session bars for gaps and invalid 15-minute session boundaries. The 15-minute EMA must not be based on missing/duplicate/corrupt intraday history.
+4. Added 17 new offline regression tests including synthetic full broker→option quote→Telegram suppression of `NaN` option prices. **203/203 local tests passed**. No real Kite, Telegram or hosting actions were used.
+5. P1 increases **80% → 90%**, P3 **80% → 85%**; the ten-phase mean is now **65% implemented, 35% remaining**. P5 hosting and P9 multi-day observed operations remain unchanged.
+6. See [market-data integrity gate](MARKET_DATA_INTEGRITY.md) for explicit scope and remaining live validation.

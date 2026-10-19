@@ -131,3 +131,11 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 - Pending entry notifications suppress futures and option-premium virtual EXIT notifications. Expired entries clear virtual tracking; missing/corrupted event status blocks exit reviews.
 - Telegram API acceptance is **not** proof of phone receipt or a real broker holding.
 - **186/186 offline Python tests pass**. No cloud host or live messages. See [Phase 15 report](docs/ENTRY_NOTICE_EXIT_SAFETY.md).
+
+
+## Phase 16: quote/15-minute integrity (2026-10-19)
+
+- Strict finite option BID/ASK values, optional NFO instrument-token identity check and unambiguous IST quote timestamps on UTC cloud workers.
+- Independent 15-minute confirmation input now rejects corrupt OHLC, duplicate or unordered rows and recent session gaps before an alert can be considered.
+- **203/203** offline tests pass, including broker-to-quote suppression of a corrupted option price. No new live market session, cloud instance, real Telegram message or order. See [integrity test design](docs/MARKET_DATA_INTEGRITY.md).
+- **Overall engineering progress: 65%, remaining: 35%**. Hosting and five-session paper operation are still unverified.

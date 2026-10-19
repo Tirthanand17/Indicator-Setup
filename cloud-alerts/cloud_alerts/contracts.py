@@ -1,7 +1,10 @@
 """Dynamic current-month NIFTY FUT and nearest listed NIFTY CE/PE discovery."""
 from __future__ import annotations
 from datetime import date,datetime
+from zoneinfo import ZoneInfo
+import math
 from .models import Contract,OptionQuote
+IST = ZoneInfo("Asia/Kolkata")
 
 
 def date_value(value):
@@ -32,19 +35,36 @@ def select_option(instruments:list[dict],today:date,side:str,underlying:float,av
 
 
 def validate_quote(contract:Contract,quote:dict,now:datetime,max_age_seconds:int=15,max_spread_pct:float=2.0)->OptionQuote:
+    """Reject corrupt/mismatched quotes before they reach phone or P&L logic.
+
+    Kite exchange timestamps without explicit offsets are interpreted in IST,
+    independently of the worker clock's timezone. Optional instrument_token
+    metadata must agree with the selected option contract when provided.
+    """
+    if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError('aware validation clock required')
+    if not isinstance(quote,dict):
+        raise ValueError('option quote malformed')
+    if 'instrument_token' in quote and (isinstance(quote['instrument_token'],bool)
+             or str(quote['instrument_token'])!=str(contract.token)):
+        raise ValueError('option quote instrument mismatch')
     depths=quote.get('depth') or {};bids=depths.get('buy') or [];asks=depths.get('sell') or []
     if not bids or not asks:raise ValueError('quote missing bid/ask depth')
     bid,ask=bids[0],asks[0]
     bp,ap=float(bid.get('price',0)),float(ask.get('price',0))
     bq,aq=int(bid.get('quantity',0)),int(ask.get('quantity',0))
+    if not math.isfinite(bp) or not math.isfinite(ap):
+        raise ValueError('nonfinite option bid/ask')
     if bp<=0 or ap<=bp or bq<contract.lot_size or aq<contract.lot_size:
         raise ValueError('unexecutable or insufficient top-of-book')
     spread=100*(ap-bp)/((ap+bp)/2)
-    if spread>max_spread_pct:raise ValueError('option spread too wide')
+    if not math.isfinite(spread) or spread>max_spread_pct:
+        raise ValueError('option spread too wide')
     raw_ts=quote.get('timestamp')
     if not raw_ts:raise ValueError('option exchange quote timestamp missing')
     updated=raw_ts if isinstance(raw_ts,datetime) else datetime.fromisoformat(str(raw_ts))
-    if updated.tzinfo is None: updated=updated.replace(tzinfo=now.tzinfo)
+    if updated.tzinfo is None:
+        updated=updated.replace(tzinfo=IST)
     age=(now-updated).total_seconds()
     if age< -3 or age>max_age_seconds:raise ValueError('option quote stale or future dated')
     return OptionQuote(contract,bp,ap,bq,aq,updated)
