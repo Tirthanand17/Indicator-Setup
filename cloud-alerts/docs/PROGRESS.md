@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 41%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 44%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████░░░░░░░░░░░░] 41%
-Remaining estimated scope      [░░░░░░░░████████████] 59%
+Overall engineering progress   [███████████░░░░░░░░░░░░░░] 44%
+Remaining estimated scope      [░░░░░░░░░░░██████████████] 56%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -16,7 +16,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
 | P2 | Daily token relay, HMAC and encrypted vault | 70% | Synthetic tests; no deployed TLS host or live handoff |
-| P3 | Real REST 5/15m candles, broker quote depth | 50% | Prototype adapter; no broker session integration test |
+| P3 | Real REST 5/15m candles, broker quote depth | 75% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 50% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 35% | Synthetic tick aggregator + callback adapter + reconciliation tests; **not wired to cloud runner** |
@@ -24,7 +24,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P8 | Walk-forward option backtests & reliability dashboard | 0% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **41%** (rounding to nearest whole percent). **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3/P4 lack live validation.
+Sum of percentages / 10 = **43.5%, rounded to 44%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -33,7 +33,14 @@ Sum of percentages / 10 = **41%** (rounding to nearest whole percent). **Actual 
 3. Created the read-only KiteTicker shadow module with strict timestamp, instrument, volume and reconnect safeguards; fixed a first-partial-bar leakage uncovered by unit tests.
 4. Created an idempotent 5-minute REST polling schedule with at most three scheduled attempts per boundary, and no burst after a delayed wake.
 5. Added durable unsent-alert expiry after 180 seconds; queued BUY messages cannot arrive many minutes late after an outage.
-6. **47 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
+6. **51 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
+
+## Read-only live API evidence (19 October 2026)
+
+- Authorized Nirala `.env` variable names verified with no secret values disclosed; original file was not changed.
+- Paid Kite Connect returned HTTP 200 for **NFO instruments**, **NIFTY futures quote+depth**, and **5-minute / 15-minute history**.
+- Verified active future `NIFTY26OCTFUT`, expiry 27 Oct 2026, listed lot size **65**, 78 recent 5-minute candles and 26 recent 15-minute candles. See [LIVE_API_SMOKE_2026-10-19.md](LIVE_API_SMOKE_2026-10-19.md).
+- Added **four synthetic full pipeline tests** from fake broker market-data through paper option quote checks and Telegram message formatting; these do not contact Kite or Telegram.
 
 ## Next highest-priority actions
 
