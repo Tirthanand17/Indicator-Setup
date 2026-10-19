@@ -1,35 +1,25 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIFTY Paper Alert Dashboard</title><link rel="stylesheet" href="style.css"></head><body>
-<h1>NIFTY Five-Indicator Paper Alerts</h1>
-<p class="notice"><strong>Read-only ₹0 beta.</strong> Opening the Kite chart only detects its presence. This version does <strong>not</strong> extract verified live indicators from the broker chart, subscribe to paid data, or submit orders. Enter <strong>completed</strong> 5-minute candle values and confirm option checks for a provisional signal notification. No automated buy/sell commands exist.</p>
-<section class="panel"><h2>Chart connection & notifications</h2><p id="chart">Checking…</p><label class="check"><input type="checkbox" id="armed">Enable local desktop notifications for manually verified candidates</label><button id="test">Send TEST notification</button><p><small>Only one alert per symbol, candle close and CE/PE direction. No alert on missing/stale data.</small></p></section>
-<section class="panel"><h2>Closed 5-minute futures candle — verified manual entry</h2>
-<p class="caption">Copy numeric values from the completed candle and DMI/ATR studies. If the chart is on a forming candle, do not check the closed box. Confirm the 15-minute chart separately.</p>
-<form id="signalForm">
-<div class="grid">
-<div><label for="symbol">Current-month NIFTY futures symbol</label><input id="symbol" required placeholder="NIFTY26OCTFUT" value="NIFTY26OCTFUT"></div>
-<div><label for="candleEnd">Completed candle END time (browser local)</label><input id="candleEnd" type="datetime-local" required></div>
-<div><label for="close">Futures candle close</label><input id="close" type="number" step="0.01" min="1" required></div>
-<div><label for="vwap">Session VWAP</label><input id="vwap" type="number" step="0.01" min="1" required></div>
-<div><label for="ema9">EMA 9 (blue)</label><input id="ema9" type="number" step="0.01" min="1" required></div>
-<div><label for="ema21">EMA 21 (purple)</label><input id="ema21" type="number" step="0.01" min="1" required></div>
-<div><label for="plusDI">DMI +DI (green)</label><input id="plusDI" type="number" step="0.0001" min="0" max="100" required></div>
-<div><label for="minusDI">DMI −DI (red)</label><input id="minusDI" type="number" step="0.0001" min="0" max="100" required></div>
-<div><label for="adx">ADX now (pink)</label><input id="adx" type="number" step="0.0001" min="0" max="100" required></div>
-<div><label for="priorAdx">ADX previous completed candle</label><input id="priorAdx" type="number" step="0.0001" min="0" max="100" required></div>
-<div><label for="atr">ATR 14 (orange; underlying points)</label><input id="atr" type="number" step="0.01" min="0.01" required></div>
-<div><label for="volume">Futures traded volume</label><input id="volume" type="number" step="1" min="1" required></div>
-<div><label for="structure">Completed price-action trigger</label><select id="structure"><option value="none">Not confirmed</option><option value="bull">Bullish breakout / retest</option><option value="bear">Bearish breakdown / retest</option></select></div>
-<div><label for="higherTimeframe">15-minute trend context</label><select id="higherTimeframe"><option value="unknown">Not verified</option><option value="bull">Bullish</option><option value="bear">Bearish</option><option value="neutral">Non-conflicting / neutral</option></select></div>
-</div>
-<label class="check"><input id="closed" type="checkbox"> I verified this five-minute candle is CLOSED, not forming.</label>
-<label class="check"><input id="optionChecks" type="checkbox"> I checked actual option strike, expiry, ASK/BID spread, lot size, IV, planned stop/target and affordable loss.</label>
-<button type="submit">Evaluate and notify if eligible</button></form>
-<h3 style="margin-top:18px">Last decision</h3><div class="result" id="result">No observation submitted.</div></section>
-<section class="panel"><h2>Paper position — manual option BID exit alerts</h2><p class="caption">This extension cannot read option quotes automatically. Enter the planned values and later type the observed option sellable BID to check STOP / TARGET. The monitor cannot exit your real positions.</p>
-<form id="positionForm"><div class="grid"><div><label for="direction">Bought contract</label><select id="direction"><option value="CE">CE</option><option value="PE">PE</option></select></div><div><label for="entry">Paid premium (per unit)</label><input id="entry" type="number" min="0.01" step="0.01" required></div><div><label for="stop">Planned sell BID stop (per unit)</label><input id="stop" type="number" min="0.01" step="0.01" required></div><div><label for="target">Planned sell BID target (per unit)</label><input id="target" type="number" min="0.01" step="0.01" required></div></div><button type="submit">Track paper position</button><button class="warn" id="clearPos" type="button">Clear tracked position</button></form>
-<p id="positionStatus" class="caption">No position tracked.</p><div class="grid"><div><label for="bid">Most recent manually observed option BID</label><input type="number" id="bid" min="0.01" step="0.01"></div></div><button id="checkExit">Check stop or target</button><div id="exitResult" class="result">No exit check yet.</div></section>
-<section class="panel"><h2>Local decision log</h2><ol class="logs" id="logs"></ol><p class="caption">Stored only in this browser's extension storage, capped at 150 events. No data is sent to third-party servers.</p></section>
-<p><a href="https://github.com/Tirthanand17/Indicator-Setup/blob/main/docs/BUY_SELL_DECISION_GUIDE.md" target="_blank" rel="noopener noreferrer">Read full CE / PE / exit / NO_TRADE guide</a></p>
-<script src="dashboard.js"></script>
-</body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIFTY Automatic Paper Alerts</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>NIFTY Automatic Five-Indicator Alerts <small>v0.2</small></h1>
+<p class="notice"><strong>Automatic screen-reading beta, not an execution bot.</strong> Reads only the displayed NIFTY futures chart legend within Kite. No manual indicator input, no trading API, no payment, and no orders. Near-close chart samples are <strong>not exchange-confirmed closed candles</strong>; every alert means <strong>REVIEW</strong>, not buy immediately. Actual option quotes, IV and your holdings are not accessible from a futures-only chart.</p>
+<section class="panel"><h2>1 · Connection & notifications</h2>
+<p id="chart">Connecting to chart…</p>
+<label class="check"><input type="checkbox" id="autoEnabled">Automatically monitor the open Kite 5-minute NIFTY futures chart</label>
+<label class="check"><input type="checkbox" id="armed">Show desktop notifications for candidate CE/PE and virtual exit reviews</label>
+<button id="test">Send TEST notification</button><button class="secondary" id="reset">Reset automatic monitor's candle history</button>
+<p class="caption">For reliable boundary sampling, leave the Kite tab open in Chrome. Browser background throttling can pause collection, in which case this tool reports WAIT_DATA. It does not run when the browser/laptop is closed.</p></section>
+<section class="panel"><h2>2 · Live values automatically read from the chart</h2>
+<p class="caption" id="updated">No valid chart frame reading yet.</p>
+<div class="grid" id="values"></div>
+<p class="caption">The values above normally belong to the <strong>forming</strong> candle. They are displayed to inspect the read-only extraction, not as entry signals.</p></section>
+<section class="panel"><h2>3 · Paper-signal evaluation at 5-minute boundaries</h2>
+<div id="result" class="result">WAIT_DATA</div>
+<div id="reasons" class="caption"></div>
+<p id="closedBar" class="caption">No near-close sample yet.</p>
+<p class="caption">Alerts require a snapshot from the last 3.5 seconds before the next bar, observation of the next bar shortly after the boundary, four consecutive near-close bars, ADX≥25 and rising, aligned VWAP/EMA/DMI, and a break of the recent 3-bar price range. Signals also use a 15-minute trend <strong>proxy</strong> from 5-minute price history; this is not an independent 15-minute chart calculation.</p>
+</section>
+<section class="panel"><h2>4 · Virtual exit alert tracker (NOT Kite holdings)</h2>
+<p id="virtual" class="caption">No prior candidate is being tracked.</p>
+<p class="caption">After a candidate CE/PE alert, the system automatically tracks a <strong>virtual underlying futures</strong> stop/target/reversal and can notify EXIT CE or EXIT PE. It does not know whether you bought an option, what premium you paid, or the real option BID. It cannot close your actual position.</p></section>
+<section class="panel"><h2>5 · Recent evaluation journal</h2><ol class="logs" id="logs"></ol><p class="caption">Local to this browser. No broker authentication material or raw page URLs stored. Maximum 150 events.</p></section>
+<p><a href="https://github.com/Tirthanand17/Indicator-Setup/blob/main/docs/BUY_SELL_DECISION_GUIDE.md" target="_blank" rel="noopener noreferrer">Read CE / PE / NO_TRADE / exit rules on GitHub</a></p>
+<script src="dashboard.js"></script></body></html>
