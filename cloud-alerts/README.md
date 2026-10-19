@@ -80,3 +80,12 @@ python -m compileall -q cloud_alerts
 - Paper entry event and virtual position are committed together **before** Telegram network delivery. Restart/failure recovery never claims a buy was actually filled.
 - `/healthz` now includes only sanitized counts of queued, Telegram-accepted and expired messages; it does not confirm phone receipt.
 - **96 offline tests pass.** Cloud hosting and real phone-generated signals remain unverified. See [progress evidence](docs/PROGRESS.md).
+
+
+## Cloud operational hardening — P4 continuation (55% overall)
+
+- Linux singleton lock prevents competing market workers on the **same** durable volume; infrastructure must still restrict to **one replica**.
+- Signed token relay rejects bodies larger than 2048 bytes before reading them fully.
+- `/healthz` reports whether the background worker is alive; `/readyz` reports only enabled + daily-token-present configuration, **not** market/phone readiness.
+- Container liveness probe and 106 passing offline tests. See [startup security/runbook](docs/RELIABLE_CLOUD_STARTUP.md) and [progress ledger](docs/PROGRESS.md).
+- **No always-on cloud instance activated**, no real alert sent from cloud, no real orders and no modifications in the protected trading folder.

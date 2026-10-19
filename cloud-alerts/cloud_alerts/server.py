@@ -16,6 +16,7 @@ from .state import State
 from .security import TokenVault,verify_relay
 from .telegram import Telegram
 from .stream_supervisor import ShadowSupervisor
+from .runtime_guard import single_worker
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -50,26 +51,58 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
 
     @asynccontextmanager
     async def lifespan(app:FastAPI):
-        task=asyncio.create_task(engine.run_forever(),name='kite-paper-alerts')
-        try:yield
-        finally:
-            task.cancel()
-            try:await task
-            except asyncio.CancelledError:pass
-            if shadow is not None:
-                await shadow.shutdown()
+        # A second Uvicorn worker using the same durable volume must fail.
+        # Different hosts/volumes still require a single-replica deployment.
+        with single_worker(cfg.root):
+            task=asyncio.create_task(engine.run_forever(),name='kite-paper-alerts')
+            app.state.worker_task=task
+            try:yield
+            finally:
+                task.cancel()
+                try:await task
+                except asyncio.CancelledError:pass
+                if shadow is not None:
+                    await shadow.shutdown()
+                app.state.worker_task=None
 
     app=FastAPI(title='NIFTY read-only paper alerts',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
     app.state.engine=engine
+    app.state.worker_task=None
     @app.get('/healthz')
     async def healthz():
-        return JSONResponse(engine.health(),headers={'Cache-Control':'no-store'})
+        data=engine.health()
+        task=app.state.worker_task
+        alive=task is not None and not task.done()
+        data['worker_running']=alive
+        # Do not report a green health probe if FastAPI is serving requests
+        # but the background market-data task has crashed.
+        return JSONResponse(data,status_code=200 if alive else 503,
+                            headers={'Cache-Control':'no-store'})
+
+    @app.get('/readyz')
+    async def readyz():
+        # Monitoring-only readiness, not the host's liveness probe: missing
+        # daily login should NOT cause the cloud provider to restart workers.
+        ready=bool(engine.enabled and vault.get(datetime.now(IST)))
+        return JSONResponse({'ready':ready,'mode':'READ_ONLY_PAPER'},
+                            status_code=200 if ready else 503,headers={'Cache-Control':'no-store'})
 
     @app.post('/internal/token')
     async def handoff(request:Request):
         if request.headers.get('content-type','').split(';')[0]!='application/json':
             raise HTTPException(415,'JSON only')
-        raw=await request.body()
+        # Strict bound BEFORE reading request content into memory. Content-Length
+        # can be absent or dishonest, therefore enforce while streaming too.
+        if request.headers.get('content-length','').isdigit() and int(request.headers['content-length'])>2048:
+            raise HTTPException(413,'token handoff body too large')
+        chunks=[]
+        size=0
+        async for chunk in request.stream():
+            size+=len(chunk)
+            if size>2048:
+                raise HTTPException(413,'token handoff body too large')
+            chunks.append(chunk)
+        raw=b''.join(chunks)
         now=datetime.now(IST)
         ts=request.headers.get('x-relay-timestamp','')
         nonce=request.headers.get('x-relay-nonce','')

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 54%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 55%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████░░░░░░░░░░] 54%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 46%
+Overall engineering progress   [██████████████░░░░░░░░░░] 55%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 45%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
 | P2 | Daily token relay, HMAC and encrypted vault | 70% | Synthetic tests; no deployed TLS host or live handoff |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 55% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
+| P4 | Telegram delivery, dedupe/outbox, health | 65% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 0% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **53.5%, rounded to 54%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **54.5%, rounded to 55%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -75,3 +75,11 @@ Sum of percentages / 10 = **53.5%, rounded to 54%**. **Actual readiness for time
 4. Validate live paid Kite REST, option bid/ask and Telegram TEST end-to-end; then paper-test five full sessions, collect delivery delay/missed-signal statistics, and compare option backtests.
 
 **Update rule:** after every future development pass, revise this file and report the progress percentage **and** the status of live cloud alerts separately. This file is a status ledger, not a market signal.
+
+## October 19 follow-up — cloud lifecycle and ingress hardening (55%)
+
+1. Added Linux/POSIX single-worker advisory lock in `STATE_DIR`: rejects a second running FastAPI worker sharing the volume; deliberate fail-closed startup on symlink attacks and releases cleanly. This does **not** replace the requirement for exactly one hosted replica.
+2. Bounded daily token-handoff request bodies to 2048 bytes *before* allocating the payload, including misleading Content-Length headers. Existing HMAC signature, 90-second clock skew and durable nonce replay guard remain enforced.
+3. Added `/readyz` showing only enabled/token-present configuration; **not** a broker/phone quality assertion. `/healthz` now fails 503 when its background engine dies. Docker liveness checks use `/healthz` rather than daily-token readiness.
+4. Added startup and dual-process protection tests, for **106/106 offline tests passing**. No actual cloud deployment, broker order, phone message or subscription charge was initiated.
+5. The previous P4 offline-completion estimate rises from 55% to 65%, moving overall from 54% to **55%**; P5 (always-on host), P8 (option backtesting) and P9 (five-session trials) remain 0%. See [reliable cloud startup](RELIABLE_CLOUD_STARTUP.md).

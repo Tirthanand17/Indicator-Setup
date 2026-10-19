@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 54%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 55%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -41,3 +41,15 @@
 - [x] Test duplicate protection, malformed candidate fail-closed, restart and Telegram failure.
 - [ ] Live Telegram acceptance and mobile receipt from the cloud.
 - [ ] Always-on host, daily token relay and 5 full market-session paper trial.
+
+
+## 2026-10-19 — P4 deployment-readiness continuation
+
+- [x] Non-root Docker health probe on `/healthz`, including worker-crash detection.
+- [x] Single-process Linux lock, fail-closed duplicate worker on the same durable volume.
+- [x] Enforce 2048-byte token relay ingress limit before memory allocation.
+- [x] Distinguish app liveness from token-present readiness (not proof of Kite authorization).
+- [x] **106/106** offline tests passing.
+- [ ] Choose and approve always-on cloud host and persistent storage (₹0 extra only if verified and approved).
+- [ ] Real signed daily token transfer and Telegram phone delivery.
+- [ ] Confirm restart recovery across a real persistent volume and multi-day market evidence.
