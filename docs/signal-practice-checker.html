@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NIFTY 5 Indicator Paper-Trading Practice Checker</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif;background:#0d1729;color:#eaf2ff}*{box-sizing:border-box}body{margin:0;padding:28px 16px}.wrap{max-width:800px;margin:auto}.panel{background:#15243a;border:1px solid #31425d;border-radius:16px;padding:24px;margin:16px 0}h1{line-height:1.2}h2{margin-top:0}p{line-height:1.6;color:#cbd9ea}label{display:block;font-weight:600;margin-top:17px;margin-bottom:7px}select,input[type=number]{width:100%;padding:12px;border-radius:8px;border:1px solid #697992;background:#0d1729;color:white;font-size:16px}.check{display:flex;gap:10px;align-items:center;font-weight:normal}.check input{width:20px;height:20px}.result{font-weight:800;font-size:28px;padding:13px;border-radius:9px;background:#29354a;margin:12px 0}.ce{color:#5ce4b4}.pe{color:#ff9898}.hold{color:#f4d184}.small{font-size:13px}.criteria{line-height:1.8}button{cursor:pointer;border:1px solid #8eb0e8;background:#253d62;color:#fff;border-radius:9px;padding:10px 17px;font-weight:600}.banner{border-left:4px solid #eab65d;padding:10px 15px;background:#302e32;color:#ffecc6}
+</style>
+</head>
+<body><main class="wrap">
+<h1>NIFTY 50 Options: Five-Indicator Practice Checker</h1>
+<p class="banner"><strong>Education / paper trading only.</strong> This offline checker does not read market data, guarantee winning trades, manage your portfolio or connect to Zerodha. It cannot submit orders. Inputs are manually entered hypothetical conditions.</p>
+<section class="panel">
+<h2>Read your saved Kite chart</h2>
+<label for="vwap">1. Last completed 5m futures close relative to session VWAP</label>
+<select id="vwap"><option value="above">Above VWAP</option><option value="below">Below VWAP</option><option value="mixed">Repeatedly crossing / too close</option></select>
+<label for="ema">2. EMA 9 relative to EMA 21</label>
+<select id="ema"><option value="bull">EMA 9 above EMA 21</option><option value="bear">EMA 9 below EMA 21</option><option value="mixed">Conflicting / tangled</option></select>
+<label for="di">3. DMI directional movement</label>
+<select id="di"><option value="bull">Green +DI above red −DI</option><option value="bear">Red −DI above green +DI</option><option value="mixed">Crossing / nearly equal</option></select>
+<label for="adx">4. DMI pink ADX value</label>
+<input type="number" id="adx" min="0" max="100" step="0.1" value="28">
+<label class="check"><input id="adxRising" type="checkbox" checked> ADX has been rising on completed candles</label>
+<label for="confirmation">5. Completed 5m candle + 15m context</label>
+<select id="confirmation"><option value="bull">Bullish breakout/retest; 15m non-conflicting</option><option value="bear">Bearish breakdown/retest; 15m non-conflicting</option><option value="none">No confirmation or higher timeframe disagrees</option></select>
+<label class="check"><input id="fresh" type="checkbox" checked> Market data fresh: valid complete candles, nonzero futures volume</label>
+<label class="check"><input id="options" type="checkbox"> Actual option quote, spread, expiry, premium risk and size have been checked</label>
+</section>
+<section class="panel" aria-live="polite">
+<h2>Provisional outcome</h2>
+<div id="result" class="result hold">NO_TRADE</div>
+<p id="details"></p>
+<ol id="criteria" class="criteria"></ol>
+<p class="small"><strong>ATR14:</strong> Read it separately on the underlying 5m chart. ATR helps define a plausible futures-price buffer near a structural stop but is not a rupee-denominated CE/PE premium stop or a directional vote.</p>
+<button id="reset" type="button">Reset to example</button>
+</section>
+<p class="small">Guide: <a href="BUY_SELL_DECISION_GUIDE.md" style="color:#9fd1ff">BUY_SELL_DECISION_GUIDE.md</a> · Last updated 2026-10-19. The ADX >=25 rule is an unoptimized educational hypothesis.</p>
+</main>
+<script>
+'use strict';
+const ids=['vwap','ema','di','adx','adxRising','confirmation','fresh','options'];
+const e=id=>document.getElementById(id);
+function calculate(){
+ const vwap=e('vwap').value,ema=e('ema').value,di=e('di').value,confirm=e('confirmation').value,adx=Number(e('adx').value);
+ const dataOk=e('fresh').checked, strength=Number.isFinite(adx)&&adx>=25&&e('adxRising').checked;
+ const bull=dataOk&&vwap==='above'&&ema==='bull'&&di==='bull'&&strength&&confirm==='bull';
+ const bear=dataOk&&vwap==='below'&&ema==='bear'&&di==='bear'&&strength&&confirm==='bear';
+ const fullyChecked=e('options').checked;
+ let text='NO_TRADE',cls='hold',detail='Wait. The proposed five-indicator directional confirmation is incomplete or conflicting.';
+ if(bull){text='POTENTIAL CE PAPER SETUP';cls='ce';detail='Bullish conditions align. '+(fullyChecked?'Option risk checks marked complete; independently validate them before any simulated entry.':'Actual option premium, spread, lot size and risk checks are still needed.');}
+ if(bear){text='POTENTIAL PE PAPER SETUP';cls='pe';detail='Bearish conditions align. '+(fullyChecked?'Option risk checks marked complete; independently validate them before any simulated entry.':'Actual option premium, spread, lot size and risk checks are still needed.');}
+ e('result').textContent=text;e('result').className='result '+cls;e('details').textContent=detail;
+ const checks=[
+ [dataOk,'Market data is valid'],
+ [vwap!=='mixed','Price position vs session VWAP is clear'],
+ [ema!=='mixed','EMA9 vs EMA21 direction is clear'],
+ [di!=='mixed','DMI +DI vs −DI direction is clear'],
+ [strength,'ADX is at least 25 and rising (research hypothesis)'],
+ [confirm!=='none','Completed candle and higher-timeframe confirmation'],
+ [fullyChecked,'Actual option premium, spread, expiry and risk assessed']
+ ];
+ e('criteria').replaceChildren(...checks.map(([ok,message])=>{const li=document.createElement('li');li.textContent=(ok?'PASS — ':'CHECK / FAIL — ')+message;return li;}));
+}
+ids.forEach(id=>e(id).addEventListener('change',calculate));
+e('adx').addEventListener('input',calculate);
+e('reset').addEventListener('click',()=>{e('vwap').value='above';e('ema').value='bull';e('di').value='bull';e('adx').value=28;e('adxRising').checked=true;e('confirmation').value='bull';e('fresh').checked=true;e('options').checked=false;calculate()});
+calculate();
+</script></body></html>
