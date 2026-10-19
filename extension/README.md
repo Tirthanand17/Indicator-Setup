@@ -15,6 +15,15 @@
 - `popup.html/js`, `dashboard.html/js`, `style.css`: automatic live chart health, readings, paper-candidate notifications and journal.
 - `tests/`: pure JS unit tests.
 
+## Verified Nirala installation (19 October 2026)
+
+- Verified installed Chrome extension **v0.2.0** from `%LOCALAPPDATA%\\IndicatorSetup\\extension` on Nirala; repo updated with the same v0.2 sources and the new automatic-reader tests.
+- Confirmed dashboard reported **Automatic read: RUNNING**, detected `NIFTY26OCTFUT`, and populated futures price, volume, Session VWAP, EMA9/EMA21, DMI and ATR without user-entered values.
+- Both **Auto Monitor** and **Desktop notifications** toggles were checked. A TEST notification was requested, but an operating-system toast was **not independently observed**; review Windows/Chrome notification settings if none appears.
+- Current result after restoring chart layout: **WAIT_DATA**, because the system needs four consecutive near-close five-minute readings before assessing its first candidate. Do not infer that an alert has fired; only the live reader has been verified.
+- **Important Kite behavior:** Reloading the chart URL opened its default `1D` view with no five indicators. Restore **Save dropdown → Open layout → NIFTY 5 Indicator Setup** to return to the saved 5m study layout. This chart-state restoration has not been automated. The extension correctly suppresses signals until the required 5m indicator fields are displayed.
+- Chrome must remain open. Background-tab throttling and a missing candle-boundary reading can still suspend alerts. No historical win rate or exchange-confirmed execution reliability has been established.
+
 ## Installation or upgrade
 
 1. Download or clone **only the extension folder** from the public repository: https://github.com/Tirthanand17/Indicator-Setup/tree/main/extension.
