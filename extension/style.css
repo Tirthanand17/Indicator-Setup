@@ -5,3 +5,6 @@
 label.check{display:flex;align-items:center;gap:8px;margin:14px 0}label.check input{width:auto;min-width:18px;height:18px}button{background:#245ea3;border:1px solid #5395dc;border-radius:8px;color:#fff;padding:11px 15px;font-weight:650;cursor:pointer;margin:6px 6px 0 0}button.secondary{background:#2c3950}button.warn{background:#613a39;border-color:#bd7978}
 .notice{border-left:4px solid #eab85a;padding:12px;background:#393330;border-radius:5px;color:#ffe3b2}
 .result{white-space:pre-wrap;padding:12px;border:1px solid #4c617d;border-radius:8px;min-height:55px}.good{color:#63f3c1}.bad{color:#ff9f9f}.muted{color:#9ab0c7}.logs{padding-left:20px;max-height:210px;overflow:auto;font-size:13px}small,.caption{color:#9fb1c5}a{color:#a9d4ff}
+.metric{background:#0c1d33;border:1px solid #33465c;border-radius:9px;padding:13px;display:flex;gap:6px;flex-direction:column}
+.metric strong{font-size:18px;font-variant-numeric:tabular-nums}.metric small{font-size:13px}
+body.popup {min-width:335px;max-width:390px}
