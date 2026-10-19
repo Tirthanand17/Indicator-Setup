@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 69%** — `[████████████████░░░░░░░░]` (**31% remaining**).
+**Overall engineering implementation estimate: 70%** — `[██████████████████░░░░░░]` (**30% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 283 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 297 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -31,6 +31,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
 - [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)
+- [Telegram Bot API acceptance and retry/latency audit](docs/TELEGRAM_DELIVERY_AUDIT.md)
 - [Restricted HTTPS ingress and TEST-only Telegram probe](docs/HTTPS_INGRESS_AND_PHONE_TEST.md)
 - [Prevent virtual EXIT reviews for undelivered entry notices](docs/ENTRY_NOTICE_EXIT_SAFETY.md)
 
@@ -52,7 +53,7 @@ The worker now persists only sanitized `ENTRY` option ASK/BID depth with each ne
 ## What is NOT done yet
 
 - No public cloud host deployed, no hosting bill authorized, no Kite credentials moved, and no Telegram cloud secrets configured. Nothing is listening on an Internet endpoint yet.
-- The optional read-only WebSocket **shadow** connection is integrated, but not live-validated. **REST candle polling** remains the ONLY source that can trigger paper alerts. Per-second option premium monitoring, live reconnect/backfill validation, and delivery-latency benchmarking remain pending.
+- The optional read-only WebSocket **shadow** connection is integrated, but not live-validated. **REST candle polling** remains the ONLY source that can trigger paper alerts. Per-second option premium monitoring, live reconnect/backfill validation and **actual** delivery-latency measurement remain pending (offline audit implemented).
 - No live Kite subscription authentication test, no real option bid/ask end-to-end test, no historical strategy validation, and no actual market-generated phone candidate alert proof.
 - No promise that any indicator combination has high win probability. This is still **PAPER / SIGNAL REVIEW ONLY**.
 
@@ -171,3 +172,7 @@ Rates/costs above are *illustrative assumptions*, not current verified fee estim
 - Reconciled 09:25–15:25 IST inclusive polling: **73 five-minute boundaries** for an explicitly selected open weekday. Fixed the inaccessible 15:25:08+ boundary and unsatisfiable 09:20 poll.
 - Added a persisted, sanitized outcome ledger (per-boundary success/failure/retry), a read-only operator session audit and fail-closed malformed-data checks. These measure REST polling coverage, **not** actual Kite provenance, Telegram handset receipt, or option win rate.
 - **283/283 local offline tests passed**; project code remains read-only and paper-only. Overall engineering estimate **69%**, cloud service still NOT deployed.
+
+## Phase 21: offline Telegram acceptance latency audit (70%)
+
+The outbox now keeps restart-safe attempted-send counts and timestamps, and a first Bot API acceptance timestamp; legacy rows are migrated without losing their messages. Run `python -m cloud_alerts.delivery_audit_cli --db /private/alerts.sqlite3 --session-date 2026-10-19` on an **operator-reviewed private read-only SQLite copy** to see per-session retry, expiry, median/p95/max API latency and unverifiable legacy counters. See [audit guide](docs/TELEGRAM_DELIVERY_AUDIT.md). **No phone receipts or live messages were obtained.**

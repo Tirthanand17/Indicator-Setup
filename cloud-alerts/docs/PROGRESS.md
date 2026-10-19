@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 69%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 70%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [█████████████████░░░░░░░] 69%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░████████] 31%
+Overall engineering progress   [██████████████████░░░░░░] 70%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 30%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,22 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 85% | Persistent sanitized REST boundary coverage and TEST-only Telegram probe; no physical-phone receipt or live host |
+| P4 | Telegram delivery, dedupe/outbox, health | 87% | Durable per-event Telegram API attempt and acceptance timestamps + sanitized offline latency audit; no physical-phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 55% | Entry-notice and REST-session coverage audits distinguish missing evidence and missed intervals; real quote provenance and out-of-sample proof absent |
+| P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **69.0%, rounded to 69%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **70.0%, rounded to 70%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+
+## Phase 21 continuation — restart-safe Telegram API acceptance telemetry (19 Oct)
+
+1. Migrated the existing SQLite `events` table in place, preserving all previously saved reviews, with sanitized first/last send-attempt UTC timestamps, retry counter, and first Bot API acceptance UTC timestamp. No credentials, chat IDs or extra message bodies were stored.
+2. Record each attempted send **before** contacting Telegram. Queued/expired/accepted transitions are fail-closed, preserving accepted timestamps across restarts and rejecting resurrection of expired alerts.
+3. Added `delivery_audit.py` and an offline read-only `delivery_audit_cli.py` to calculate per-session acceptance coverage, retries, median/p95/max API latency and accepted-after-180-second counts; legacy timing gaps are explicitly reported. Dates require deliberate session selection; holidays are not inferred.
+4. Replayed outage/restart and migration cases with synthetic Telegram transports. **297/297 local tests passed** after this implementation. No network calls to Kite/Telegram; no live cloud service or phone receipt was tested.
+5. See [TELEGRAM_DELIVERY_AUDIT.md](TELEGRAM_DELIVERY_AUDIT.md). Telegram API success **does not** equal handset delivery and no trade was placed.
 
 ## Completed in this continuation
 

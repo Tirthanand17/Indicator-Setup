@@ -31,6 +31,17 @@ class State:
                 event_id TEXT NOT NULL, phase TEXT NOT NULL, payload TEXT NOT NULL,
                 payload_sha256 TEXT NOT NULL,
                 PRIMARY KEY (event_id,phase));''')
+            # Non-destructive migration: existing saved alert rows remain intact.
+            # These columns never contain message bodies, phone IDs or API keys.
+            event_columns={row[1] for row in db.execute('PRAGMA table_info(events)')}
+            for name,ddl in (
+                ('delivery_attempts','INTEGER NOT NULL DEFAULT 0'),
+                ('first_attempt_utc','TEXT'),
+                ('last_attempt_utc','TEXT'),
+                ('accepted_at_utc','TEXT'),
+            ):
+                if name not in event_columns:
+                    db.execute(f'ALTER TABLE events ADD COLUMN {name} {ddl}')
     def _connect(self):return sqlite3.connect(self.path,timeout=10)
     def record_rest_attempt(self, now:datetime, outcome:str)->None:
         """Persist sanitized per-boundary monitoring quality, never prices/secrets.
@@ -171,8 +182,50 @@ class State:
             row=db.execute('SELECT delivered FROM events WHERE event_id=?',(event_id,)).fetchone()
             return int(row[0]) if row else None
 
-    def mark_delivered(self,event_id:str):
-        with self._connect() as db:db.execute('UPDATE events SET delivered=1 WHERE event_id=?',(event_id,))
+    def record_delivery_attempt(self,event_id:str,when:datetime)->bool:
+        """Durably count a send attempt BEFORE contacting Telegram.
+
+        Only queued events can be retried; accepted/expired events cannot be
+        mutated by a delayed task after a restart. No error text is stored.
+        """
+        if not isinstance(when,datetime) or when.tzinfo is None or when.utcoffset() is None:
+            raise ValueError('timezone-aware attempt time required')
+        if not isinstance(event_id,str) or not event_id:
+            raise ValueError('nonempty event ID required')
+        stamp=when.astimezone(timezone.utc).isoformat()
+        with self._connect() as db:
+            row=db.execute('UPDATE events SET '
+                'delivery_attempts=delivery_attempts+1, '
+                'first_attempt_utc=COALESCE(first_attempt_utc,?), '
+                'last_attempt_utc=? WHERE event_id=? AND delivered=0',
+                (stamp,stamp,event_id))
+            return row.rowcount==1
+
+    def mark_delivered(self,event_id:str,when:datetime|None=None)->bool:
+        """Telegram Bot API accepted a response; NOT a confirmed phone receipt.
+
+        First acceptance is durable and immutable; an expired notification is
+        not allowed to become accepted via a late worker response.
+        """
+        when=when or datetime.now(timezone.utc)
+        if not isinstance(when,datetime) or when.tzinfo is None or when.utcoffset() is None:
+            raise ValueError('timezone-aware acceptance time required')
+        stamp=when.astimezone(timezone.utc).isoformat()
+        with self._connect() as db:
+            row=db.execute('UPDATE events SET delivered=1,accepted_at_utc=?, '
+                'delivery_attempts=CASE WHEN delivery_attempts=0 THEN 1 ELSE delivery_attempts END, '
+                'first_attempt_utc=COALESCE(first_attempt_utc,?), '
+                'last_attempt_utc=COALESCE(last_attempt_utc,?) '
+                'WHERE event_id=? AND delivered=0',
+                (stamp,stamp,stamp,event_id))
+            return row.rowcount==1
+
+    def read_delivery_audit_rows(self)->list[tuple]:
+        """Return only audit metadata, never outbox payloads or user secrets."""
+        with self._connect() as db:
+            return db.execute('SELECT status,at,delivered,delivery_attempts, '
+                'first_attempt_utc,last_attempt_utc,accepted_at_utc '
+                'FROM events ORDER BY at,status').fetchall()
     def pending_events(self)->list[tuple[str,str]]:
         with self._connect() as db:
             return db.execute('SELECT event_id,payload FROM events WHERE delivered=0 ORDER BY at LIMIT 10').fetchall()

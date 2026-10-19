@@ -69,10 +69,19 @@ class Engine:
         # Outbox is *at least once*, not mathematically exactly once: crash after
         # Telegram accepted but before SQLite commit could duplicate a message.
         for event_id,body in self.db.pending_events():
+            # Persist the attempt before the external request, so retry counts
+            # survive process restarts even if Telegram raises or times out.
+            if not self.db.record_delivery_attempt(event_id,current):
+                continue
             try:
                 await asyncio.to_thread(self.telegram.send,body)
-                self.db.mark_delivered(event_id)
-                self.last_alert_at=datetime.now(IST)
+                accepted_at=current if now is not None else datetime.now(IST)
+                if not self.db.mark_delivered(event_id,accepted_at):
+                    # A concurrent expiry or state change forbids claiming an
+                    # accepted event, even though API response was successful.
+                    self.set_status('PHONE_DELIVERY_UNCERTAIN','Alert status changed while sending')
+                    break
+                self.last_alert_at=accepted_at
             except Exception:
                 self.set_status('PHONE_DELIVERY_FAILED','Telegram request failed; retrying queued alert')
                 break

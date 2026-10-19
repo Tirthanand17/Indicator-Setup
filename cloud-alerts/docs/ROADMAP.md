@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 68%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 70%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -191,3 +191,9 @@
 - [ ] Obtain an approved cloud host and send first real cloud Telegram TEST.
 
 **Live cloud hosting remains OFF; P9 has zero real observed trial sessions.**
+
+## Phase 21 — restart-safe delivery audit (offline complete)
+
+- Added non-destructive SQLite outbox migration with attempt count, first/last UTC attempt stamps, and Telegram Bot API acceptance UTC time. Outbox and virtual paper-entry invariants remain in place.
+- Offline read-only CLI computes per-session attempted/accepted/expired reviews, retry counts and p50/p95 API acceptance latency. Old successful entries lacking timestamps count as unknown, not instantaneous.
+- Full local test suite **297/297 passing**. See [TELEGRAM_DELIVERY_AUDIT.md](TELEGRAM_DELIVERY_AUDIT.md). **Cannot verify handset delivery or cloud readiness until a free approved always-on host is available.**
