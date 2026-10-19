@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 55%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 56%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -53,3 +53,13 @@
 - [ ] Choose and approve always-on cloud host and persistent storage (₹0 extra only if verified and approved).
 - [ ] Real signed daily token transfer and Telegram phone delivery.
 - [ ] Confirm restart recovery across a real persistent volume and multi-day market evidence.
+
+
+## 2026-10-19 — P8 non-misleading performance evidence foundation
+
+- [x] Reject missing/delayed/invalid NIFTY option quote pairs and synthetic-as-real win-rate claims.
+- [x] Estimate hypothetical ASK-entry/BID-exit gross/net P&L with caller-supplied realistic per-trade slippage and brokerage/tax charges.
+- [x] Require 30 paired paper observations and 5 days before a sample can be reviewed; tags alone never prove capture provenance.
+- [x] **116/116** offline tests passing across all cloud modules.
+- [ ] Collect independently verified real quote-pair evidence and calendar; implement chronological walk-forward train/test split.
+- [ ] Full live-market session trials and real Telegram mobile receipt checks on an explicitly approved always-on host.

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 55%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 56%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████░░░░░░░░░░] 55%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 45%
+Overall engineering progress   [██████████████░░░░░░░░░░] 56%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 44%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 0% | No independent option historical bid/ask dataset or out-of-sample evidence |
+| P8 | Walk-forward option backtests & reliability dashboard | 10% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **54.5%, rounded to 55%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **55.5%, rounded to 56%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -83,3 +83,11 @@ Sum of percentages / 10 = **54.5%, rounded to 55%**. **Actual readiness for time
 3. Added `/readyz` showing only enabled/token-present configuration; **not** a broker/phone quality assertion. `/healthz` now fails 503 when its background engine dies. Docker liveness checks use `/healthz` rather than daily-token readiness.
 4. Added startup and dual-process protection tests, for **106/106 offline tests passing**. No actual cloud deployment, broker order, phone message or subscription charge was initiated.
 5. The previous P4 offline-completion estimate rises from 55% to 65%, moving overall from 54% to **55%**; P5 (always-on host), P8 (option backtesting) and P9 (five-session trials) remain 0%. See [reliable cloud startup](RELIABLE_CLOUD_STARTUP.md).
+
+## October 19 follow-up — honest option-level paper evidence (56%)
+
+1. Added a pure paper quote-pair validator and after-cost scoring module with explicit post-signal quote timestamps, listed option contract, expiry, top-of-book BID/ASK and sufficient available depth.
+2. Gross and net reference estimates use ASK on entry and BID on exit, bounded pessimistic slippage on both legs and mandatory positive per-roundtrip charges. **No actual fill or market profitability is claimed.**
+3. Invalid, over-delayed, weekend, expired, reversed, wide-spread or liquidity-insufficient quote observations fail closed.
+4. The summary refuses any sample under 30 paired observations over at least 5 days; synthetic/unverified inputs get an explicit `UNVERIFIED_SOURCE` label even when counts are high. Captured-quote tags alone are **not independently verified**.
+5. Offline test suite now **116/116 passed**. P8 research-evidence scaffolding moves from 0% to **10%**; overall 55% to **56%**. Actual option depth archive, independent provenance validation, chronological walk-forward split and multi-day trial remain pending. See [paper-evidence technical design](PAPER_EVIDENCE_EVALUATION.md).
