@@ -15,6 +15,7 @@ from .security import TokenVault
 from .state import State
 from .signals import decide
 from .telegram import Telegram,format_review
+from .scheduler import CandlePollScheduler
 IST=ZoneInfo('Asia/Kolkata')
 logger=logging.getLogger('cloud_alerts')
 
@@ -39,9 +40,13 @@ class Engine:
           'status_at':self.status_at.isoformat(),
           'last_market_data_at':self.last_data_at.isoformat() if self.last_data_at else None,
           'last_phone_accept_at':self.last_alert_at.isoformat() if self.last_alert_at else None,
-          'reason':self.last_error,'mode':'READ_ONLY_PAPER','order_execution':False}
+          'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
+          'mode':'READ_ONLY_PAPER','order_execution':False}
 
     async def _deliver_outbox(self)->None:
+        # Entries older than 180 seconds are informationally stale for intraday
+        # option buying. Discard them rather than deliver a dangerous old BUY.
+        self.db.expire_events_before(datetime.now(IST)-timedelta(seconds=180))
         # Outbox is *at least once*, not mathematically exactly once: crash after
         # Telegram accepted but before SQLite commit could duplicate a message.
         for event_id,body in self.db.pending_events():
@@ -157,11 +162,19 @@ class Engine:
         self.db.set_runtime('virtual_candidate','')
 
     async def run_forever(self)->None:
+        scheduler=CandlePollScheduler()
+        last_outbox_minute=None
         while True:
             now=datetime.now(IST)
-            # Poll at hh:mm:12, :27, :42, :57 during the first minute after a 5m boundary,
-            # accommodating broker historical data publication lag without rapid REST calls.
-            eligible=(now.minute%5==0 and 12<=now.second<=58)
-            if eligible or (self.status in ('PHONE_DELIVERY_FAILED',) and now.second>=12):
+            minute=now.replace(second=0,microsecond=0)
+            # Retry queued Telegram messages even when broker data is unavailable,
+            # and expire those no longer timely. Limit retry to once a minute.
+            if minute!=last_outbox_minute:
+                last_outbox_minute=minute
+                if self.enabled:
+                    await self._deliver_outbox()
+                else:
+                    self.db.expire_events_before(now-timedelta(seconds=180))
+            if scheduler.claim(now):
                 await self.run_once(now)
-            await asyncio.sleep(15)
+            await asyncio.sleep(2)
