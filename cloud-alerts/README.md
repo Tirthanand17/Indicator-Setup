@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 68%** — `[████████████████░░░░░░░░]` (**32% remaining**).
+**Overall engineering implementation estimate: 69%** — `[████████████████░░░░░░░░]` (**31% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 264 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 283 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -30,6 +30,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
+- [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)
 - [Restricted HTTPS ingress and TEST-only Telegram probe](docs/HTTPS_INGRESS_AND_PHONE_TEST.md)
 - [Prevent virtual EXIT reviews for undelivered entry notices](docs/ENTRY_NOTICE_EXIT_SAFETY.md)
 
@@ -164,3 +165,9 @@ python -m cloud_alerts.evidence_cli --state-db /private/snapshot/alerts.sqlite3 
 ```
 
 Rates/costs above are *illustrative assumptions*, not current verified fee estimates. [Coverage audit and interpretation](docs/QUOTE_COVERAGE_AUDIT.md). **Overall: 68% implementation estimate; 32% remaining.** Cloud is **not** active.
+
+## October 19 Phase 20 — monitoring coverage and cutoff correction
+
+- Reconciled 09:25–15:25 IST inclusive polling: **73 five-minute boundaries** for an explicitly selected open weekday. Fixed the inaccessible 15:25:08+ boundary and unsatisfiable 09:20 poll.
+- Added a persisted, sanitized outcome ledger (per-boundary success/failure/retry), a read-only operator session audit and fail-closed malformed-data checks. These measure REST polling coverage, **not** actual Kite provenance, Telegram handset receipt, or option win rate.
+- **283/283 local offline tests passed**; project code remains read-only and paper-only. Overall engineering estimate **69%**, cloud service still NOT deployed.

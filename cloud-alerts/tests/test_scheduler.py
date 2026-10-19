@@ -2,7 +2,7 @@ from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
 from cloud_alerts.scheduler import CandlePollScheduler
 IST=ZoneInfo('Asia/Kolkata')
-D=datetime(2026,10,19,9,20,tzinfo=IST)
+D=datetime(2026,10,19,9,25,tzinfo=IST)
 
 def test_poll_runs_after_boundary_and_at_most_three_times():
     s=CandlePollScheduler()
@@ -14,6 +14,9 @@ def test_poll_runs_after_boundary_and_at_most_three_times():
     assert s.claim(D+timedelta(seconds=43))
     assert not s.claim(D+timedelta(seconds=58))
     assert s.claim(D+timedelta(minutes=5,seconds=8))
+    # Final monitored 15:25 five-minute boundary remains eligible after :00.
+    assert s.claim(D.replace(hour=15,minute=25,second=43))
+    assert not s.claim(D.replace(hour=15,minute=26,second=43))
 
 def test_scheduler_ignores_closed_session_and_timezone_naive_clock():
     s=CandlePollScheduler()

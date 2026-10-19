@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlite3
 from .quote_evidence import canonical_snapshot
 from .evaluation import EvidenceError
+from .session_coverage import boundary_for, OUTCOMES
 
 class State:
     def __init__(self,path:str):
@@ -23,11 +24,43 @@ class State:
                 mismatch_reasons TEXT NOT NULL,
                 PRIMARY KEY (future_symbol, candle_start_utc));
               CREATE INDEX IF NOT EXISTS idx_shadow_compared_at ON shadow_evidence(compared_at_utc);
+              CREATE TABLE IF NOT EXISTS rest_poll_coverage (
+                boundary_utc TEXT PRIMARY KEY, last_observed_utc TEXT NOT NULL,
+                attempts INTEGER NOT NULL, outcome TEXT NOT NULL);
               CREATE TABLE IF NOT EXISTS option_quote_observations (
                 event_id TEXT NOT NULL, phase TEXT NOT NULL, payload TEXT NOT NULL,
                 payload_sha256 TEXT NOT NULL,
                 PRIMARY KEY (event_id,phase));''')
     def _connect(self):return sqlite3.connect(self.path,timeout=10)
+    def record_rest_attempt(self, now:datetime, outcome:str)->None:
+        """Persist sanitized per-boundary monitoring quality, never prices/secrets.
+
+        A later failure cannot erase a prior successful REST decision. Repeated
+        polls count as attempts, not extra monitored candle boundaries.
+        """
+        if outcome not in OUTCOMES:
+            raise ValueError('unsupported REST coverage outcome')
+        boundary=boundary_for(now)
+        if boundary is None:
+            raise ValueError('no scheduled REST polling boundary')
+        start=boundary.astimezone(timezone.utc).isoformat()
+        observed=now.astimezone(timezone.utc).isoformat()
+        with self._connect() as db:
+            db.execute('INSERT INTO rest_poll_coverage '
+                       '(boundary_utc,last_observed_utc,attempts,outcome) '
+                       'VALUES(?,?,1,?) ON CONFLICT(boundary_utc) DO UPDATE SET '
+                       'last_observed_utc=excluded.last_observed_utc, '
+                       'attempts=rest_poll_coverage.attempts+1, '
+                       "outcome=CASE WHEN rest_poll_coverage.outcome='REST_VALID' "
+                       "THEN 'REST_VALID' ELSE excluded.outcome END",
+                       (start,observed,outcome))
+
+    def read_rest_coverage(self)->list[tuple[str,int,str]]:
+        """Entire sanitized ledger; use offline-only for a trial-day audit."""
+        with self._connect() as db:
+            return db.execute('SELECT boundary_utc,attempts,outcome '
+                              'FROM rest_poll_coverage ORDER BY boundary_utc').fetchall()
+
     def is_sent(self,event_id:str)->bool:
         with self._connect() as db:
             return db.execute('SELECT 1 FROM events WHERE event_id=?',(event_id,)).fetchone() is not None

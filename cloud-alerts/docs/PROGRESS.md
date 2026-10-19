@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 68%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 69%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 68%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 32%
+Overall engineering progress   [█████████████████░░░░░░░] 69%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░████████] 31%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 80% | Explicit cloud Telegram TEST-only CLI with safe API-acceptance reporting; no physical-phone receipt or live host |
+| P4 | Telegram delivery, dedupe/outbox, health | 85% | Persistent sanitized REST boundary coverage and TEST-only Telegram probe; no physical-phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 50% | Includes entry-notice coverage reconciliation, excluded-pair accounting and deliberately withheld rankable win rate; real quote provenance and out-of-sample proof absent |
+| P8 | Walk-forward option backtests & reliability dashboard | 55% | Entry-notice and REST-session coverage audits distinguish missing evidence and missed intervals; real quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **68.0%, rounded to 68%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **69.0%, rounded to 69%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -194,3 +194,11 @@ Sum of current percentages / 10 = **68.0%, rounded to 68%**. **Actual readiness 
 4. Adds `scorable_event_coverage_pct`, `entry_events_missing_all_quotes`, `incomplete_quote_pairs`, `rejected_quote_pairs`, and explicit `ranking_blockers`. None are model accuracy claims; no signals are issued by this offline CLI.
 5. Full offline suite **264/264 passed**; tests include one win out of ten claimed entries, no observations, conflicting quote contracts, unsafe unregistered quote observations and read-only SQLite audits. No live market sampling, hosting, Telegram receipt or order execution.
 6. P8 synthetic tooling estimated **40% → 50%**, ten-phase average **67% → 68%**, **32% remaining**. P5 host activation and P9 market-session evidence remain **0% observed**. See [coverage audit](QUOTE_COVERAGE_AUDIT.md).
+
+## October 19 Phase 20 — exact polling window and durable REST coverage (69%)
+
+1. Reconciled two contradictory time gates: the scheduler formerly polled 09:20 though `Engine.run_once` refused until 09:25, and the engine used an inclusive cutoff at exactly 15:25:00, which prevented the scheduled 15:25:08/23/43 checks. The active strategy monitoring window is now 09:25–15:25:59 IST on configured weekdays (**73 five-minute polling boundaries**). This is not the entire NSE trading day.
+2. A durable, privacy-limited SQLite `rest_poll_coverage` table tracks each scheduled boundary's attempts and best outcome (`REST_VALID`, `WAIT_DATA`, `WAIT_TOKEN`, `API_ERROR`) without recording quotes, account identifiers, payloads or credentials. Retry failure cannot overwrite a previously valid REST candle decision.
+3. New offline `session_audit_cli` reads SQLite strictly read-only and accounts for unobserved boundaries instead of silently counting only successes. The operator must explicitly supply actual open NSE session days. The tool **does not independently verify holidays, market-data provenance, phone receipts, or actual paper returns**.
+4. Added **19 offline regression tests** covering first/last boundaries, UTC/IST conversion, durable restarts, missing tokens, failed broker requests, retry outcomes, unobserved whole days, malformed stored timestamps, CLI privacy and read-only behavior. Full suite **283/283** passed; no broker or Telegram network calls were performed.
+5. P4 monitoring diagnostics **80% → 85%**, P8 evidence-completeness tools **50% → 55%**, moving the 10-phase weighted mean from 68% to **69%**. Phase P9 remains at **zero real observed market sessions**; live hosting, real HTTPS token handoff and phone receipt proof remain unavailable. See [REST session coverage guide](REST_SESSION_COVERAGE.md).

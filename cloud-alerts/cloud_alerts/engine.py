@@ -17,6 +17,7 @@ from .signals import decide
 from .telegram import Telegram,format_review
 from .quote_evidence import make_snapshot
 from .scheduler import CandlePollScheduler
+from .session_coverage import boundary_for
 from .stream_supervisor import ShadowSupervisor
 from .premium import (PremiumHypothesis,reference_from_quote,parse_reference,
                       reference_contract,evaluate_bid,exit_text)
@@ -38,6 +39,7 @@ class Engine:
         self.instrument_rows=None
         self.instrument_date=None
         self.last_data_at=None
+        self._rest_verified_at=None
         self.last_alert_at=None
         self.last_error=None
 
@@ -100,18 +102,34 @@ class Engine:
         now=(now or datetime.now(IST)).astimezone(IST)
         if not self.enabled:
             self.set_status('DISABLED');return
-        if now.weekday()>=5 or now.time()<time(9,25) or now.time()>time(15,25):
+        # Last scheduled boundary is 15:25:08-58 IST, not exactly 15:25:00.
+        # At 15:26 the worker stops, avoiding late new paper-review alerts.
+        if now.weekday()>=5 or now.time()<time(9,25) or now.time()>=time(15,26):
             self.set_status('MARKET_CLOSED');return
-        token=self.vault.get(now)
-        if not token:
-            self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
-            return
-        # Market-data getters are blocking HTTP; offload from FastAPI worker loop.
+        self._rest_verified_at=None
+        outcome='WAIT_DATA'
         try:
-            await asyncio.wait_for(self._collect_once(now,token),timeout=24)
-        except Exception:
-            # No raw exception: Kite exceptions can include URLs/Authorization material.
-            self.set_status('WAIT_DATA','Kite candle, quote or API request failed; no signal sent')
+            token=self.vault.get(now)
+            if not token:
+                self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
+                outcome='WAIT_TOKEN'
+                return
+            # Market-data getters are blocking HTTP; offload from FastAPI loop.
+            try:
+                await asyncio.wait_for(self._collect_once(now,token),timeout=24)
+                if self._rest_verified_at==now:
+                    outcome='REST_VALID'
+            except Exception:
+                # Never expose Kite exception text, headers or credentials.
+                self.set_status('WAIT_DATA','Kite candle, quote or API request failed; no signal sent')
+                outcome='API_ERROR'
+        finally:
+            # Quote/delivery failure after a validated REST decision must not
+            # erase evidence of an otherwise monitored five-minute boundary.
+            if self._rest_verified_at==now:
+                outcome='REST_VALID'
+            if boundary_for(now) is not None:
+                self.db.record_rest_attempt(now,outcome)
 
     async def _collect_once(self,now:datetime,token:str)->None:
         kite=KiteReadOnly(self.api_key,token)
@@ -143,6 +161,7 @@ class Engine:
         previous_completed=self.db.get_runtime('last_processed_candle')
         stamp=fut.symbol+':'+completed5[-1].start.isoformat()
         if previous_completed==stamp:
+            self._rest_verified_at=now
             # Don't suppress delayed Telegram retry.
             await self._deliver_outbox(now)
             return
@@ -165,6 +184,7 @@ class Engine:
         if decision.status=='WAIT_DATA':
             self.set_status('WAIT_DATA',decision.reason)
             return
+        self._rest_verified_at=now
         # Mark NO_TRADE decisions as completed below. REVIEW candidates must
         # first obtain valid option depth; a transient stale quote can be retried
         # by the bounded scheduler without dropping a potential review.
@@ -246,7 +266,7 @@ class Engine:
         """
         if not self.paper_premium_tracking or not self.enabled:return
         now=(now or datetime.now(IST)).astimezone(IST)
-        if now.weekday()>=5 or now.time()<time(9,30) or now.time()>time(15,25):return
+        if now.weekday()>=5 or now.time()<time(9,30) or now.time()>=time(15,26):return
         raw=self.db.get_runtime('virtual_candidate')
         if not raw:
             self.premium_status='IDLE';return

@@ -178,3 +178,16 @@
 - [x] Add tests for selection bias, SQLite read-only source audit, and missing/invalid evidence; **264/264** local tests.
 - [ ] Capture 5+ market sessions and independently verify real option depth, Telegram handset receipt and realistic costs.
 - [ ] Deploy only on approved always-on cloud infrastructure, after provider/cost eligibility checks.
+
+## Phase 20 — durable REST monitoring coverage (69% estimated overall)
+
+- [x] Align scheduler and engine boundaries at 09:25 through 15:25 IST, including eligible 15:25:+seconds polling.
+- [x] Persist sanitized per-five-minute outcomes with idempotent boundary keys; prevent later failure from erasing success.
+- [x] Provide read-only explicit-session-day audit that accounts for all expected, missing, failed and observed boundaries.
+- [x] Reject malformed/duplicate saved observations and avoid public credentials, paths and account records.
+- [x] **283/283 offline tests passed.**
+- [ ] Verify actual trading holidays and early closes when the operator selects market days.
+- [ ] Record five genuine end-to-end market days on approved always-on hosting, with independent phone and quote verification.
+- [ ] Obtain an approved cloud host and send first real cloud Telegram TEST.
+
+**Live cloud hosting remains OFF; P9 has zero real observed trial sessions.**

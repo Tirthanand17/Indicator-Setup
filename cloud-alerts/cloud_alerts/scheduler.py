@@ -25,7 +25,7 @@ class CandlePollScheduler:
         if now.tzinfo is None:
             return False
         local = now.astimezone(IST)
-        if (local.weekday() >= 5 or not time(9,20) <= local.time() <= time(15,25)
+        if (local.weekday() >= 5 or not time(9,25) <= local.time() < time(15,26)
                 or local.minute % 5 != 0):
             return False
         boundary = local.replace(second=0,microsecond=0)
