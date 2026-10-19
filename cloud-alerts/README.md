@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 63%** — `[█████████████░░░░░░░]` (**37% remaining**).
+**Overall engineering implementation estimate: 64%** — `[█████████████░░░░░░░]` (**36% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 177 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 184 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -31,6 +31,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
 - [Restricted HTTPS ingress and TEST-only Telegram probe](docs/HTTPS_INGRESS_AND_PHONE_TEST.md)
+- [Prevent virtual EXIT reviews for undelivered entry notices](docs/ENTRY_NOTICE_EXIT_SAFETY.md)
 
 ## What is implemented in this prototype
 
@@ -38,7 +39,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - Fresh, completed candle guards. Calculates **Session HLC3 VWAP**, **EMA9**, **EMA21**, **DMI/ADX14** and **ATR14** from underlying futures candles. Separately calculates **15-minute EMA** context from broker 15-minute candles.
 - Paper candidate `REVIEW_CE`, `REVIEW_PE`, `NO_TRADE`, `WAIT_DATA` decisions. Requires ADX >=25 **and rising**, DMI direction, aligned VWAP and EMAs, three-prior-bar breakout, and 15-minute confirmation. Thresholds are unoptimized research assumptions.
 - Chooses an actual listed option, checks fresh top-of-book **BID/ASK** and lot quantity. Telegram text reports strike, bid/ask, lot size, futures underlying stop and *illustrative* target. Does not claim an executable premium stop or option P&L.
-- A tracked **virtual futures candidate** may produce later `EXIT REVIEW` alerts. It does not know actual holdings and **cannot close an option**.
+- A tracked **virtual futures candidate** may produce later `EXIT REVIEW` alerts **only once its matching paper entry review is accepted by the Telegram Bot API**; unsent/expired reviews produce no linked exit. It does not know actual holdings and **cannot close an option**.
 - Read-only **daily token handoff**: an opt-in local sender reads the existing trading project's `.env` without changing it, and transfers only the access token to an approved HTTPS cloud endpoint using signed, replay-protected requests. Cloud encryption-at-rest uses a separately configured Fernet key on a persistent volume.
 - Persistent SQLite candidate dedupe and Telegram outbox, privacy-limited `/healthz`, cloud container skeleton, unit/security tests, and opt-in defaults.
 
@@ -122,3 +123,11 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 - Added [`deploy/Caddyfile.example`](deploy/Caddyfile.example) for **operator-reviewed** host-level TLS termination exposing only signed POST token handoff to the localhost worker. This example is **not deployed** and does not prove TLS issuance.
 - Added `python -m cloud_alerts.telegram_probe --check-only` and `python -m cloud_alerts.telegram_probe --send-test --confirm-send`. The latter is an **explicit** non-market test; API acceptance does **not** establish that the user's phone received it.
 - **177/177 synthetic tests pass**. No cloud costs, hosted service, real Telegram/Kite requests, broker orders or changes to the read-only original trading folder. Engineering estimate **63%**, live cloud operation **not started**.
+
+
+## Phase 15 — virtual-exit notice safety (64%)
+
+- New virtual entries persist an `entry_event_id` in the same SQLite transaction as the queued paper entry notification.
+- Pending entry notifications suppress futures and option-premium virtual EXIT notifications. Expired entries clear virtual tracking; missing/corrupted event status blocks exit reviews.
+- Telegram API acceptance is **not** proof of phone receipt or a real broker holding.
+- **184/184 offline Python tests pass**. No cloud host or live messages. See [Phase 15 report](docs/ENTRY_NOTICE_EXIT_SAFETY.md).

@@ -78,6 +78,23 @@ class Engine:
         if self.db.claim_event(event_id,status,now,body):
             await self._deliver_outbox(now)
 
+    def _entry_notice_gate(self,position:dict)->str:
+        """Never issue virtual EXIT based on an entry review unseen by Telegram.
+
+        New candidates carry their entry outbox ID. Older persisted candidates
+        do not: keep the old research-only semantics, but mark them as legacy.
+        This tests Telegram API acceptance, not receipt by the user's phone.
+        """
+        entry_id=position.get('entry_event_id')
+        if entry_id is None:return 'LEGACY_UNVERIFIED'
+        if not isinstance(entry_id,str) or not entry_id or len(entry_id)>256:
+            return 'INVALID'
+        delivery=self.db.event_delivery_status(entry_id)
+        if delivery==1:return 'ACCEPTED'
+        if delivery==0:return 'PENDING'
+        if delivery==2:return 'EXPIRED'
+        return 'MISSING'
+
     async def run_once(self,now:datetime|None=None)->None:
         now=(now or datetime.now(IST)).astimezone(IST)
         if not self.enabled:
@@ -191,7 +208,10 @@ class Engine:
         candidate={
             'direction':side,'symbol':fut.symbol,'signal_candle':decision.candle.start.isoformat(),
             'entry':decision.candle.close,'stop':decision.stop_underlying,
-            'target':decision.target_underlying,'expiry_date':now.date().isoformat()}
+            'target':decision.target_underlying,'expiry_date':now.date().isoformat(),
+            # Link virtual position to delivery of the actual entry notification.
+            # Queued/expired entry reviews must never generate misleading exits.
+            'entry_event_id':event_id}
         if self.paper_premium_tracking:
             candidate['premium']=reference_from_quote(
                 oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
@@ -230,6 +250,17 @@ class Engine:
         if position.get('expiry_date')!=now.date().isoformat():
             self.db.set_runtime('virtual_candidate','')
             self.premium_status='EXPIRED_CANDIDATE_CLEARED'
+            return
+        entry_gate=self._entry_notice_gate(position)
+        if entry_gate=='PENDING':
+            self.premium_status='ENTRY_NOTICE_QUEUED'
+            return
+        if entry_gate=='EXPIRED':
+            self.db.set_runtime('virtual_candidate','')
+            self.premium_status='UNSENT_ENTRY_EXPIRED'
+            return
+        if entry_gate in ('INVALID','MISSING'):
+            self.premium_status='ENTRY_NOTICE_UNVERIFIABLE'
             return
         premium=position.get('premium')
         if not isinstance(premium,dict):
@@ -277,6 +308,14 @@ class Engine:
         position=json.loads(raw)
         if position.get('symbol')!=symbol or position.get('expiry_date')!=now.date().isoformat():
             self.db.set_runtime('virtual_candidate','');return
+        entry_gate=self._entry_notice_gate(position)
+        if entry_gate=='PENDING':return
+        if entry_gate=='EXPIRED':
+            self.db.set_runtime('virtual_candidate','')
+            return
+        if entry_gate in ('INVALID','MISSING'):
+            self.set_status('WAIT_DATA','Virtual entry notification cannot be verified')
+            return
         if candle.start.isoformat()<=position['signal_candle']:return
         side=position['direction'];stop=position['stop'];target=position['target']
         breached_stop=(candle.low<=stop if side=='CE' else candle.high>=stop)

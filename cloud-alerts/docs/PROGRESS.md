@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 63%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 64%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 63%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 37%
+Overall engineering progress   [████████████████░░░░░░░░] 64%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 36%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -20,11 +20,11 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P4 | Telegram delivery, dedupe/outbox, health | 80% | Explicit cloud Telegram TEST-only CLI with safe API-acceptance reporting; no physical-phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
-| P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
+| P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **62.5%, rounded to 63%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **63.5%, rounded to 64%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -145,3 +145,13 @@ Sum of current percentages / 10 = **62.5%, rounded to 63%**. **Actual readiness 
 3. Telegram's HTTP API acceptance is reported separately from **physical-phone receipt, which remains unverified**. All exceptions produce safe codes with no secret values in output.
 4. New offline tests for endpoint route restrictions and Telegram fake transports bring the complete suite to **177/177 tests passed**. No live Telegram calls, cloud deployments, DNS/TLS operations, protected trading-folder modifications or orders occurred.
 5. P4 engineering estimate **75 → 80%**; P5 preparation **20 → 25%**. Ten-phase average **62.5%, rounded to 63%**. P5 host provisioning and real cloud operation remain **0% observed**; P9 market sessions remain **0%**. See [Phase 14 HTTPS ingress and phone test](HTTPS_INGRESS_AND_PHONE_TEST.md).
+
+
+## October 19 Phase 15 — no virtual exits for unseen entry notifications (64%)
+
+1. Each new virtual CE/PE candidate now carries its original `entry_event_id`; this points to the existing durable Telegram outbox row, **not** to a real Kite order or holding.
+2. Both underlying-futures and optional actual-option-BID virtual exit monitors **wait** while the entry review is queued, and issue **no EXIT review** if the entry review never receives Telegram Bot API acceptance. This avoids confusing an unseen BUY review with a subsequent orphan EXIT.
+3. If the entry review expires after 180 seconds, the associated virtual candidate is cleared before it can generate an EXIT. Corrupt/missing linked events fail closed without exposing message payloads.
+4. Pre-existing legacy virtual candidates without an `entry_event_id` retain research-only compatibility; no host has been deployed to contain legacy real entries. New candidates always use the linked safety gate.
+5. Added **7 tests** for queued/expired/accepted entries, optional premium watcher network avoidance and crash/restart persistence; **184/184 offline tests pass**. No real broker/Telegram requests or cloud deployment.
+6. P7 engineering estimate **65% → 75%**. Overall estimated engineering scope **63% → 64%**; live host activation and five-session proof remain **0%**. See [entry-notice gate](ENTRY_NOTICE_EXIT_SAFETY.md).

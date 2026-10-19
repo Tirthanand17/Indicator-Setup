@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 58%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 64%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -11,7 +11,7 @@
 | P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Atomic entry+candidate persistence, privacy-safe queue metrics (96 offline tests); unvalidated live** | Real paired phone receives TEST and market candidate exactly once in normal run |
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
 | P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW RUNTIME INTEGRATED + SQLite quality ledger + SYNTHETIC TESTS**; live websocket not verified | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
-| P7 | Virtual exit and option premium intrabar risk tracking | **Opt-in premium BID tracker + virtual STOP/TARGET/TIME review, 96 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
+| P7 | Virtual exit and option premium intrabar risk tracking | **Premium BID tracker and Telegram-accepted entry notice gate, 184 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
 | P8 | Walk-forward option-level backtesting, audits, dashboards | **NOT STARTED** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
 
@@ -128,3 +128,15 @@
 - [ ] Prove Nirala-off monitoring and five real paper-only trading sessions.
 
 **Engineering progress estimate: 63%; cloud host still inactive; live strategy proof still missing.**
+
+
+## Phase 15 — entry notification must precede virtual exit (2026-10-19)
+
+- [x] Persist linked `entry_event_id` in every new paper candidate while atomically queuing its phone notice.
+- [x] Suppress both underlying-candle and option-BID virtual exits until Telegram reports accepted entry notice.
+- [x] Clear an expired/unsent candidate without generating a misleading orphan exit.
+- [x] Fail closed for missing/corrupt linked outbox references; test recovery after restart.
+- [x] Full offline suite: **184/184 passed**.
+- [ ] Validate actual phone receipt and option-level paper evidence across five trading sessions on an approved always-on host.
+
+**Overall engineering estimate: 64%. Live cloud service still OFF.**
