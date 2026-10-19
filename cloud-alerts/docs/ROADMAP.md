@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 72%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 73%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -220,3 +220,13 @@
 - [x] **322/322 offline Python tests pass**.
 - [ ] Choose a qualifying, operator-approved always-on cloud host with private encrypted-at-rest persistence.
 - [ ] Validate live daily token handoff, Telegram handset receipt and five paper-only market sessions.
+
+
+## Phase 24 — per-message freshness and late-entry safety
+
+- [x] Atomically check <=180-second queued alert age at each attempted send; time-zone-safe and fail-closed malformed dates.
+- [x] Preserve actual Telegram API acceptance metrics while refusing late or unverified entry acknowledgements as a virtual EXIT authorization.
+- [x] Reconcile stale/late-linked virtual paper candidates after restart.
+- [x] Test an intentionally slow Telegram batch, edge timestamps, incomplete historic acceptance data and underlying EXIT blocking.
+- [x] 339/339 synthetic/offline tests pass; cloud connectivity remains disabled.
+- [ ] Validate real-world p95 API acceptance latency and physical-phone receipts only on an explicitly approved host.

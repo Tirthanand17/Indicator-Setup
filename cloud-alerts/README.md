@@ -6,7 +6,7 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 72%** — `[██████████████████░░░░░░]` (**28% remaining**).
+**Overall engineering implementation estimate: 73%** — `[██████████████████░░░░░░]` (**27% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
@@ -18,6 +18,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - Added a fail-closed `cloud_alerts.preflight` and a single-worker hardened Docker Compose template (`deploy/compose.yml`). The container refuses to start if critical secrets, a private writable persistent mount, or minimum free space are missing.
 - This is **structural readiness only**. It does not deploy a host, install credentials, transmit Telegram messages, or validate a live trade signal.
 - See [cloud deployment preflight](docs/CLOUD_DEPLOYMENT_PREFLIGHT.md).
+
+**Phase 24 update:** send-time atomic freshness guard and late/untimed entry-notice exclusion for virtual EXIT; **339/339 local tests passed**. These safeguards were not validated on a live cloud host. See [dispatch freshness design](docs/DISPATCH_FRESHNESS.md).
 
 ## Start here
 

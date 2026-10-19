@@ -58,7 +58,7 @@ async def test_accepted_entry_allows_underlying_exit_only_after_acceptance(tmp_p
     e,pos=create(tmp_path);store(e,pos)
     await e._check_virtual_exit(stopped_candle(),pos['symbol'],NOW+timedelta(minutes=5))
     assert len(e.db.pending_events())==1
-    e.db.mark_delivered('notice-1')
+    e.db.mark_delivered('notice-1',NOW+timedelta(seconds=2))
     await e._check_virtual_exit(stopped_candle(),pos['symbol'],NOW+timedelta(minutes=5))
     assert len(e.telegram.messages)==1
     assert 'EXIT REVIEW' in e.telegram.messages[0]
@@ -101,7 +101,7 @@ async def test_restart_retains_entry_notice_gate(tmp_path):
     await second._check_virtual_exit(stopped_candle(),pos['symbol'],NOW+timedelta(minutes=5))
     assert second.telegram.messages==[]
     assert second.db.get_runtime('virtual_candidate')
-    second.db.mark_delivered('notice-1')
+    second.db.mark_delivered('notice-1',NOW+timedelta(seconds=2))
     await second._check_virtual_exit(stopped_candle(),pos['symbol'],NOW+timedelta(minutes=5))
     assert len(second.telegram.messages)==1
 

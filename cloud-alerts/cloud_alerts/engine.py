@@ -71,7 +71,10 @@ class Engine:
         for event_id,body in self.db.pending_events():
             # Persist the attempt before the external request, so retry counts
             # survive process restarts even if Telegram raises or times out.
-            if not self.db.record_delivery_attempt(event_id,current):
+            # Recheck each message at actual send time. A batch-wide cutoff
+            # can become stale while previous Telegram HTTP calls run.
+            attempt_at=current if now is not None else datetime.now(IST)
+            if not self.db.claim_fresh_delivery_attempt(event_id,attempt_at):
                 continue
             try:
                 await asyncio.to_thread(self.telegram.send,body)
@@ -101,11 +104,7 @@ class Engine:
         if entry_id is None:return 'LEGACY_UNVERIFIED'
         if not isinstance(entry_id,str) or not entry_id or len(entry_id)>256:
             return 'INVALID'
-        delivery=self.db.event_delivery_status(entry_id)
-        if delivery==1:return 'ACCEPTED'
-        if delivery==0:return 'PENDING'
-        if delivery==2:return 'EXPIRED'
-        return 'MISSING'
+        return self.db.entry_notice_delivery_state(entry_id)
 
     async def run_once(self,now:datetime|None=None)->None:
         now=(now or datetime.now(IST)).astimezone(IST)
@@ -261,8 +260,8 @@ class Engine:
             return
         self.db.set_runtime('last_processed_candle',stamp)
         await self._deliver_outbox(now)
-        if self.db.event_delivery_status(event_id)==1:
-            self.set_status(decision.status,'Paper review accepted by Telegram API')
+        if self.db.entry_notice_delivery_state(event_id)=='ACCEPTED':
+            self.set_status(decision.status,'Paper review accepted in time by Telegram API')
         else:
             self.set_status('PHONE_DELIVERY_FAILED','Paper review queued, not confirmed delivered')
 
@@ -297,7 +296,7 @@ class Engine:
             self.db.set_runtime('virtual_candidate','')
             self.premium_status='UNSENT_ENTRY_EXPIRED'
             return
-        if entry_gate in ('INVALID','MISSING'):
+        if entry_gate in ('INVALID','MISSING','LATE_ACCEPTED','UNVERIFIABLE'):
             self.premium_status='ENTRY_NOTICE_UNVERIFIABLE'
             return
         premium=position.get('premium')
@@ -359,7 +358,7 @@ class Engine:
         if entry_gate=='EXPIRED':
             self.db.set_runtime('virtual_candidate','')
             return
-        if entry_gate in ('INVALID','MISSING'):
+        if entry_gate in ('INVALID','MISSING','LATE_ACCEPTED','UNVERIFIABLE'):
             self.set_status('WAIT_DATA','Virtual entry notification cannot be verified')
             return
         if candle.start.isoformat()<=position['signal_candle']:return

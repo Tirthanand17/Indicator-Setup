@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 72%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 73%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████████░░░░░░] 72%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 28%
+Overall engineering progress   [██████████████████░░░░░░] 73%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 27%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 90% | Durable per-event Telegram API attempt and acceptance timestamps + sanitized offline latency audit; no physical-phone receipt or live host |
+| P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 42% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
-| P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
+| P7 | Virtual/option-premium exit tracking | 80% | Only *timely* verified Telegram API acceptance authorizes a virtual EXIT; expired, late or untimed entry references fail closed; still no holding/fill or live trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **72.0%, rounded to 72%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **73.0%, rounded to 73%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Phase 22 continuation — private SQLite WAL recovery snapshots (19 Oct)
 
@@ -227,3 +227,12 @@ Sum of current percentages / 10 = **72.0%, rounded to 72%**. **Actual readiness 
 3. Wired reconciliation under the existing single-worker lock in FastAPI lifespan. An invalid current-day candidate aborts startup before any notification worker launches rather than silently permitting a misleading virtual EXIT. This intentionally requires manual assessment of same-day legacy candidates without event links.
 4. Added 13 synthetic regression tests: mixed UTC/IST, stale vs future entries, accepted/new queued entries, prior-day expiry, atomic failure, idempotence and actual app startup. The full offline suite passes **322/322**. No cloud host, broker authorization, Telegram physical-phone delivery or real trade has been tested.
 5. P4 engineering readiness **87% → 90%**, P5 preparatory operational reliability **35% → 42%**, ten-phase mean **71% → 72%**. P5 live deployment and P9 observed market sessions remain at zero. See [startup reconciliation](STARTUP_RECONCILIATION.md).
+
+
+## Phase 24 — atomically freshness-gated phone dispatch (73%)
+
+1. The worker now checks each queued notification against an aware, real send-time timestamp **inside the same SQLite transaction that records an attempt**. This fixes stale messages that cross the 180-second TTL while preceding queued HTTP calls consume time. Malformed timestamps and significantly future-dated rows fail closed.
+2. A late API acceptance can still happen after network transmission starts (the Telegram call is not reversible). Its actual delay is retained for audit but **does not authorize a virtual EXIT**. Historic accepted rows missing an acceptance timestamp also cannot authorize new virtual exit notices.
+3. Startup reconciliation removes current-day paper candidates linked to late, expired or unverified entry notices. A current-day candidate tied to timely accepted or still-queued entry notifications is preserved.
+4. Added 17 offline regressions (including timestamp offsets, 180-second boundary, deliberately slow batch, late or missing API timing, and virtual exit suppression). **339/339 Python tests pass**. No broker API, Telegram network delivery, cloud host or actual trading involved.
+5. P4 **90% → 95%** and P7 **75% → 80%** implementation estimates; ten-phase mean **72% → 73%**. P5 remains prep-only and P9 remains zero live-market sessions. See [dispatch freshness design](DISPATCH_FRESHNESS.md).

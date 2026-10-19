@@ -8,6 +8,27 @@ from .quote_evidence import canonical_snapshot
 from .evaluation import EvidenceError
 from .session_coverage import boundary_for, OUTCOMES
 
+def _entry_notice_state(created_at:str, delivered:int, accepted_at:str|None)->str:
+    """Classify original Telegram API timing, never handset receipt.
+
+    The old schema may have accepted events without a saved acceptance time;
+    such rows cannot authorize a new virtual EXIT during unattended recovery.
+    """
+    if delivered==0:return 'PENDING'
+    if delivered==2:return 'EXPIRED'
+    if delivered!=1:return 'INVALID'
+    if not accepted_at:return 'UNVERIFIABLE'
+    try:
+        start=datetime.fromisoformat(created_at)
+        end=datetime.fromisoformat(accepted_at)
+        if (start.tzinfo is None or start.utcoffset() is None or
+                end.tzinfo is None or end.utcoffset() is None):
+            raise ValueError('timezone missing')
+        age=(end.astimezone(timezone.utc)-start.astimezone(timezone.utc)).total_seconds()
+    except (TypeError,ValueError,OverflowError):
+        return 'UNVERIFIABLE'
+    return 'ACCEPTED' if -5<=age<180 else 'LATE_ACCEPTED'
+
 class State:
     def __init__(self,path:str):
         self.path=path
@@ -182,6 +203,14 @@ class State:
             row=db.execute('SELECT delivered FROM events WHERE event_id=?',(event_id,)).fetchone()
             return int(row[0]) if row else None
 
+    def entry_notice_delivery_state(self,event_id:str)->str:
+        """Accepted within TTL is required before generating a virtual EXIT."""
+        with self._connect() as db:
+            row=db.execute('SELECT at,delivered,accepted_at_utc FROM events WHERE event_id=?',
+                           (event_id,)).fetchone()
+        if not row:return 'MISSING'
+        return _entry_notice_state(row[0],row[1],row[2])
+
     def record_delivery_attempt(self,event_id:str,when:datetime)->bool:
         """Durably count a send attempt BEFORE contacting Telegram.
 
@@ -200,6 +229,48 @@ class State:
                 'last_attempt_utc=? WHERE event_id=? AND delivered=0',
                 (stamp,stamp,event_id))
             return row.rowcount==1
+
+    def claim_fresh_delivery_attempt(self,event_id:str,when:datetime,
+                                     *,max_age_seconds:int=180)->bool:
+        """Atomically recheck alert age immediately before a Telegram send.
+
+        A previous outbox-wide expiry is not sufficient: earlier network calls
+        in the same batch may consume the remaining TTL of later messages.
+        This gate claims only existing queued alerts and records the attempt
+        in the same transaction. It never sends a message itself.
+        """
+        if not isinstance(when,datetime) or when.tzinfo is None or when.utcoffset() is None:
+            raise ValueError('timezone-aware attempt time required')
+        if not isinstance(event_id,str) or not event_id:
+            raise ValueError('nonempty event ID required')
+        if not isinstance(max_age_seconds,int) or isinstance(max_age_seconds,bool) or not 1<=max_age_seconds<=180:
+            raise ValueError('invalid notification age limit')
+        stamp=when.astimezone(timezone.utc).isoformat()
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT at, delivered FROM events WHERE event_id=?',
+                           (event_id,)).fetchone()
+            if row is None or row[1]!=0:
+                return False
+            try:
+                created=datetime.fromisoformat(row[0])
+                if created.tzinfo is None or created.utcoffset() is None:
+                    raise ValueError('naive event timestamp')
+                age=(when.astimezone(timezone.utc)-created.astimezone(timezone.utc)).total_seconds()
+            except (ValueError,TypeError,OverflowError):
+                age=float('inf')
+            # No speculative messages from significantly future-dated or
+            # malformed records. At +180 seconds expiry is already due.
+            if age>=max_age_seconds or age < -5:
+                db.execute('UPDATE events SET delivered=2 WHERE event_id=? AND delivered=0',
+                           (event_id,))
+                return False
+            updated=db.execute('UPDATE events SET '
+                'delivery_attempts=delivery_attempts+1, '
+                'first_attempt_utc=COALESCE(first_attempt_utc,?), '
+                'last_attempt_utc=? WHERE event_id=? AND delivered=0',
+                (stamp,stamp,event_id))
+            return updated.rowcount==1
 
     def mark_delivered(self,event_id:str,when:datetime|None=None)->bool:
         """Telegram Bot API accepted a response; NOT a confirmed phone receipt.
@@ -297,9 +368,12 @@ class State:
                 older=candidate['expiry_date']<local.date().isoformat()
                 missing_notice=False
                 if not older:
-                    delivered=db.execute('SELECT delivered FROM events WHERE event_id=?',
+                    delivered=db.execute('SELECT at,delivered,accepted_at_utc FROM events '
+                                         'WHERE event_id=?',
                                          (candidate['entry_event_id'],)).fetchone()
-                    missing_notice=delivered is None or delivered[0]==2
+                    kind=(_entry_notice_state(*delivered) if delivered is not None else 'MISSING')
+                    missing_notice=kind in ('MISSING','EXPIRED','UNVERIFIABLE',
+                                            'LATE_ACCEPTED','INVALID')
                 if older or missing_notice:
                     db.execute('UPDATE runtime SET value=? WHERE key=?',('', 'virtual_candidate'))
                     cleared=1
