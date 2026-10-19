@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**All percentages withheld until milestone evidence exists.** A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 41%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -8,9 +8,9 @@
 | P1 | Pure indicators, quote/contract mapping, signal rules | **Implemented + synthetic tests** | All unit tests pass, alert not sent on missing/invalid data |
 | P2 | Opt-in read-only daily `.env` token handoff and encrypted cloud vault | **Implemented + synthetic tests** | Signed HMAC, nonce, expiry, ciphertext at rest; still need real TLS host test |
 | P3 | Kite Connect REST historical 5m/15m and quote backend | **Implemented (unvalidated live)** | Actual paid API tests on fully completed exchange bars |
-| P4 | Telegram cloud delivery, retry/outbox, health endpoint | **Implemented (unvalidated live)** | Real paired phone receives TEST and market candidate exactly once in normal run |
+| P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Implemented (unvalidated live)** | Real paired phone receives TEST and market candidate exactly once in normal run |
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
-| P6 | KiteTicker streaming / 1m→5m aggregation and REST reconciliation | **NOT STARTED** | Exchange timestamps, reconnect/backfill, no gaps, measured p95 latency |
+| P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW MODULE + SYNTHETIC TESTS**; not integrated with worker | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
 | P7 | Virtual exit and option premium intrabar risk tracking | **VIRTUAL FUTURES EXIT prototype only** | Real option bid/ask observations, IV and liquidity checks, no holdings assumption |
 | P8 | Walk-forward option-level backtesting, audits, dashboards | **NOT STARTED** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
