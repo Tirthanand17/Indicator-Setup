@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 73%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 74%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████████░░░░░░] 73%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 27%
+Overall engineering progress   [██████████████████░░░░░░] 74%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 26%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -16,15 +16,24 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
-| P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
+| P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
 | P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 42% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
-| P7 | Virtual/option-premium exit tracking | 80% | Only *timely* verified Telegram API acceptance authorizes a virtual EXIT; expired, late or untimed entry references fail closed; still no holding/fill or live trial |
+| P7 | Virtual/option-premium exit tracking | 85% | Paper option entry references and evidence capture use actual live quote observation time; late/out-of-session review blocked; no holdings/fills or live trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **73.0%, rounded to 73%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **74.0%, rounded to 74%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+
+
+## Phase 25 — real send-time and quote-response clocks (74%)
+
+1. Reproduced the 339/339-test GitHub baseline. Found that live `run_forever()` passed the initial scheduler timestamp to `run_once(now=...)`, and that subsequent Telegram dispatch reused that earlier time after blocking Kite HTTP reads. In a delayed response this could authorize an alert older than the 180-second TTL.
+2. The real worker now invokes `run_once()` without a synthetic timestamp. A task-local context ensures live send attempts and Telegram API acceptance are timed **at the actual send/response**, while explicitly supplied `run_once(now=...)` test clocks remain deterministic. Context is safely restored after exceptions.
+3. A separately sampled option quote **response time** is used for broker quote freshness, entry claim, hypothetical premium reference, and entry evidence timestamp. A market-data request cannot treat a fresh exchange quote as future dated or treat an already stale quote as fresh merely because the candle poll began earlier. A quote returned after 15:00 IST does not create a new paper BUY review.
+4. Added seven offline regressions using a synthetic wall clock and simulated slow REST and Telegram transport, including response-time quote checks, wrong-side expiry, and post-cutoff suppression. **346/346 local tests passed** and source compiled. No real Kite or Telegram requests in these tests.
+5. P3 **85 → 90%**, P7 **80 → 85%**, mean **73 → 74%**. Approved hosting P5 remains only preparation and real paper sessions P9 remain zero. See [live response-clock safety](LIVE_CLOCK_AND_QUOTE_FRESHNESS.md).
 
 ## Phase 22 continuation — private SQLite WAL recovery snapshots (19 Oct)
 

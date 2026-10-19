@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 73%** — `[██████████████████░░░░░░]` (**27% remaining**).
+**Overall engineering implementation estimate: 74%** — `[██████████████████░░░░░░]` (**26% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 322 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 346 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -19,7 +19,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - This is **structural readiness only**. It does not deploy a host, install credentials, transmit Telegram messages, or validate a live trade signal.
 - See [cloud deployment preflight](docs/CLOUD_DEPLOYMENT_PREFLIGHT.md).
 
-**Phase 24 update:** send-time atomic freshness guard and late/untimed entry-notice exclusion for virtual EXIT; **339/339 local tests passed**. These safeguards were not validated on a live cloud host. See [dispatch freshness design](docs/DISPATCH_FRESHNESS.md).
+**Phase 25 update:** real-mode Telegram send/acceptance timestamps now use fresh clock samples after slow REST calls. Option BID/ASK quote freshness, virtual entry reference and observation evidence use the actual quote response clock, with post-15:00 IST entries blocked. **346/346 local tests passed**. No cloud validation yet. See [live response-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md).
 
 ## Start here
 
@@ -32,6 +32,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
+- [Live quote-response and Telegram send-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md)
 - [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)
 - [Telegram Bot API acceptance and retry/latency audit](docs/TELEGRAM_DELIVERY_AUDIT.md)
 - [Private WAL-consistent SQLite state snapshots and recovery](docs/STATE_SNAPSHOT_RECOVERY.md)

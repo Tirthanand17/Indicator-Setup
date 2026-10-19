@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 73%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 74%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -230,3 +230,14 @@
 - [x] Test an intentionally slow Telegram batch, edge timestamps, incomplete historic acceptance data and underlying EXIT blocking.
 - [x] 339/339 synthetic/offline tests pass; cloud connectivity remains disabled.
 - [ ] Validate real-world p95 API acceptance latency and physical-phone receipts only on an explicitly approved host.
+
+
+## Phase 25 — actual HTTP response clock for live paper alerts
+
+- [x] Real worker uses a fresh wall clock for each queued Telegram send and API acceptance, even after slow Kite REST calls.
+- [x] Explicit `run_once(now=...)` remains a deterministic offline-replay seam; prevent clock mode leakage across tasks and exceptions.
+- [x] Recheck option depth against the live quote-response instant, not the original candle-boundary clock.
+- [x] Stamp option evidence, virtual references and alert creation at the actual observed time, without representing quotes as fills.
+- [x] Abort any paper BUY review whose option quote arrives after the 15:00 IST entry cutoff.
+- [x] **346/346 local synthetic tests passed**. Cloud deploy and independent handset validation still pending.
+- [ ] Complete five approved hosted market sessions, independently verify live quote depth and Telegram phone receipts.

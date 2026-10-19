@@ -5,6 +5,7 @@ For millisecond/second tick updates, see the *planned* KiteTicker WebSocket stag
 """
 from __future__ import annotations
 import asyncio,json,os,logging
+from contextvars import ContextVar
 from datetime import datetime,timedelta,time
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -42,6 +43,11 @@ class Engine:
         self._rest_verified_at=None
         self.last_alert_at=None
         self.last_error=None
+        # Task-local flag: live polling must sample the wall clock when Telegram
+        # is actually contacted, not the earlier REST candle poll timestamp.
+        # Explicit run_once(now=...) preserves deterministic historical tests.
+        self._live_delivery_clock: ContextVar[bool] = ContextVar(
+            'nifty_live_delivery_clock', default=False)
 
     def set_status(self,status:str,detail:str|None=None):
         self.status=status;self.status_at=datetime.now(IST)
@@ -62,6 +68,11 @@ class Engine:
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
 
     async def _deliver_outbox(self, now:datetime|None=None)->None:
+        # run_once() from the real worker can spend up to 24 seconds fetching
+        # REST/option data before reaching this function. A captured boundary
+        # timestamp cannot authorize a send that is already stale.
+        if self._live_delivery_clock.get():
+            now=None
         # Entries older than 180 seconds are informationally stale for intraday
         # option buying. Discard them rather than deliver a dangerous old BUY.
         current=(now or datetime.now(IST)).astimezone(IST)
@@ -107,6 +118,16 @@ class Engine:
         return self.db.entry_notice_delivery_state(entry_id)
 
     async def run_once(self,now:datetime|None=None)->None:
+        # Passing `now` is the offline/replay test seam. The real scheduler calls
+        # without it, so network-time expiry and API acceptance always use fresh
+        # wall-clock observations even after slow market-data collection.
+        token=self._live_delivery_clock.set(now is None)
+        try:
+            return await self._run_once_at(now)
+        finally:
+            self._live_delivery_clock.reset(token)
+
+    async def _run_once_at(self,now:datetime|None=None)->None:
         now=(now or datetime.now(IST)).astimezone(IST)
         if not self.enabled:
             self.set_status('DISABLED');return
@@ -222,7 +243,16 @@ class Engine:
         try:
             opt=select_option(self.instrument_rows,now.date(),side,decision.candle.close,avoid_expiry_day=True)
             raw=await asyncio.to_thread(kite.full_quote,opt.symbol)
-            oq=validate_quote(opt,raw,now,max_age_seconds=15,max_spread_pct=2)
+            # Historical indicator evaluation belongs to the candle boundary,
+            # but executable option depth must be fresh at the *response* time.
+            # The REST fetch can take seconds: comparing this quote to the
+            # earlier candle-poll clock wrongly accepts stale depth or rejects
+            # valid newer exchange timestamps as future dated.
+            observed_at=(datetime.now(IST) if self._live_delivery_clock.get() else now)
+            if observed_at.date()!=now.date() or observed_at.time()>time(15,0):
+                self.set_status('NO_TRADE','Option quote returned after entry cutoff')
+                return
+            oq=validate_quote(opt,raw,observed_at,max_age_seconds=15,max_spread_pct=2)
         except (ValueError,TypeError,KeyError):
             self.set_status('NO_TRADE','No liquid fresh executable option quote; skip alert')
             return
@@ -244,16 +274,16 @@ class Engine:
         if self.paper_premium_tracking:
             candidate['premium']=reference_from_quote(
                 oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
-                created_at=now,hypothesis=self.premium_hypothesis)
+                created_at=observed_at,hypothesis=self.premium_hypothesis)
         # Record the actual observed ASK/BID alongside the paper candidate.
         # The quotation is not a fill, and its source is explicitly unverified.
         try:
             quote_snapshot=make_snapshot(event_id,'ENTRY',
-                decision.candle.start+timedelta(minutes=5),now,oq)
+                decision.candle.start+timedelta(minutes=5),observed_at,oq)
         except ValueError:
             self.set_status('WAIT_DATA','Quote evidence validation failed; no paper entry')
             return
-        accepted=self.db.claim_entry_with_candidate(event_id,decision.status,now,body,
+        accepted=self.db.claim_entry_with_candidate(event_id,decision.status,observed_at,body,
                     json.dumps(candidate,separators=(',',':')),quote_snapshot=quote_snapshot)
         if not accepted:
             self.set_status('WAIT_DATA','Entry claim rejected: duplicate or existing paper position')
@@ -406,5 +436,5 @@ class Engine:
                     last_premium_poll_slot=slot
                     await self.poll_virtual_premium(now)
             if scheduler.claim(now):
-                await self.run_once(now)
+                await self.run_once()
             await asyncio.sleep(2)
