@@ -228,16 +228,86 @@ class State:
                 'FROM events ORDER BY at,status').fetchall()
     def pending_events(self)->list[tuple[str,str]]:
         with self._connect() as db:
-            return db.execute('SELECT event_id,payload FROM events WHERE delivered=0 ORDER BY at LIMIT 10').fetchall()
+            return db.execute('SELECT event_id,payload FROM events WHERE delivered=0 ORDER BY julianday(at), event_id LIMIT 10').fetchall()
     def expire_events_before(self, cutoff:datetime)->int:
-        """Never deliver a stale entry review after an outage or restart.
+        """Expire queued notifications by instant, not ISO offset text order.
 
+        SQLite's raw string comparison gives wrong results when historical
+        events use different UTC offsets. julianday normalizes both operands.
         delivered state: 0 queued, 1 Telegram accepted, 2 expired unsent.
         """
+        if not isinstance(cutoff, datetime) or cutoff.tzinfo is None or cutoff.utcoffset() is None:
+            raise ValueError('timezone-aware cutoff required')
         with self._connect() as db:
-            cur=db.execute('UPDATE events SET delivered=2 WHERE delivered=0 AND at < ?',
-                           (cutoff.isoformat(),))
+            cur=db.execute('UPDATE events SET delivered=2 WHERE delivered=0 '
+                           'AND julianday(at) < julianday(?)',
+                           (cutoff.astimezone(timezone.utc).isoformat(),))
             return cur.rowcount
+
+    def reconcile_startup(self, now:datetime)->dict:
+        """Atomic pre-worker recovery, with no network access or message payloads.
+
+        The operator must repair malformed or unlinked same-day candidates;
+        silently treating them as real paper entries could trigger false exits.
+        Exactly one owner holds the app-level worker lock when this is called.
+        """
+        import json
+        from zoneinfo import ZoneInfo
+        if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError('timezone-aware startup time required')
+        local=now.astimezone(ZoneInfo('Asia/Kolkata'))
+        cutoff=(now-timedelta(seconds=180)).astimezone(timezone.utc).isoformat()
+        expired=cleared=0
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            # Check candidate BEFORE changing anything: malformed persisted
+            # state must fail closed, not leave a partial recovery behind.
+            row=db.execute('SELECT value FROM runtime WHERE key=?',('virtual_candidate',)).fetchone()
+            candidate=None
+            if row and row[0]:
+                try:
+                    candidate=json.loads(row[0])
+                    if not isinstance(candidate,dict):raise ValueError
+                    day=candidate['expiry_date']
+                    if not isinstance(day,str) or len(day)!=10:
+                        raise ValueError
+                    from datetime import date
+                    date_val=date.fromisoformat(day)
+                    if (not isinstance(candidate.get('direction'),str)
+                        or candidate['direction'] not in ('CE','PE')
+                        or not isinstance(candidate.get('signal_candle'),str)
+                        or date_val>local.date()):
+                        raise ValueError
+                    # Old-day candidates can be removed safely without
+                    # trusting legacy entry links or stale option references.
+                    if date_val==local.date():
+                        entry_id=candidate.get('entry_event_id')
+                        if not isinstance(entry_id,str) or not entry_id:
+                            raise ValueError
+                        if db.execute('SELECT 1 FROM events WHERE event_id=?',
+                                      (entry_id,)).fetchone() is None:
+                            raise ValueError
+                except (ValueError,TypeError,KeyError) as exc:
+                    raise ValueError('invalid or unlinked virtual candidate on startup') from exc
+            # Timezone-normalized cutoff covers old UTC- and IST-stamped rows.
+            result=db.execute('UPDATE events SET delivered=2 WHERE delivered=0 '
+                              'AND julianday(at) < julianday(?)',(cutoff,))
+            expired=result.rowcount
+            if candidate is not None:
+                older=candidate['expiry_date']<local.date().isoformat()
+                missing_notice=False
+                if not older:
+                    delivered=db.execute('SELECT delivered FROM events WHERE event_id=?',
+                                         (candidate['entry_event_id'],)).fetchone()
+                    missing_notice=delivered is None or delivered[0]==2
+                if older or missing_notice:
+                    db.execute('UPDATE runtime SET value=? WHERE key=?',('', 'virtual_candidate'))
+                    cleared=1
+        return {'expired_queued_notifications':expired,
+                'cleared_stale_virtual_candidates':cleared,
+                'preserved_active_candidate':bool(candidate is not None and not cleared),
+                'telegram_phone_receipt_verified':False,
+                'broker_orders_placed':False}
     def outbox_summary(self)->dict:
         """Safe counts for health endpoints; never expose Telegram payloads."""
         with self._connect() as db:

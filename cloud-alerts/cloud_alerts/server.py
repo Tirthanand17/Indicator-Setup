@@ -62,6 +62,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
         # A second Uvicorn worker using the same durable volume must fail.
         # Different hosts/volumes still require a single-replica deployment.
         with single_worker(cfg.root):
+            # Reconcile persisted paper state before any retry or market poll.
+            # A malformed/unlinked candidate blocks startup until inspected.
+            app.state.startup_recovery=state.reconcile_startup(datetime.now(IST))
             task=asyncio.create_task(engine.run_forever(),name='kite-paper-alerts')
             app.state.worker_task=task
             try:yield
@@ -76,6 +79,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     app=FastAPI(title='NIFTY read-only paper alerts',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
     app.state.engine=engine
     app.state.worker_task=None
+    app.state.startup_recovery=None
     @app.get('/healthz')
     async def healthz():
         data=engine.health()

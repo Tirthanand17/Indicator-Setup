@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 71%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 72%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████████░░░░░░] 71%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 29%
+Overall engineering progress   [██████████████████░░░░░░] 72%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░███████] 28%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 85% | Quote time-zone and numeric fail-closed checks added; earlier paid Kite GET smoke verified, but **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 87% | Durable per-event Telegram API attempt and acceptance timestamps + sanitized offline latency audit; no physical-phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 35% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
+| P4 | Telegram delivery, dedupe/outbox, health | 90% | Durable per-event Telegram API attempt and acceptance timestamps + sanitized offline latency audit; no physical-phone receipt or live host |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 42% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **71.0%, rounded to 71%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **72.0%, rounded to 72%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Phase 22 continuation — private SQLite WAL recovery snapshots (19 Oct)
 
@@ -218,3 +218,12 @@ Sum of current percentages / 10 = **71.0%, rounded to 71%**. **Actual readiness 
 3. New offline `session_audit_cli` reads SQLite strictly read-only and accounts for unobserved boundaries instead of silently counting only successes. The operator must explicitly supply actual open NSE session days. The tool **does not independently verify holidays, market-data provenance, phone receipts, or actual paper returns**.
 4. Added **19 offline regression tests** covering first/last boundaries, UTC/IST conversion, durable restarts, missing tokens, failed broker requests, retry outcomes, unobserved whole days, malformed stored timestamps, CLI privacy and read-only behavior. Full suite **283/283** passed; no broker or Telegram network calls were performed.
 5. P4 monitoring diagnostics **80% → 85%**, P8 evidence-completeness tools **50% → 55%**, moving the 10-phase weighted mean from 68% to **69%**. Phase P9 remains at **zero real observed market sessions**; live hosting, real HTTPS token handoff and phone receipt proof remain unavailable. See [REST session coverage guide](REST_SESSION_COVERAGE.md).
+
+
+## October 19 Phase 23 — fail-closed startup reconciliation (72%)
+
+1. Fixed timezone-unsafe string comparisons in `expire_events_before`: pending Telegram alerts now expire by absolute instant using SQLite `julianday()` with an aware cutoff. Old UTC and IST records behave identically.
+2. Added atomic `State.reconcile_startup`: before the worker starts, expire stale queued reviews, clear old-day/expired virtual paper candidates, preserve today's accepted/recent-pending positions, and fail closed on corrupt or unlinked same-day candidate state. There are no network requests, orders, or token reads in reconciliation.
+3. Wired reconciliation under the existing single-worker lock in FastAPI lifespan. An invalid current-day candidate aborts startup before any notification worker launches rather than silently permitting a misleading virtual EXIT. This intentionally requires manual assessment of same-day legacy candidates without event links.
+4. Added 13 synthetic regression tests: mixed UTC/IST, stale vs future entries, accepted/new queued entries, prior-day expiry, atomic failure, idempotence and actual app startup. The full offline suite passes **322/322**. No cloud host, broker authorization, Telegram physical-phone delivery or real trade has been tested.
+5. P4 engineering readiness **87% → 90%**, P5 preparatory operational reliability **35% → 42%**, ten-phase mean **71% → 72%**. P5 live deployment and P9 observed market sessions remain at zero. See [startup reconciliation](STARTUP_RECONCILIATION.md).

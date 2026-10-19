@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 70%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 72%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -209,3 +209,14 @@
 - [ ] Five actual paper sessions with full REST interval coverage, phone evidence and option cost-based results.
 
 **Engineering estimate: 71% complete, 29% remaining. No cloud service deployed, no broker orders.**
+
+
+## Phase 23 — startup reconciliation / UTC-safe expiration
+
+- [x] Normalize expiry by actual instant, not ISO text ordering; reject naive timestamps.
+- [x] Reconcile stale queued alerts and expired virtual candidates atomically before enabling polling.
+- [x] Preserve same-session Telegram-accepted or still-valid queued candidates across restarts.
+- [x] Block startup on malformed/unlinked same-day paper positions rather than manufacturing EXIT evidence.
+- [x] **322/322 offline Python tests pass**.
+- [ ] Choose a qualifying, operator-approved always-on cloud host with private encrypted-at-rest persistence.
+- [ ] Validate live daily token handoff, Telegram handset receipt and five paper-only market sessions.
