@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 70%** — `[██████████████████░░░░░░]` (**30% remaining**).
+**Overall engineering implementation estimate: 71%** — `[██████████████████░░░░░░]` (**29% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 297 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 309 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -32,6 +32,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
 - [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)
 - [Telegram Bot API acceptance and retry/latency audit](docs/TELEGRAM_DELIVERY_AUDIT.md)
+- [Private WAL-consistent SQLite state snapshots and recovery](docs/STATE_SNAPSHOT_RECOVERY.md)
 - [Restricted HTTPS ingress and TEST-only Telegram probe](docs/HTTPS_INGRESS_AND_PHONE_TEST.md)
 - [Prevent virtual EXIT reviews for undelivered entry notices](docs/ENTRY_NOTICE_EXIT_SAFETY.md)
 
@@ -176,3 +177,10 @@ Rates/costs above are *illustrative assumptions*, not current verified fee estim
 ## Phase 21: offline Telegram acceptance latency audit (70%)
 
 The outbox now keeps restart-safe attempted-send counts and timestamps, and a first Bot API acceptance timestamp; legacy rows are migrated without losing their messages. Run `python -m cloud_alerts.delivery_audit_cli --db /private/alerts.sqlite3 --session-date 2026-10-19` on an **operator-reviewed private read-only SQLite copy** to see per-session retry, expiry, median/p95/max API latency and unverifiable legacy counters. See [audit guide](docs/TELEGRAM_DELIVERY_AUDIT.md). **No phone receipts or live messages were obtained.**
+
+
+## Phase 22 — private WAL-consistent recovery snapshots (71% overall)
+
+- Added the offline-only `python -m cloud_alerts.snapshot --snapshot --db ... --output ...` tool and read-only `--verify`. It creates an atomic SQLite backup including uncheckpointed WAL commits, and refuses unsafe permissions or overwriting an existing backup.
+- A snapshot contains sensitive paper-review message text and **is not encrypted by the tool**. Use it only on approved, private, encrypted-at-rest infrastructure. The separate Kite access token vault is not backed up.
+- **309/309 local offline tests passed.** No cloud host activated, no live phone receipts or broker orders. See [state snapshot and recovery runbook](docs/STATE_SNAPSHOT_RECOVERY.md).

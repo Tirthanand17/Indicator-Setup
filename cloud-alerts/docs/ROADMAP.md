@@ -197,3 +197,15 @@
 - Added non-destructive SQLite outbox migration with attempt count, first/last UTC attempt stamps, and Telegram Bot API acceptance UTC time. Outbox and virtual paper-entry invariants remain in place.
 - Offline read-only CLI computes per-session attempted/accepted/expired reviews, retry counts and p50/p95 API acceptance latency. Old successful entries lacking timestamps count as unknown, not instantaneous.
 - Full local test suite **297/297 passing**. See [TELEGRAM_DELIVERY_AUDIT.md](TELEGRAM_DELIVERY_AUDIT.md). **Cannot verify handset delivery or cloud readiness until a free approved always-on host is available.**
+
+
+## Phase 22 — WAL-consistent cloud-state recovery (71%)
+
+- [x] Add private SQLite `backup()` snapshot with WAL integrity, source/backup permission enforcement and atomic no-overwrite output.
+- [x] Add offline verification and sanitized CLI report that omits alert messages, tokens and account details.
+- [x] Test restart with pending alert from live WAL state and verify malformed, symlink or too-open files fail closed.
+- [x] **309/309 local synthetic tests passed**; documentation warns that backup is sensitive **unencrypted SQLite**, and no automatic restore exists.
+- [ ] Operator approval and verified persistent encrypted always-on host; real token handoff and handset TEST still pending.
+- [ ] Five actual paper sessions with full REST interval coverage, phone evidence and option cost-based results.
+
+**Engineering estimate: 71% complete, 29% remaining. No cloud service deployed, no broker orders.**
