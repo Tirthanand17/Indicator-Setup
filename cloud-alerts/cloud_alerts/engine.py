@@ -43,10 +43,11 @@ class Engine:
           'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
           'mode':'READ_ONLY_PAPER','order_execution':False}
 
-    async def _deliver_outbox(self)->None:
+    async def _deliver_outbox(self, now:datetime|None=None)->None:
         # Entries older than 180 seconds are informationally stale for intraday
         # option buying. Discard them rather than deliver a dangerous old BUY.
-        self.db.expire_events_before(datetime.now(IST)-timedelta(seconds=180))
+        current=(now or datetime.now(IST)).astimezone(IST)
+        self.db.expire_events_before(current-timedelta(seconds=180))
         # Outbox is *at least once*, not mathematically exactly once: crash after
         # Telegram accepted but before SQLite commit could duplicate a message.
         for event_id,body in self.db.pending_events():
@@ -60,7 +61,7 @@ class Engine:
 
     async def _send_event(self,event_id:str,status:str,now:datetime,body:str)->None:
         if self.db.claim_event(event_id,status,now,body):
-            await self._deliver_outbox()
+            await self._deliver_outbox(now)
 
     async def run_once(self,now:datetime|None=None)->None:
         now=(now or datetime.now(IST)).astimezone(IST)
@@ -102,7 +103,7 @@ class Engine:
         stamp=fut.symbol+':'+completed5[-1].start.isoformat()
         if previous_completed==stamp:
             # Don't suppress delayed Telegram retry.
-            await self._deliver_outbox()
+            await self._deliver_outbox(now)
             return
         decision=decide(completed5,now,completed15)
         self.last_data_at=now
@@ -115,7 +116,7 @@ class Engine:
             await self._check_virtual_exit(completed5[-1],fut.symbol,now)
         if decision.status not in ('REVIEW_CE','REVIEW_PE'):
             self.set_status('NO_TRADE',decision.reason)
-            await self._deliver_outbox()
+            await self._deliver_outbox(now)
             return
         side=decision.status[-2:]
         try:
