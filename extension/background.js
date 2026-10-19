@@ -7,7 +7,27 @@ const ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0
 const configGet = async () => (await chrome.storage.local.get({ armed: false })).armed === true;
 async function chartState() {
   const { chartSeenAt = 0, chartSymbol = null } = await chrome.storage.session.get(['chartSeenAt', 'chartSymbol']);
-  return { chartOpen: Date.now() - chartSeenAt < 35000, chartSeenAt, chartSymbol };
+  // Chrome host permission allows discovery of the chart tab without reading page content.
+  // This is presence ONLY: no indicator readings, tokens, cookies or market quotes.
+  let detected = false;
+  let detectedSymbol = null;
+  try {
+    const tabs = await chrome.tabs.query({ url: 'https://kite.zerodha.com/markets/ext/chart/*' });
+    for (const tab of tabs) {
+      if (!tab.url) continue;
+      const path = new URL(tab.url).pathname; // DO NOT read URL hash or iframe session tokens
+      if (!path.startsWith('/markets/ext/chart/')) continue;
+      detected = true;
+      const parts = path.split('/');
+      const value = parts[parts.length - 2];
+      if (/^NIFTY\\d{2}[A-Z]{3}FUT$/.test(value)) detectedSymbol = value;
+    }
+  } catch { /* Older Chrome or disallowed tab enumeration; rely on heartbeat. */ }
+  return {
+    chartOpen: detected || Date.now() - chartSeenAt < 35000,
+    chartSeenAt: detected ? Date.now() : chartSeenAt,
+    chartSymbol: detectedSymbol || chartSymbol
+  };
 }
 async function addLog(entry) {
   const { logs = [] } = await chrome.storage.local.get('logs');
