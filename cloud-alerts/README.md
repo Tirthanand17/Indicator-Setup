@@ -90,7 +90,6 @@ python -m compileall -q cloud_alerts
 - Container liveness probe and 106 passing offline tests. See [startup security/runbook](docs/RELIABLE_CLOUD_STARTUP.md) and [progress ledger](docs/PROGRESS.md).
 - **No always-on cloud instance activated**, no real alert sent from cloud, no real orders and no modifications in the protected trading folder.
 
+### Cloud operational readiness (Phase 8 continuation)
 
-## P8 paper-evidence scorer (56% overall)
-
-The pure [option-level paper-evidence module](cloud_alerts/evaluation.py) checks independent post-signal entry/exit quote timestamps and BID/ASK/depth. It calculates a hypothetical gross/net reference using pessimistic taker quotes, caller-specified slippage and nonzero charges; rejects missing/invalid/late quotes; and avoids labeling synthetic or tiny samples as reliable win-rate evidence. See [evaluation contract](docs/PAPER_EVIDENCE_EVALUATION.md). **116/116 tests passed.** This does not provide actual option executions, data provenance, validated profitability, hosting, or live Telegram cloud alerts.
+A separate **`GET /operationalz`** checks that completed REST market decisions are recent and Telegram has no pending messages. Unlike `/healthz` (process liveness) and `/readyz` (token presence), it intentionally reports HTTP 503 on stale data and market closure. Its result **never proves that the operator received a Telegram push**, and all alert execution remains disabled until separately configured. See [operational gate and safety notes](docs/OPERATIONAL_READINESS.md). Offline tests: **129 passing**. Overall estimated code readiness **57%**, not live service readiness.

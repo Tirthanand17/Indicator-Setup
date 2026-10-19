@@ -115,3 +115,7 @@ REST 5m history is dependable for candle-close research but may be slower than a
 ## Optional P7 premium review (no deployment yet)
 
 See [PREMIUM_EXIT_MONITOR.md](PREMIUM_EXIT_MONITOR.md). It defaults to OFF and is strictly virtual: a signal-time ASK is not a purchase fill, and later BID observations are not realized P&L. Host operators should only enable `PAPER_PREMIUM_TRACKING_ENABLED=true` after real-data freshness, Telegram confirmation and acceptable polling quotas have been tested. It never places an order or reads holdings.
+
+## Additional P4 operational monitoring (2026-10-19)
+
+Use **`/operationalz`** as a nonsecret operator diagnostic only, never as the Docker restart/liveness probe. It returns HTTP 200 only after the evaluator is enabled, daily token is present, one worker is running, a valid REST `NO_TRADE`/`REVIEW` decision is newer than 420 seconds during the supported session, and no phone messages are queued. It reports `phone_receipt_verified=false` even on success. During weekends, before 09:30, after 15:25 or before the first successful REST decision, HTTP 503 is normal. See [operational readiness reference](OPERATIONAL_READINESS.md).

@@ -17,6 +17,7 @@ from .security import TokenVault,verify_relay
 from .telegram import Telegram
 from .stream_supervisor import ShadowSupervisor
 from .runtime_guard import single_worker
+from .operational import assess_operational
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -86,6 +87,26 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
         ready=bool(engine.enabled and vault.get(datetime.now(IST)))
         return JSONResponse({'ready':ready,'mode':'READ_ONLY_PAPER'},
                             status_code=200 if ready else 503,headers={'Cache-Control':'no-store'})
+
+    @app.get('/operationalz')
+    async def operationalz():
+        # This is stricter than /readyz: today's token is insufficient if
+        # REST decisions are stale or Telegram has undelivered queued messages.
+        # Never claim the user's phone RECEIVED a notification.
+        task = app.state.worker_task
+        now = datetime.now(IST)
+        report = assess_operational(
+            now,
+            worker_running=bool(task is not None and not task.done()),
+            enabled=engine.enabled,
+            token_present=bool(vault.get(now)),
+            last_data_at=engine.last_data_at,
+            status=engine.status,
+            queued_alerts=state.outbox_summary()['queued'],
+        )
+        return JSONResponse(report,
+                            status_code=200 if report['monitoring_data_ready'] else 503,
+                            headers={'Cache-Control': 'no-store'})
 
     @app.post('/internal/token')
     async def handoff(request:Request):

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 56%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 57%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████░░░░░░░░░░] 56%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 44%
+Overall engineering progress   [██████████████░░░░░░░░░░] 57%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 43%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
 | P2 | Daily token relay, HMAC and encrypted vault | 70% | Synthetic tests; no deployed TLS host or live handoff |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 65% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
+| P4 | Telegram delivery, dedupe/outbox, health | 75% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 10% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **55.5%, rounded to 56%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **56.5%, rounded to 57%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -91,3 +91,12 @@ Sum of percentages / 10 = **55.5%, rounded to 56%**. **Actual readiness for time
 3. Invalid, over-delayed, weekend, expired, reversed, wide-spread or liquidity-insufficient quote observations fail closed.
 4. The summary refuses any sample under 30 paired observations over at least 5 days; synthetic/unverified inputs get an explicit `UNVERIFIED_SOURCE` label even when counts are high. Captured-quote tags alone are **not independently verified**.
 5. Offline test suite now **116/116 passed**. P8 research-evidence scaffolding moves from 0% to **10%**; overall 55% to **56%**. Actual option depth archive, independent provenance validation, chronological walk-forward split and multi-day trial remain pending. See [paper-evidence technical design](PAPER_EVIDENCE_EVALUATION.md).
+
+## October 19 follow-up — operational health that cannot fake readiness (57%)
+
+1. Added [`operational.py`](../cloud_alerts/operational.py) and `/operationalz` to separate worker liveness, daily token presence, and **fresh completed REST decision data**.
+2. The operational gate fails closed for disabled worker, market closure, no daily token, pending Telegram outbox, erroneous state, absent/stale/future REST observations, or missing broker decisions.
+3. The response explicitly says `phone_receipt_verified=false` and `real_orders_enabled=false`; a successful API call **cannot prove** delivery on the physical phone.
+4. Preserved `/healthz` for Docker liveness and `/readyz` for token availability; neither is a substitute for full market-trial evidence.
+5. Ran **129/129 offline tests** after preserving the signed `/internal/token` route and its auth/replay/size protection tests. See [operational readiness details](OPERATIONAL_READINESS.md). No live cloud host was created and no account credentials entered.
+6. P4 offline completion moves **65% → 75%**; P5 and P9 remain **0%** until genuinely deployed and tested. Overall estimated scope **57% implemented, 43% remaining**.

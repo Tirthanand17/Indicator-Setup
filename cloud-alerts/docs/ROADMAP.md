@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 56%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 57%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -63,3 +63,12 @@
 - [x] **116/116** offline tests passing across all cloud modules.
 - [ ] Collect independently verified real quote-pair evidence and calendar; implement chronological walk-forward train/test split.
 - [ ] Full live-market session trials and real Telegram mobile receipt checks on an explicitly approved always-on host.
+
+## 2026-10-19 — P4 operational health gate (57%)
+
+- [x] `/operationalz` distinguishes fresh REST decisions from basic process and token presence.
+- [x] Fail closed if outbox queued, missing/expired token, stale data, weekend/after hours, or background worker stopped.
+- [x] Never call cloud Telegram API acceptance proof of handset delivery.
+- [x] Preserve `/internal/token` and tests for replay, request size, and signed submission.
+- [x] **129/129** synthetic/offline tests passing.
+- [ ] Deploy only after verified free/approved always-on host; test actual phone receipt and hardware-off operation.
