@@ -1,14 +1,17 @@
 {
   "manifest_version": 3,
   "name": "NIFTY Five-Indicator Paper Alerts",
-  "version": "0.1.0",
-  "description": "Read-only Kite chart presence and manually verified closed-candle CE/PE paper-trading alert checks; no orders or paid APIs.",
+  "version": "0.2.0",
+  "description": "Automatically observes read-only, visible Zerodha Kite chart legend values and alerts on provisional 5m paper CE/PE setups. Never trades.",
   "permissions": ["storage", "notifications"],
   "host_permissions": ["https://kite.zerodha.com/*"],
-  "action": { "default_title": "NIFTY Paper Alerts", "default_popup": "popup.html" },
-  "background": { "service_worker": "background.js" },
+  "action": {"default_title":"NIFTY Paper Alerts", "default_popup":"popup.html"},
+  "background": {"service_worker":"background.js"},
   "content_scripts": [{
-    "matches": ["https://kite.zerodha.com/markets/ext/chart/*", "https://kite.zerodha.com/static/chart/tradingview/*"],
-    "js": ["content.js"], "run_at": "document_idle", "all_frames": true
+    "matches":["https://kite.zerodha.com/*"],
+    "js":["reader.js","content.js"],
+    "run_at":"document_idle",
+    "all_frames":true,
+    "match_origin_as_fallback":true
   }]
 }
