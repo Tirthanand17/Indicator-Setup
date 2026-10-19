@@ -132,11 +132,11 @@
 
 ## Phase 15 — entry notification must precede virtual exit (2026-10-19)
 
-- [x] Persist linked `entry_event_id` in every new paper candidate while atomically queuing its phone notice.
+- [x] Persist and enforce linked `entry_event_id` in every new paper candidate at the SQLite transaction boundary; reject mismatched links.
 - [x] Suppress both underlying-candle and option-BID virtual exits until Telegram reports accepted entry notice.
 - [x] Clear an expired/unsent candidate without generating a misleading orphan exit.
 - [x] Fail closed for missing/corrupt linked outbox references; test recovery after restart.
-- [x] Full offline suite: **184/184 passed**.
+- [x] Full offline suite: **186/186 passed**.
 - [ ] Validate actual phone receipt and option-level paper evidence across five trading sessions on an approved always-on host.
 
 **Overall engineering estimate: 64%. Live cloud service still OFF.**

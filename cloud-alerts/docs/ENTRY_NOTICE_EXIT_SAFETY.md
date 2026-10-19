@@ -8,7 +8,7 @@ A paper-review entry can be safely persisted while Telegram delivery temporarily
 
 ## New invariant
 
-1. The entry-processing transaction saves the outbox event and virtual candidate together. Each **new** candidate includes the `entry_event_id` used for the outbox event.
+1. The entry-processing transaction saves the outbox event and virtual candidate together. Every **new** candidate includes the `entry_event_id` used for the outbox event; the SQLite transaction injects a missing ID and rejects an ID that points to a different event.
 2. While delivery state is **0 / queued**, both the 5-minute underlying virtual exit checker and opt-in 20-second option-BID watcher refrain from emitting exit notices. The premium watcher does not query Kite.
 3. When Telegram returns success and the outbox is marked **1 / accepted**, the virtual exit watchers may resume. Success means only Telegram Bot API acceptance, **not** handset delivery or a filled trade.
 4. When the entry is **2 / expired** (180-second limit), virtual tracking is cleared without a linked exit. The entry remains in the privacy-limited historical outbox counts.
@@ -17,7 +17,7 @@ A paper-review entry can be safely persisted while Telegram delivery temporarily
 
 ## Test evidence
 
-Seven new synthetic tests: pending entry, expired entry, accepted entry, premium network skip, premium expiration, missing linkage and restart survival. Full suite **184/184**. The tests use synthetic phone transports and futures/option objects only.
+Nine new synthetic tests: pending entry, expired entry, accepted entry, premium network skip, premium expiration, missing linkage, restart survival, transaction-created linkage and mismatched foreign-link rejection. Full suite **186/186**. The tests use synthetic phone transports and futures/option objects only.
 
 ## Remaining production blockers
 

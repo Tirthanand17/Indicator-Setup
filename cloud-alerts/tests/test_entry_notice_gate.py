@@ -104,3 +104,21 @@ async def test_restart_retains_entry_notice_gate(tmp_path):
     second.db.mark_delivered('notice-1')
     await second._check_virtual_exit(stopped_candle(),pos['symbol'],NOW+timedelta(minutes=5))
     assert len(second.telegram.messages)==1
+
+
+def test_database_enforces_link_for_legacy_caller(tmp_path):
+    e,pos=create(tmp_path)
+    pos.pop('entry_event_id')
+    assert e.db.claim_entry_with_candidate('notice-1','REVIEW_CE',NOW,
+        'FAKE BUY REVIEW',json.dumps(pos))
+    saved=json.loads(e.db.get_runtime('virtual_candidate'))
+    assert saved['entry_event_id']=='notice-1'
+    assert e.db.event_delivery_status('notice-1')==0
+
+def test_database_rejects_foreign_notification_link_atomically(tmp_path):
+    e,pos=create(tmp_path)
+    pos['entry_event_id']='wrong-other-entry'
+    assert not e.db.claim_entry_with_candidate('notice-1','REVIEW_CE',NOW,
+        'FAKE BUY REVIEW',json.dumps(pos))
+    assert e.db.get_runtime('virtual_candidate') is None
+    assert not e.db.pending_events()

@@ -149,9 +149,9 @@ Sum of current percentages / 10 = **63.5%, rounded to 64%**. **Actual readiness 
 
 ## October 19 Phase 15 — no virtual exits for unseen entry notifications (64%)
 
-1. Each new virtual CE/PE candidate now carries its original `entry_event_id`; this points to the existing durable Telegram outbox row, **not** to a real Kite order or holding.
+1. Each new virtual CE/PE candidate now carries its original `entry_event_id`, enforced in the SQLite transaction even when a caller omits it; mismatched IDs fail closed; this points to the existing durable Telegram outbox row, **not** to a real Kite order or holding.
 2. Both underlying-futures and optional actual-option-BID virtual exit monitors **wait** while the entry review is queued, and issue **no EXIT review** if the entry review never receives Telegram Bot API acceptance. This avoids confusing an unseen BUY review with a subsequent orphan EXIT.
 3. If the entry review expires after 180 seconds, the associated virtual candidate is cleared before it can generate an EXIT. Corrupt/missing linked events fail closed without exposing message payloads.
 4. Pre-existing legacy virtual candidates without an `entry_event_id` retain research-only compatibility; no host has been deployed to contain legacy real entries. New candidates always use the linked safety gate.
-5. Added **7 tests** for queued/expired/accepted entries, optional premium watcher network avoidance and crash/restart persistence; **184/184 offline tests pass**. No real broker/Telegram requests or cloud deployment.
+5. Added **9 tests** for queued/expired/accepted entries, optional premium watcher network avoidance, crash/restart persistence, automatic SQLite event linkage and foreign event-ID rejection; **186/186 offline tests pass**. No real broker/Telegram requests or cloud deployment.
 6. P7 engineering estimate **65% → 75%**. Overall estimated engineering scope **63% → 64%**; live host activation and five-session proof remain **0%**. See [entry-notice gate](ENTRY_NOTICE_EXIT_SAFETY.md).

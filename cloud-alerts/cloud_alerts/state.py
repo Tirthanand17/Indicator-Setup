@@ -50,6 +50,13 @@ class State:
                 or not candidate['symbol'].startswith('NIFTY')
                 or not isinstance(candidate.get('signal_candle'),str)):
             return False
+        # The database is the final authority for the event/candidate link.
+        # A caller may omit the ID (compatibility with older research callers),
+        # but a mismatched ID is rejected before anything can be persisted.
+        if candidate.get('entry_event_id',event_id)!=event_id:
+            return False
+        candidate['entry_event_id']=event_id
+        candidate_json=json.dumps(candidate,separators=(',',':'))
         with self._connect() as db:
             # SQLite executes the claim + candidate update in one transaction.
             db.execute('BEGIN IMMEDIATE')

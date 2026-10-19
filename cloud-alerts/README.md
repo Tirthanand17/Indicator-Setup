@@ -10,7 +10,7 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 184 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 186 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -127,7 +127,7 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 
 ## Phase 15 — virtual-exit notice safety (64%)
 
-- New virtual entries persist an `entry_event_id` in the same SQLite transaction as the queued paper entry notification.
+- The SQLite transaction automatically links each new virtual entry to its queued paper notification and rejects a conflicting `entry_event_id`.
 - Pending entry notifications suppress futures and option-premium virtual EXIT notifications. Expired entries clear virtual tracking; missing/corrupted event status blocks exit reviews.
 - Telegram API acceptance is **not** proof of phone receipt or a real broker holding.
-- **184/184 offline Python tests pass**. No cloud host or live messages. See [Phase 15 report](docs/ENTRY_NOTICE_EXIT_SAFETY.md).
+- **186/186 offline Python tests pass**. No cloud host or live messages. See [Phase 15 report](docs/ENTRY_NOTICE_EXIT_SAFETY.md).
