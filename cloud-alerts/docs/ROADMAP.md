@@ -1,13 +1,13 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 41%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 44%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
 | P0 | Requirements, security boundaries and cloud architecture | **Documented** | Permission/read-only plan and hardware-off path spelled out |
 | P1 | Pure indicators, quote/contract mapping, signal rules | **Implemented + synthetic tests** | All unit tests pass, alert not sent on missing/invalid data |
 | P2 | Opt-in read-only daily `.env` token handoff and encrypted cloud vault | **Implemented + synthetic tests** | Signed HMAC, nonce, expiry, ciphertext at rest; still need real TLS host test |
-| P3 | Kite Connect REST historical 5m/15m and quote backend | **Implemented (unvalidated live)** | Actual paid API tests on fully completed exchange bars |
+| P3 | Kite Connect REST historical 5m/15m and quote backend | **Partial live paid Kite data smoke passed** | Actual paid API tests on fully completed exchange bars |
 | P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Implemented (unvalidated live)** | Real paired phone receives TEST and market candidate exactly once in normal run |
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
 | P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW MODULE + SYNTHETIC TESTS**; not integrated with worker | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
@@ -22,7 +22,7 @@
 3. **Notification readiness:** actual Telegram API acceptance and mobile receipt, delayed/failed alert counts.
 4. **Trading value:** genuine after-cost OPTION-level backtest and forward paper results.
 
-Only (1) is currently demonstrated. Do not conflate tests with real trading performance.
+(1) is demonstrated and a **limited read-only subset of (2)** was verified from Nirala via paid Kite market-data HTTP GETs; cloud market session, live option alerts and (3)/(4) remain unverified. Do not conflate tests with real trading performance.
 
 ## Next user approvals/dependencies
 
