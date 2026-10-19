@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 74%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 75%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████████░░░░░░] 74%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 26%
+Overall engineering progress   [██████████████████░░░░░░] 75%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 25%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -20,12 +20,19 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 42% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
-| P7 | Virtual/option-premium exit tracking | 85% | Paper option entry references and evidence capture use actual live quote observation time; late/out-of-session review blocked; no holdings/fills or live trial |
+| P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **74.0%, rounded to 74%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **74.5%, rounded to 75%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 26 — premium BID watcher response clock and cutoff (75%)
+
+1. Reproduced GitHub commit `c106fd3` and its **346/346** local tests. Found the optional premium watcher still accepted a timestamp captured **before** a slow option quote request, despite the Phase 25 five-minute entry path having been fixed.
+2. Changed unattended `run_forever()` to call `poll_virtual_premium()` without a timestamp, preserving an explicit offline simulation clock for tests. Premium quote freshness, risk evaluation, SQLite quote observation and Telegram event timestamps now reflect the actual quote **response** time in live mode.
+3. A request crossing 15:15 IST produces an explicit **TIME review without a claimed quote BID**, and a response reaching 15:26 IST is suppressed. A stale or future quote cannot create a STOP/TARGET review. Task-local live clock mode is always restored.
+4. Added six synthetic regression tests; **352/352 local tests passed**. No broker requests, Telegram sends or cloud activation. **P7 85 → 90%, 10-phase mean 74.0 → 74.5%, displayed as 75%**. See [premium response clock design](PREMIUM_RESPONSE_CLOCK.md).
 
 ## Phase 25 — real send-time and quote-response clocks (74%)
 

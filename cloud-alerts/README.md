@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 74%** — `[██████████████████░░░░░░]` (**26% remaining**).
+**Overall engineering implementation estimate: 75%** — `[██████████████████░░░░░░]` (**25% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 346 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 352 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -18,6 +18,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - Added a fail-closed `cloud_alerts.preflight` and a single-worker hardened Docker Compose template (`deploy/compose.yml`). The container refuses to start if critical secrets, a private writable persistent mount, or minimum free space are missing.
 - This is **structural readiness only**. It does not deploy a host, install credentials, transmit Telegram messages, or validate a live trade signal.
 - See [cloud deployment preflight](docs/CLOUD_DEPLOYMENT_PREFLIGHT.md).
+
+**Phase 26 update:** the optional live virtual-premium BID watcher now checks broker depth using the **actual quote response clock**, rather than the previous 20-second polling timestamp. Late option responses crossing 15:15 IST become TIME reviews with no claimed executable exit price; responses after 15:26 do not create a new exit alert. Explicit-time replay remains deterministic; **352/352 offline tests passed**. No live cloud deployment. See [premium response-time guardrails](docs/PREMIUM_RESPONSE_CLOCK.md).
 
 **Phase 25 update:** real-mode Telegram send/acceptance timestamps now use fresh clock samples after slow REST calls. Option BID/ASK quote freshness, virtual entry reference and observation evidence use the actual quote response clock, with post-15:00 IST entries blocked. **346/346 local tests passed**. No cloud validation yet. See [live response-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md).
 
@@ -32,6 +34,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
+- [Premium BID watcher response-time and session cutoff safety](docs/PREMIUM_RESPONSE_CLOCK.md)
 - [Live quote-response and Telegram send-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md)
 - [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)
 - [Telegram Bot API acceptance and retry/latency audit](docs/TELEGRAM_DELIVERY_AUDIT.md)

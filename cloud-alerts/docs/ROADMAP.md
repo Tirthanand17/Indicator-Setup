@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 74%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 75%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -241,3 +241,14 @@
 - [x] Abort any paper BUY review whose option quote arrives after the 15:00 IST entry cutoff.
 - [x] **346/346 local synthetic tests passed**. Cloud deploy and independent handset validation still pending.
 - [ ] Complete five approved hosted market sessions, independently verify live quote depth and Telegram phone receipts.
+
+## Phase 26 — premium BID watcher response-time safety (2026-10-19)
+
+- [x] Fix live 20-second premium watcher to sample the wall clock after quote fetch, not at initial scheduler slot.
+- [x] Preserve explicit offline test-time mode and reset task-local context on all paths.
+- [x] Convert option depth response crossing 15:15 IST into TIME review without a synthetic executable BID.
+- [x] Suppress post-15:26 option exit reviews when a slow broker response crosses market close.
+- [x] Prevent stale response quotes from creating synthetic STOP/TARGET evidence.
+- [x] Six added synthetic regressions; **352/352 local tests pass**. Progress estimate **75%**, not live operational readiness.
+- [ ] Validate actual option BID/ASK and Telegram handset delivery from an approved always-on host with persistent secure storage.
+- [ ] Complete five full actual market-session paper trials and after-cost independent performance evidence.

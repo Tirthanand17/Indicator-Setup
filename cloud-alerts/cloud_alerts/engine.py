@@ -296,14 +296,21 @@ class Engine:
             self.set_status('PHONE_DELIVERY_FAILED','Paper review queued, not confirmed delivered')
 
     async def poll_virtual_premium(self,now:datetime|None=None)->None:
-        """Read-only candidate BID watcher. Never assumes user actually bought CE/PE.
+        """Read-only paper BID watcher; live calls always sample response/send clocks.
 
-        Monitoring is explicitly disabled until the operator opts in after reviewing
-        research stop/target fractions. Kite quote timestamps must be fresh and
-        the exact same listed contract as the paper candidate.
+        An explicitly supplied `now` is ONLY the deterministic offline-test seam.
+        The unattended worker must call without a timestamp. No Kite orders.
         """
+        live = now is None
+        marker = self._live_delivery_clock.set(live)
+        try:
+            observed = (now or datetime.now(IST)).astimezone(IST)
+            await self._poll_virtual_premium_at(observed, live=live)
+        finally:
+            self._live_delivery_clock.reset(marker)
+
+    async def _poll_virtual_premium_at(self,now:datetime,*,live:bool)->None:
         if not self.paper_premium_tracking or not self.enabled:return
-        now=(now or datetime.now(IST)).astimezone(IST)
         if now.weekday()>=5 or now.time()<time(9,30) or now.time()>=time(15,26):return
         raw=self.db.get_runtime('virtual_candidate')
         if not raw:
@@ -339,6 +346,7 @@ class Engine:
             return
         # Time-based exit review can be sent even when market quotes are missing;
         # the message explicitly says NO executable bid was observed.
+        observed_at=now
         if now.time()>=time(15,15):
             reason='TIME'
             quote=None
@@ -351,9 +359,23 @@ class Engine:
                 kite=KiteReadOnly(self.api_key,token)
                 raw_quote=await asyncio.wait_for(
                     asyncio.to_thread(kite.full_quote,contract.symbol),timeout=8)
-                quote=validate_quote(contract,raw_quote,now,max_age_seconds=15,max_spread_pct=2)
-                reason=evaluate_bid(reference,quote,now)
-                self.last_premium_quote_at=now
+                # A captured 20-second polling-slot timestamp is NOT the moment
+                # the quote returned. The option watcher must use fresh time,
+                # just like the five-minute entry quote checker.
+                observed_at=datetime.now(IST) if live else now
+                if observed_at.date()!=now.date() or observed_at.time()>=time(15,26):
+                    self.premium_status='SESSION_ENDED_DURING_QUOTE'
+                    return
+                if observed_at.time()>=time(15,15):
+                    # Intraday time cutoff wins. A late quote is NOT executable
+                    # evidence for a STOP/TARGET, and no fake EXIT bid is saved.
+                    reason='TIME'
+                    quote=None
+                else:
+                    quote=validate_quote(contract,raw_quote,observed_at,
+                                         max_age_seconds=15,max_spread_pct=2)
+                    reason=evaluate_bid(reference,quote,observed_at)
+                    self.last_premium_quote_at=observed_at
             except (ValueError,TypeError,KeyError,asyncio.TimeoutError):
                 self.premium_status='WAIT_FRESH_PREMIUM_QUOTE';return
             except Exception:
@@ -363,15 +385,15 @@ class Engine:
             return
         if quote is not None and isinstance(position.get('entry_event_id'),str):
             try:
-                snapshot=make_snapshot(position['entry_event_id'],'EXIT',quote.updated,now,quote)
+                snapshot=make_snapshot(position['entry_event_id'],'EXIT',quote.updated,observed_at,quote)
                 self.db.record_option_quote_observation(snapshot)
             except Exception:
                 # Evidence failure is not proof of a fill or a reason to omit a
                 # risk EXIT review; the offline report will show it as unpaired.
                 self.premium_status='QUOTE_EVIDENCE_WRITE_FAILED'
         event_id='VIRTUAL_OPTION_EXIT:'+position['signal_candle']+':'+reason
-        msg=exit_text(reference,reason,now,quote)
-        await self._send_event(event_id,'VIRTUAL_OPTION_EXIT_'+reason,now,msg)
+        msg=exit_text(reference,reason,observed_at,quote)
+        await self._send_event(event_id,'VIRTUAL_OPTION_EXIT_'+reason,observed_at,msg)
         # Durable claim occurs before clearing virtual candidate; on Telegram failure,
         # the pre-existing outbox can still retry until its short expiry.
         self.db.set_runtime('virtual_candidate','')
@@ -434,7 +456,9 @@ class Engine:
                 slot=(now.date().isoformat(),now.hour,now.minute,now.second//20)
                 if slot!=last_premium_poll_slot:
                     last_premium_poll_slot=slot
-                    await self.poll_virtual_premium(now)
+                    # Never pass the scheduler's captured timestamp into a
+                    # live quote watcher; time can advance during broker I/O.
+                    await self.poll_virtual_premium()
             if scheduler.claim(now):
                 await self.run_once()
             await asyncio.sleep(2)
