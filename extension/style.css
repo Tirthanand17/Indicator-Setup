@@ -1,0 +1,7 @@
+:root { font-family:system-ui,Arial,sans-serif; color-scheme:dark; background:#0e1625; color:#eaf2ff }
+*{box-sizing:border-box}body{max-width:970px;margin:0 auto;padding:22px}body.popup{width:350px;padding:15px}h1,h2,h3{margin:0 0 12px}p{line-height:1.5;color:#d0dcea}
+.panel{background:#17263a;padding:20px;border:1px solid #324460;border-radius:12px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}label{display:block;font-size:.93em;margin:5px 0}input,select{width:100%;padding:10px;color:#f8fbff;border:1px solid #69809e;border-radius:7px;background:#0c1727;font-size:15px}
+label.check{display:flex;align-items:center;gap:8px;margin:14px 0}label.check input{width:auto;min-width:18px;height:18px}button{background:#245ea3;border:1px solid #5395dc;border-radius:8px;color:#fff;padding:11px 15px;font-weight:650;cursor:pointer;margin:6px 6px 0 0}button.secondary{background:#2c3950}button.warn{background:#613a39;border-color:#bd7978}
+.notice{border-left:4px solid #eab85a;padding:12px;background:#393330;border-radius:5px;color:#ffe3b2}
+.result{white-space:pre-wrap;padding:12px;border:1px solid #4c617d;border-radius:8px;min-height:55px}.good{color:#63f3c1}.bad{color:#ff9f9f}.muted{color:#9ab0c7}.logs{padding-left:20px;max-height:210px;overflow:auto;font-size:13px}small,.caption{color:#9fb1c5}a{color:#a9d4ff}
