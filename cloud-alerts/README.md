@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 62%** — `[████████████░░░░░░░░]` (**38% remaining**).
+**Overall engineering implementation estimate: 63%** — `[█████████████░░░░░░░]` (**37% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 168 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 177 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -30,6 +30,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
+- [Restricted HTTPS ingress and TEST-only Telegram probe](docs/HTTPS_INGRESS_AND_PHONE_TEST.md)
 
 ## What is implemented in this prototype
 
@@ -114,3 +115,10 @@ Daily token handoff now refuses to report success when a transfer fails, loads o
 The server and standalone preflight now share secret-redacting checks that reject example placeholders; **enabled** alerts require syntactically valid Kite API and Telegram settings. Existing sensitive state artifacts must be private and worker-owned, and the Docker entrypoint sets `umask 077` before creating database or lock files. **168/168 offline tests** pass. This is not proof of real credential validity, cloud uptime, or message delivery.
 
 See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overall progress ledger](docs/PROGRESS.md). No always-on host has been approved or activated; alerts stay disabled by default.
+
+
+## Phase 14 — restricted HTTPS ingress and TEST-only Telegram probe
+
+- Added [`deploy/Caddyfile.example`](deploy/Caddyfile.example) for **operator-reviewed** host-level TLS termination exposing only signed POST token handoff to the localhost worker. This example is **not deployed** and does not prove TLS issuance.
+- Added `python -m cloud_alerts.telegram_probe --check-only` and `python -m cloud_alerts.telegram_probe --send-test --confirm-send`. The latter is an **explicit** non-market test; API acceptance does **not** establish that the user's phone received it.
+- **177/177 synthetic tests pass**. No cloud costs, hosted service, real Telegram/Kite requests, broker orders or changes to the read-only original trading folder. Engineering estimate **63%**, live cloud operation **not started**.

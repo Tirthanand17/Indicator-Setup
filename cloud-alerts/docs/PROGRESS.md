@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 62%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 63%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████░░░░░░░░░] 62%
-Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 38%
+Overall engineering progress   [████████████████░░░░░░░░] 63%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 37%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -17,14 +17,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 75% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 20% | Fail-closed bootstrap and private volume policies implemented/tests; **host activation and laptop-off verification remain 0%** |
+| P4 | Telegram delivery, dedupe/outbox, health | 80% | Explicit cloud Telegram TEST-only CLI with safe API-acceptance reporting; no physical-phone receipt or live host |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 20% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **61.5%, rounded to 62%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **62.5%, rounded to 63%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -136,3 +136,12 @@ Sum of current percentages / 10 = **61.5%, rounded to 62%**. **Actual readiness 
 4. Docker startup explicitly sets `umask 077` before the preflight and Uvicorn execution. Offline static checks enforce a single worker, localhost-bound ingress, a mounted private state volume and no credential COPY instructions.
 5. Full **168/168 offline tests** pass. No cloud infrastructure, broker requests, Telegram messages or real trades were used. The original protected Windows trading directory was not accessed or changed in this phase.
 6. Only **P5 preparatory infrastructure scope 10% → 20%**, bringing ten-phase mean to **61.5%, rounded to 62%**. The continuously running host, live token handoff and phone receipt remain **not verified**. See [fail-closed configuration and state guide](FAIL_CLOSED_CONFIG.md).
+
+
+## October 19 Phase 14 — HTTPS ingress blueprint and explicit Telegram TEST (63%)
+
+1. Added a Caddy HTTPS reverse-proxy example that forwards **only signed `POST /internal/token`** to the localhost-bound application and responds 404 to public health, readiness and all other routes. Its 2 KB request limit complements the existing receiver-side HMAC, nonce replay and 2048-byte checks. This is a **static example, not a deployed TLS endpoint or a certificate test**.
+2. Added `python -m cloud_alerts.telegram_probe --check-only` for offline sanitized Telegram environment validation and an explicitly confirmed `--send-test --confirm-send` TEST-only command. The command cannot send a signal/order and does not call Kite.
+3. Telegram's HTTP API acceptance is reported separately from **physical-phone receipt, which remains unverified**. All exceptions produce safe codes with no secret values in output.
+4. New offline tests for endpoint route restrictions and Telegram fake transports bring the complete suite to **177/177 tests passed**. No live Telegram calls, cloud deployments, DNS/TLS operations, protected trading-folder modifications or orders occurred.
+5. P4 engineering estimate **75 → 80%**; P5 preparation **20 → 25%**. Ten-phase average **62.5%, rounded to 63%**. P5 host provisioning and real cloud operation remain **0% observed**; P9 market sessions remain **0%**. See [Phase 14 HTTPS ingress and phone test](HTTPS_INGRESS_AND_PHONE_TEST.md).

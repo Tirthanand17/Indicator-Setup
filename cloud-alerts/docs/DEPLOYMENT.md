@@ -44,6 +44,8 @@ docker run --name nifty-alerts --restart unless-stopped --env-file /private/aler
   -v nifty_alert_state:/data/nifty-alerts -p 127.0.0.1:8080:8080 nifty-readonly-alerts
 ```
 
+See [`deploy/Caddyfile.example`](../deploy/Caddyfile.example) and [HTTPS ingress and TEST-only Telegram guide](HTTPS_INGRESS_AND_PHONE_TEST.md) for a route-restricted example. These are not installed, tested against actual TLS or active on a host.
+
 **Do not expose :8080 on the public Internet without an HTTPS reverse proxy.** `/internal/token` is signed and replay-protected but still carries a bearer token over HTTPS; rate-limit and secure that endpoint. Run only **ONE** worker. Check `/healthz` returns `DISABLED`, `WAIT_TOKEN`, or another safe state without secret values. Cloud deployment must be guarded behind cost approval.
 
 ## 4 — Daily token handoff after your usual Zerodha login
@@ -72,7 +74,7 @@ python -m cloud_alerts.token_sender --env-file "<EXISTING_TRADING_FOLDER>\.env" 
 
 The existing Chrome extension already paired a Telegram bot, but the **cloud worker does not inherit the extension's credentials automatically**. Set the bot token and chat ID in **cloud secret settings** through an approved secure user action. Do **not** export them through GitHub commits, public code, Chrome debugging logs or chat screenshots.
 
-First send a **TEST** message using a separate approved secure integration procedure, verify it reaches your own private phone chat, and capture server time → Telegram accepted time → phone observed time. The cloud prototype has no publicly accessible test message endpoint to prevent random users from sending messages.
+First send a **TEST** message using a separate approved secure integration procedure, verify it reaches your own private phone chat, and capture server time → Telegram accepted time → phone observed time. The cloud prototype has no publicly accessible test message endpoint to prevent random users from sending messages. After approved secure cloud configuration, use `python -m cloud_alerts.telegram_probe --check-only` to validate variable formats without any network request; use `python -m cloud_alerts.telegram_probe --send-test --confirm-send` only for an operator-confirmed, visibly TEST-only message. API acceptance does not prove physical handset delivery.
 
 ## 6 — Trading-day gates and monitoring
 

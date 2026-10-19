@@ -1,0 +1,21 @@
+# HOST-LEVEL EXAMPLE ONLY; not an activated public deployment.
+# Set NIFTY_TOKEN_FQDN to an approved, DNS-resolving domain and TLS email.
+# Caddy runs on the VM host; the bot listens ONLY on 127.0.0.1:8080.
+# Caddy automatically provisions HTTPS certificates; never publish the HMAC key.
+# Only allow the signed daily-token route through the Internet proxy.
+{$NIFTY_TOKEN_FQDN} {
+    tls {$NIFTY_TLS_EMAIL}
+    @token_handoff {
+        path /internal/token
+        method POST
+    }
+    handle @token_handoff {
+        request_body {
+            max_size 2KB
+        }
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

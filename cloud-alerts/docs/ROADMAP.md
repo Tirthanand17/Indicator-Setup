@@ -115,3 +115,16 @@
 - [ ] Confirm actual Telegram TEST receipt on the phone, and collect market-session signal / delay evidence.
 
 **Engineering progress estimate: 62%; live-host activation: 0%; additional broker orders: none.**
+
+
+## Phase 14 — HTTPS ingress and Telegram channel verification template (2026-10-19)
+
+- [x] Create a TLS-terminating Caddy configuration example with only `POST /internal/token` publicly routed; all other URLs return 404.
+- [x] Keep the worker `127.0.0.1:8080` only and limit ingress request bodies.
+- [x] Add an explicitly confirmed TEST-only Telegram command, with offline configuration check and safe JSON acceptance reporting.
+- [x] Verify **177/177 local tests passed**; nothing was sent to real Telegram or Kite.
+- [ ] Obtain explicit host/cost approval and verify uptime, DNS, certificate issuance, VM firewall and persistent volume.
+- [ ] Run signed live token handoff and TEST from an approved cloud host; confirm physical phone receipt.
+- [ ] Prove Nirala-off monitoring and five real paper-only trading sessions.
+
+**Engineering progress estimate: 63%; cloud host still inactive; live strategy proof still missing.**
