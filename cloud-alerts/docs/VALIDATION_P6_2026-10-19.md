@@ -1,6 +1,6 @@
 # P6 streaming integration — offline validation report
 
-**Date:** 2026-10-19. **Result:** 61/61 local Python tests passed; **live Kite WebSocket, live option buy/exit alert and cloud host NOT tested** in this pass.
+**Date:** 2026-10-19. **Result:** 67/67 local Python tests passed; **live Kite WebSocket, live option buy/exit alert and cloud host NOT tested** in this pass.
 
 ## New implementation
 
@@ -21,7 +21,13 @@
 | Contract month/instrument rollover closes old socket and re-subscribes | `test_stream_supervisor.py` |
 | Socket failure does not block confirmed REST `NO_TRADE` decisions | `test_shadow_worker.py` |
 | No socket after session cutoff | `test_stream_supervisor.py` |
+| Durable quality ledger: 45-day retention, no token/account fields, unique per candle | `test_shadow_persistence.py` |
 | Default-off configuration, signature/replay safety and delayed alert expiration | `test_server.py`, `test_security.py`, `test_stale_delivery.py` |
+
+## Durable diagnostic improvements
+
+- `State.shadow_evidence` persists only futures symbol, UTC candle start, UTC observation time, `MATCH`/`MISMATCH`/`MISSING`, and enum-whitelisted mismatch reasons. No tokens, user IDs or raw packets.
+- One row per contract/candle, 45-day retention; `State.shadow_summary` reports rolling 30-day counts. Persistence is **best effort**, never required for a REST signal. Five additional offline tests passed.
 
 ## Known limitations
 

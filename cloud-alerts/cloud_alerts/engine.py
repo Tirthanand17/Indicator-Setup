@@ -45,7 +45,8 @@ class Engine:
           'last_phone_accept_at':self.last_alert_at.isoformat() if self.last_alert_at else None,
           'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
           'mode':'READ_ONLY_PAPER','order_execution':False,
-          'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'}}
+          'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
+          'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
 
     async def _deliver_outbox(self, now:datetime|None=None)->None:
         # Entries older than 180 seconds are informationally stale for intraday
@@ -119,11 +120,18 @@ class Engine:
             return
         if shadow_ready:
             try:
-                self.shadow.reconcile(completed5[-1])
+                shadow_verdict=self.shadow.reconcile(completed5[-1])
+                status=('MISSING' if shadow_verdict is None else
+                        'MATCH' if shadow_verdict else 'MISMATCH')
+                evidence=getattr(self.shadow,'evidence',None)
+                reasons=(evidence.last_reasons if evidence is not None and status=='MISMATCH' else ())
+                self.db.record_shadow_evidence(fut.symbol,completed5[-1].start,now,status,tuple(reasons))
             except (ValueError,TypeError):
                 # Corrupt shadow evidence is never an excuse to skip an otherwise
                 # validated broker REST candle. It is reported in stream health.
                 logger.warning('Shadow reconciliation rejected malformed evidence')
+            except Exception:
+                logger.warning('Optional shadow evidence persistence failed; REST-only strategy unaffected')
         decision=decide(completed5,now,completed15)
         self.last_data_at=now
         if decision.status=='WAIT_DATA':

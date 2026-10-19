@@ -50,6 +50,7 @@ async def test_shadow_integrated_but_no_signal_generated(tmp_path,monkeypatch):
     assert e.health()['shadow_stream']['authority']=='REST_ONLY'
     await e.run_once(T+timedelta(seconds=2))
     assert len(sh.reconciles)==1  # duplicate authenticated REST candle
+    assert e.db.shadow_summary(T+timedelta(seconds=20))['counts']['MISSING']==1
 
 @pytest.mark.asyncio
 async def test_shadow_transport_failure_does_not_disable_broker_rest(tmp_path,monkeypatch):
@@ -61,3 +62,22 @@ async def test_shadow_transport_failure_does_not_disable_broker_rest(tmp_path,mo
     assert e.status=='NO_TRADE'
     assert not sh.reconciles  # diagnostic evidence unavailable
     assert e.db.get_runtime('last_processed_candle')
+
+
+@pytest.mark.asyncio
+async def test_reconciled_match_survives_engine_restart(tmp_path,monkeypatch):
+    monkeypatch.setattr(mod,'KiteReadOnly',FakeBroker)
+    monkeypatch.setattr(mod,'decide',lambda c,n,c15:Decision('NO_TRADE','ADX weak',c[-1]))
+    class Matched(FakeShadow):
+        def reconcile(self,candle):
+            self.reconciles.append(candle.start)
+            return True
+    e=make(tmp_path,Matched())
+    await e.run_once(T)
+    assert e.status=='NO_TRADE'
+    # SQLite evidence is durable; the feed itself may stop or restart.
+    from cloud_alerts.state import State
+    recovered=State(str(tmp_path/'sqlite.db'))
+    summary=recovered.shadow_summary(T+timedelta(minutes=1))
+    assert summary['counts']['MATCH']==1
+    assert summary['total']==1

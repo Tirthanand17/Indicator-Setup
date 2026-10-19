@@ -48,6 +48,8 @@ flowchart TD
 
 ## Synthetic test coverage
 
+`tests/test_shadow_persistence.py`: SQLite duplicate handling, sanitized reason allowlist, restart survival and 45-day retention.
+
 `tests/test_stream_supervisor.py` and `tests/test_shadow_worker.py`: async lifecycle, generation fencing, private diagnostic health, matching and missing REST candles, window bounding, rollover, after-hours cleanup and continuation on socket errors.
 
 `tests/test_streaming.py`: initial partial bar dropped, continuous synthetic tick aggregation, out-of-order packets, stale or future tick rejection, gap recovery, cumulative volume reset, duplicate packets, session hours, disconnected state, explicit REST reconciliation mismatch, and mock full-mode subscription.
@@ -56,7 +58,7 @@ flowchart TD
 
 `tests/test_stale_delivery.py`: a queued historical BUY alert older than 180 seconds is expired, not delivered late; a fresh alert is delivered only once in the normal success path.
 
-**61/61 tests pass as of this integration.**
+**67/67 tests pass as of this integration.**
 
 **Test limitations:** synthetic simulated data is not evidence that Kite's live WebSocket reproduces exchange OHLCV. A single `.tick` structure is not proof of normal market conditions. The actual Kite paid account, rate-limits, heartbeat, reconnections and phone delivery latency still require separately authorized integration tests.
 
@@ -66,11 +68,11 @@ flowchart TD
 - The Kite SDK's threaded callback is marshalled into the async event loop; generation numbers invalidate callbacks from old sockets after rollover or token renewal.
 - On each new **completed** REST candle, the worker compares the matching shadow candle and updates bounded in-memory counters in `/healthz`. These counters and last mismatch reasons are diagnostic only, and no mismatch or absent shadow candle is permitted to generate an entry or exit alert.
 - After 15:31 IST, the worker closes the shadow socket for the day. On next-session activation it rewarms and discards the initial partial candle.
-- **Durable quality metrics are still pending:** after a process restart, in-memory quality counters begin again.
+- **Durable quality metrics are implemented:** `State.record_shadow_evidence` stores sanitized one-row-per-(future,candle) verdicts in SQLite for up to 45 days; `State.shadow_summary` summarizes 30-day match/mismatch/missing counts on `/healthz`. In-memory tick telemetry resets on restart, but durable candle-level results survive.
 
 ## Remaining validation work
 
-- Persist or export per-session reconciliation evidence after reviewing privacy and storage requirements.
+- Validate persisted session reconciliation evidence against a live paid Kite streaming connection on an approved host; compare broker historical OHLCV and streaming bar deltas, sample across network outages, contract rollover, and multiple market regimes.
 - Test 5+ market sessions, chart holidays, expiry rollover, network interruptions, late starts and token expiration; report percentage matched / discrepancies and p50/p95/p99 tick-to-phone delays.
 - Only after formal data-quality evidence consider a faster tick-driven **candidate notification**, still gated by separate actual-option quote, risk and non-execution rules.
 

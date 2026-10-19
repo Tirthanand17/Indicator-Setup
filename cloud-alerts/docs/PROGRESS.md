@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 48%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 49%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████░░░░░░░░░░░░] 48%
-Remaining estimated scope      [░░░░░░░░░░░░█████████████] 52%
+Overall engineering progress   [████████████░░░░░░░░░░░░] 49%
+Remaining estimated scope      [░░░░░░░░░░░░█████████████] 51%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -19,12 +19,12 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P3 | Real REST 5/15m candles, broker quote depth | 75% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
 | P4 | Telegram delivery, dedupe/outbox, health | 50% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
-| P6 | WebSocket shadow monitoring and REST reconciliation | 75% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
+| P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 25% | Futures virtual-exit prototype only; no real premium state |
 | P8 | Walk-forward option backtests & reliability dashboard | 0% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **47.5%, rounded to 48%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **48.5%, rounded to 49%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -33,7 +33,7 @@ Sum of percentages / 10 = **47.5%, rounded to 48%**. **Actual readiness for time
 3. Created the read-only KiteTicker shadow module with strict timestamp, instrument, volume and reconnect safeguards; fixed a first-partial-bar leakage uncovered by unit tests.
 4. Created an idempotent 5-minute REST polling schedule with at most three scheduled attempts per boundary, and no burst after a delayed wake.
 5. Added durable unsent-alert expiry after 180 seconds; queued BUY messages cannot arrive many minutes late after an outage.
-6. **61 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
+6. **67 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
 
 ## Read-only live API evidence (19 October 2026)
 
@@ -46,8 +46,9 @@ Sum of percentages / 10 = **47.5%, rounded to 48%**. **Actual readiness for time
 
 1. Introduced a `ShadowSupervisor` owning one optional read-only KiteTicker diagnostic connection (disabled by default), with asynchronous callback marshaling, token/instrument rollover, stale-callback fencing and end-of-session socket cleanup.
 2. Introduced bounded `StreamEvidence` comparisons of shadow five-minute bars with completed REST candles; exposes sanitized matched/mismatched/unavailable counters from `/healthz` without changing REST decision authority.
-3. Added mock-transport tests and synthetic broker integration tests: **61/61 passed**. No real Kite WebSocket message, real cloud Telegram alert or new hosting charge used for this phase.
-4. Checked connected Render workspace (existing free web services only) and official Always Free VM alternatives. No service was created, modified or redeployed. See [hosting evaluation](HOSTING_EVALUATION.md).
+3. Added mock-transport tests and synthetic broker integration tests: **67/67 passed**. No real Kite WebSocket message, real cloud Telegram alert or new hosting charge used for this phase.
+4. Added a 45-day SQLite reconciliation ledger with strict sanitized values, duplicate suppression and summary endpoints; no tokens, raw ticks, account identifiers or broker orders are stored.
+5. Checked connected Render workspace (existing free web services only) and official Always Free VM alternatives. No service was created, modified or redeployed. See [hosting evaluation](HOSTING_EVALUATION.md).
 
 ## Next highest-priority actions
 
