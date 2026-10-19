@@ -4,6 +4,10 @@ A practical, step-by-step **educational / paper-trading** guide for using **five
 
 **Read the full guide:** [Kite five-indicator setup and CE/PE trading playbook](docs/KITE_NIFTY_FIVE_INDICATOR_PLAYBOOK.md)
 
+**Quick practical guide:** [Exactly when to consider CE / PE, when to sell to exit, NO_TRADE rules, ATR stop examples and the timestamped 10:33 AM chart analysis](docs/BUY_SELL_DECISION_GUIDE.md).
+
+**Interactive learning exercise:** [Offline signal-practice checker (HTML)](docs/signal-practice-checker.html) — download/view Raw and open locally in a browser. This educational tool does **not** connect to Kite or place orders.
+
 ## The five studies
 
 | # | Study | Inputs | Suggested display | Purpose |
