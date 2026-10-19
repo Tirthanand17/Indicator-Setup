@@ -33,8 +33,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 ## What is NOT done yet
 
 - No public cloud host deployed, no hosting bill authorized, no Kite credentials moved, and no Telegram cloud secrets configured. Nothing is listening on an Internet endpoint yet.
-- No true real-time Kite WebSocket collector: **REST candle polling** is the initial testable prototype; streaming ticks, per-second option premium monitoring, reconnect/backfill, and latency benchmarking are next phases.
-- No live Kite subscription authentication test, no real option bid/ask end-to-end test, no historical strategy validation, and no actual market-generated phone candidate alert proof.
+- A **shadow-only** KiteTicker/WebSocket module exists with synthetic tests, but it is **not integrated into the cloud runtime** or reconciled against live historical candles. REST candle polling remains the only proposed decision source. Real-time option premium monitoring, reconnect/backfill quality evidence, and latency benchmarking remain.
+- Authenticated paid Kite **read-only REST** market data was successfully checked on Nirala. The cloud worker itself, live option bid/ask path, historical strategy validation and an actual market-generated phone candidate alert remain unverified.
 - No promise that any indicator combination has high win probability. This is still **PAPER / SIGNAL REVIEW ONLY**.
 
 ## Quick local checks — no broker data or tokens needed
