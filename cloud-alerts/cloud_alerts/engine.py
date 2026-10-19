@@ -51,6 +51,7 @@ class Engine:
           'last_market_data_at':self.last_data_at.isoformat() if self.last_data_at else None,
           'last_phone_accept_at':self.last_alert_at.isoformat() if self.last_alert_at else None,
           'reason':self.last_error,'expired_alerts_discarded':self.db.count_expired(),
+          'phone_outbox':self.db.outbox_summary(),
           'mode':'READ_ONLY_PAPER','order_execution':False,
           'paper_premium_tracking':self.paper_premium_tracking,'premium_status':self.premium_status,
           'premium_quote_at':self.last_premium_quote_at.isoformat() if self.last_premium_quote_at else None,
@@ -146,11 +147,13 @@ class Engine:
         if decision.status=='WAIT_DATA':
             self.set_status('WAIT_DATA',decision.reason)
             return
-        # Previous valid event is finished; do not refetch or spam the candle.
-        self.db.set_runtime('last_processed_candle',stamp)
+        # Mark NO_TRADE decisions as completed below. REVIEW candidates must
+        # first obtain valid option depth; a transient stale quote can be retried
+        # by the bounded scheduler without dropping a potential review.
         if decision.candle is not None:
             await self._check_virtual_exit(completed5[-1],fut.symbol,now)
         if decision.status not in ('REVIEW_CE','REVIEW_PE'):
+            self.db.set_runtime('last_processed_candle',stamp)
             self.set_status('NO_TRADE',decision.reason)
             await self._deliver_outbox(now)
             return
@@ -161,6 +164,7 @@ class Engine:
             try:
                 active=json.loads(previous_virtual)
                 if active.get('expiry_date')==now.date().isoformat():
+                    self.db.set_runtime('last_processed_candle',stamp)
                     self.set_status('NO_TRADE','Existing virtual candidate awaiting exit review')
                     await self._deliver_outbox(now)
                     return
@@ -180,10 +184,10 @@ class Engine:
             self.set_status('WAIT_DATA','Option quote fetch error; no alert')
             return
         # Informational review only; option premium stops are NOT implied by ATR.
+        # Save candidate and outbox in the SAME SQLite transaction before sending
+        # to Telegram; a crash cannot strand an alert without its exit reference.
         body=format_review(decision,oq)
         event_id=stamp+':'+decision.status
-        await self._send_event(event_id,decision.status,now,body)
-        self.set_status(decision.status,'Futures + option market-depth review sent or queued')
         candidate={
             'direction':side,'symbol':fut.symbol,'signal_candle':decision.candle.start.isoformat(),
             'entry':decision.candle.close,'stop':decision.stop_underlying,
@@ -192,7 +196,17 @@ class Engine:
             candidate['premium']=reference_from_quote(
                 oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
                 created_at=now,hypothesis=self.premium_hypothesis)
-        self.db.set_runtime('virtual_candidate',json.dumps(candidate,separators=(',',':')))
+        accepted=self.db.claim_entry_with_candidate(event_id,decision.status,now,body,
+                                    json.dumps(candidate,separators=(',',':')))
+        if not accepted:
+            self.set_status('WAIT_DATA','Entry claim rejected: duplicate or existing paper position')
+            return
+        self.db.set_runtime('last_processed_candle',stamp)
+        await self._deliver_outbox(now)
+        if self.db.event_delivery_status(event_id)==1:
+            self.set_status(decision.status,'Paper review accepted by Telegram API')
+        else:
+            self.set_status('PHONE_DELIVERY_FAILED','Paper review queued, not confirmed delivered')
 
     async def poll_virtual_premium(self,now:datetime|None=None)->None:
         """Read-only candidate BID watcher. Never assumes user actually bought CE/PE.

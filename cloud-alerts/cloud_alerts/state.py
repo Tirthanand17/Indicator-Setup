@@ -30,6 +30,51 @@ class State:
             row=db.execute('INSERT OR IGNORE INTO events(event_id,status,at,payload) VALUES(?,?,?,?)',
                 (event_id,status,now.isoformat(),payload))
             return row.rowcount>0
+    def claim_entry_with_candidate(self,event_id:str,status:str,now:datetime,
+                                   payload:str,candidate_json:str)->bool:
+        """Atomically queue the paper entry and persist its virtual position.
+
+        A process crash cannot leave a queued BUY without its corresponding
+        paper-exit reference. Existing same-day virtual entries, malformed
+        state and duplicate event IDs all fail closed. No broker orders.
+        """
+        import json
+        try:
+            candidate=json.loads(candidate_json)
+        except (TypeError, ValueError):
+            return False
+        if (not isinstance(candidate,dict) or status not in ('REVIEW_CE','REVIEW_PE')
+                or candidate.get('direction') != status[-2:]
+                or candidate.get('expiry_date') != now.date().isoformat()
+                or not isinstance(candidate.get('symbol'),str)
+                or not candidate['symbol'].startswith('NIFTY')
+                or not isinstance(candidate.get('signal_candle'),str)):
+            return False
+        with self._connect() as db:
+            # SQLite executes the claim + candidate update in one transaction.
+            db.execute('BEGIN IMMEDIATE')
+            old=db.execute('SELECT value FROM runtime WHERE key=?',('virtual_candidate',)).fetchone()
+            if old and old[0]:
+                try:
+                    existing=json.loads(old[0])
+                    if not isinstance(existing,dict):return False
+                    if existing.get('expiry_date')==now.date().isoformat():return False
+                except (ValueError,TypeError):
+                    return False
+            cur=db.execute('INSERT OR IGNORE INTO events(event_id,status,at,payload) VALUES(?,?,?,?)',
+                           (event_id,status,now.isoformat(),payload))
+            if cur.rowcount!=1:return False
+            db.execute('INSERT INTO runtime(key,value) VALUES(?,?) '
+                       'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                       ('virtual_candidate',candidate_json))
+            return True
+
+    def event_delivery_status(self,event_id:str)->int|None:
+        """0 queued, 1 Telegram API accepted, 2 expired; None not claimed."""
+        with self._connect() as db:
+            row=db.execute('SELECT delivered FROM events WHERE event_id=?',(event_id,)).fetchone()
+            return int(row[0]) if row else None
+
     def mark_delivered(self,event_id:str):
         with self._connect() as db:db.execute('UPDATE events SET delivered=1 WHERE event_id=?',(event_id,))
     def pending_events(self)->list[tuple[str,str]]:
@@ -44,6 +89,14 @@ class State:
             cur=db.execute('UPDATE events SET delivered=2 WHERE delivered=0 AND at < ?',
                            (cutoff.isoformat(),))
             return cur.rowcount
+    def outbox_summary(self)->dict:
+        """Safe counts for health endpoints; never expose Telegram payloads."""
+        with self._connect() as db:
+            rows=db.execute('SELECT delivered, COUNT(*) FROM events GROUP BY delivered').fetchall()
+        counts={int(status):int(count) for status,count in rows}
+        return {'queued':counts.get(0,0),'accepted':counts.get(1,0),
+                'expired':counts.get(2,0),'contents_exposed':False}
+
     def count_expired(self)->int:
         with self._connect() as db:
             return int(db.execute('SELECT COUNT(*) FROM events WHERE delivered=2').fetchone()[0])

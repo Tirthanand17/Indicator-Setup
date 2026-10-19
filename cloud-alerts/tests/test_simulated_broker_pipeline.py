@@ -101,3 +101,19 @@ async def test_incomplete_historical_candles_fail_closed(tmp_path,monkeypatch):
     # 8 seconds are explicitly needed after end of the last bar.
     await e.run_once(NOW-timedelta(seconds=8))
     assert e.status=='WAIT_DATA' and not e.telegram.sent
+
+@pytest.mark.asyncio
+async def test_temporary_stale_option_quote_can_retry_same_completed_candle(tmp_path,monkeypatch):
+    """A missing quote at first REST poll must not permanently skip the candle."""
+    e=engine(tmp_path,monkeypatch)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    FakeKite.option_quote_valid=False
+    await e.run_once(NOW)
+    assert e.status=='NO_TRADE'
+    assert e.db.get_runtime('last_processed_candle') is None
+    assert not e.telegram.sent
+    FakeKite.option_quote_valid=True
+    await e.run_once(NOW)
+    assert e.status=='REVIEW_CE'
+    assert len(e.telegram.sent)==1
+    assert e.db.get_runtime('last_processed_candle') is not None

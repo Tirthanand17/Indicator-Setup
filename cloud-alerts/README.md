@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 48%** — `[██████████░░░░░░░░░░░░]` (**52% remaining**).
+**Overall engineering implementation estimate: 54%** — `[██████████░░░░░░░░░░░░]` (**46% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 61 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 96 local synthetic Python tests passed (including stream lifecycle and REST integration). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## Start here
 
@@ -72,4 +72,11 @@ python -m compileall -q cloud_alerts
 
 ## Cloud worker progress
 
-**Engineering readiness: 53% (estimated)**. [Progress board](docs/PROGRESS.md), [virtual premium monitoring](docs/PREMIUM_EXIT_MONITOR.md). 88 synthetic Python tests passing. Not cloud deployed; no orders.
+**Engineering readiness: 54% (estimated)**. [Progress board](docs/PROGRESS.md), [virtual premium monitoring](docs/PREMIUM_EXIT_MONITOR.md). 96 synthetic Python tests passing. Not cloud deployed; no orders.
+
+## Latest reliability patch — 19 October 2026
+
+- Broker option quote failures can now be retried at the same completed-candle boundary under the existing bounded scheduler; stale depth still never produces a signal.
+- Paper entry event and virtual position are committed together **before** Telegram network delivery. Restart/failure recovery never claims a buy was actually filled.
+- `/healthz` now includes only sanitized counts of queued, Telegram-accepted and expired messages; it does not confirm phone receipt.
+- **96 offline tests pass.** Cloud hosting and real phone-generated signals remain unverified. See [progress evidence](docs/PROGRESS.md).

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 53%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 54%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [█████████████░░░░░░░░░░░] 53%
-Remaining estimated scope      [░░░░░░░░░░░░░████████████] 47%
+Overall engineering progress   [██████████████░░░░░░░░░░] 54%
+Remaining estimated scope      [░░░░░░░░░░░░░░██████████] 46%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -16,15 +16,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
 | P1 | Five indicators, contract/quote selection, decision rules | 80% | Unit-tested, not validated against live Kite data or option P&L |
 | P2 | Daily token relay, HMAC and encrypted vault | 70% | Synthetic tests; no deployed TLS host or live handoff |
-| P3 | Real REST 5/15m candles, broker quote depth | 75% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
-| P4 | Telegram delivery, dedupe/outbox, health | 50% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
+| P3 | Real REST 5/15m candles, broker quote depth | 80% | Paid Kite GETs verified on 19 Oct; **option contract quote and cloud runtime still unverified** |
+| P4 | Telegram delivery, dedupe/outbox, health | 55% | Prototype tests; existing browser pairing does not validate cloud phone alerts |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 0% | Requires eligible host, budget and permission |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 65% | Opt-in actual-option BID tracking and hypothetical exit alerts implemented with synthetic tests; no actual option holding, fill or live market trial |
 | P8 | Walk-forward option backtests & reliability dashboard | 0% | No independent option historical bid/ask dataset or out-of-sample evidence |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of percentages / 10 = **52.5%, rounded to 53%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of percentages / 10 = **53.5%, rounded to 54%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -33,7 +33,7 @@ Sum of percentages / 10 = **52.5%, rounded to 53%**. **Actual readiness for time
 3. Created the read-only KiteTicker shadow module with strict timestamp, instrument, volume and reconnect safeguards; fixed a first-partial-bar leakage uncovered by unit tests.
 4. Created an idempotent 5-minute REST polling schedule with at most three scheduled attempts per boundary, and no burst after a delayed wake.
 5. Added durable unsent-alert expiry after 180 seconds; queued BUY messages cannot arrive many minutes late after an outage.
-6. **88 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
+6. **96 Python tests passed** after these changes, with no live Kite API calls or Telegram messages sent by the tests.
 
 ## Read-only live API evidence (19 October 2026)
 
@@ -46,7 +46,7 @@ Sum of percentages / 10 = **52.5%, rounded to 53%**. **Actual readiness for time
 
 1. Introduced a `ShadowSupervisor` owning one optional read-only KiteTicker diagnostic connection (disabled by default), with asynchronous callback marshaling, token/instrument rollover, stale-callback fencing and end-of-session socket cleanup.
 2. Introduced bounded `StreamEvidence` comparisons of shadow five-minute bars with completed REST candles; exposes sanitized matched/mismatched/unavailable counters from `/healthz` without changing REST decision authority.
-3. Added mock-transport tests and synthetic broker integration tests: **88/88 passed**. No real Kite WebSocket message, real cloud Telegram alert or new hosting charge used for this phase.
+3. Added mock-transport tests and synthetic broker integration tests: **96/96 passed**. No real Kite WebSocket message, real cloud Telegram alert or new hosting charge used for this phase.
 4. Added a 45-day SQLite reconciliation ledger with strict sanitized values, duplicate suppression and summary endpoints; no tokens, raw ticks, account identifiers or broker orders are stored.
 5. Checked connected Render workspace (existing free web services only) and official Always Free VM alternatives. No service was created, modified or redeployed. See [hosting evaluation](HOSTING_EVALUATION.md).
 
@@ -55,8 +55,17 @@ Sum of percentages / 10 = **52.5%, rounded to 53%**. **Actual readiness for time
 1. Added [`premium.py`](../cloud_alerts/premium.py), observing the original NIFTY CE/PE contract's **fresh BID**, using the signal-time quoted ASK only as a hypothetical reference — never a claimed order fill.
 2. Added an explicitly opt-in (`PAPER_PREMIUM_TRACKING_ENABLED=false` by default) 20-second read-only option quote checker, no orders/holdings calls, and fail-closed stale/depth checks.
 3. Added durable STOP / TARGET / TIME virtual exit reviews through the existing Telegram outbox; at most one active virtual candidate, with no carryover across days.
-4. Unit and synthetic integrated tests now pass **88/88**. Real bid/ask feed, real phone alerts, and timing on an approved cloud host are **unverified**.
+4. Unit and synthetic integrated tests now pass **96/96**. Real bid/ask feed, real phone alerts, and timing on an approved cloud host are **unverified**.
 5. See [Premium exit monitor technical design](PREMIUM_EXIT_MONITOR.md). Cloud deployment remains **not active**. Original read-only trading folder remains unchanged.
+
+## P3/P4 continuation — atomic entry + recoverable option quotes (19 Oct)
+
+1. Fixed a real loss-of-alert window: if the selected option quote is temporarily stale at a completed candle, do **not** mark that candle processed. The bounded scheduled follow-up can retry with a fresher quote; no additional unbounded API polling.
+2. Added a transactional SQLite `claim_entry_with_candidate` that atomically persists the Telegram outbox message and corresponding paper-only candidate **before attempting external delivery**. Crashes cannot leave a newly queued BUY without its virtual exit reference.
+3. Rejected malformed prior positions, duplicates and concurrent same-day virtual entries. A new day may clear/replace a previously expired paper candidate.
+4. Telegram failures keep entry events queued; the engine reports `PHONE_DELIVERY_FAILED` rather than misrepresenting a queued event as successfully sent. The existing 180-second delivery expiry still applies.
+5. Added payload-free public health counts (`phone_outbox`) for queued/accepted/expired messages; this does **not** prove mobile receipt.
+6. Validated **96/96 offline tests** including restart-after-send-failure, stale-quote retry, bad stored state and outbox privacy. No real phone messages, broker orders or service provisioning occurred in this continuation.
 
 ## Next highest-priority actions
 

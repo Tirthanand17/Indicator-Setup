@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 53%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 54%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -8,10 +8,10 @@
 | P1 | Pure indicators, quote/contract mapping, signal rules | **Implemented + synthetic tests** | All unit tests pass, alert not sent on missing/invalid data |
 | P2 | Opt-in read-only daily `.env` token handoff and encrypted cloud vault | **Implemented + synthetic tests** | Signed HMAC, nonce, expiry, ciphertext at rest; still need real TLS host test |
 | P3 | Kite Connect REST historical 5m/15m and quote backend | **Partial live paid Kite data smoke passed** | Actual paid API tests on fully completed exchange bars |
-| P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Implemented (unvalidated live)** | Real paired phone receives TEST and market candidate exactly once in normal run |
+| P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Atomic entry+candidate persistence, privacy-safe queue metrics (96 offline tests); unvalidated live** | Real paired phone receives TEST and market candidate exactly once in normal run |
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
 | P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW RUNTIME INTEGRATED + SQLite quality ledger + SYNTHETIC TESTS**; live websocket not verified | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
-| P7 | Virtual exit and option premium intrabar risk tracking | **Opt-in premium BID tracker + virtual STOP/TARGET/TIME review, 88 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
+| P7 | Virtual exit and option premium intrabar risk tracking | **Opt-in premium BID tracker + virtual STOP/TARGET/TIME review, 96 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
 | P8 | Walk-forward option-level backtesting, audits, dashboards | **NOT STARTED** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
 
@@ -32,3 +32,12 @@
 - Perform explicit broker-market/Telegram integration tests **in paper-only mode**; no order placement is ever authorized by this repo.
 
 **Date:** 2026-10-19. See [P7 virtual premium exit monitor](PREMIUM_EXIT_MONITOR.md).
+
+## October 19 reliability continuation
+
+- [x] Retry transient stale option quotes within bounded already-scheduled REST probes.
+- [x] Atomically queue paper-entry Telegram event and save its virtual candidate.
+- [x] Surface queued/accepted/expired alert counts without payload content.
+- [x] Test duplicate protection, malformed candidate fail-closed, restart and Telegram failure.
+- [ ] Live Telegram acceptance and mobile receipt from the cloud.
+- [ ] Always-on host, daily token relay and 5 full market-session paper trial.
