@@ -1,6 +1,6 @@
 # Zerodha Kite: Complete NIFTY 50 Five-Indicator Setup and CE/PE Paper-Trading Playbook
 
-**Version:** 1.0 | **Date:** 2026-10-19 | **Scope:** NIFTY intraday directional **option buying** (CE / PE), not option selling.
+**Version:** 1.1 | **Date:** 2026-10-19 | **Scope:** NIFTY intraday directional **option buying** (CE / PE), not option selling.
 
 > EDUCATIONAL AND PAPER-TRADING ONLY. None of the rules below has been established as the statistically best or most accurate setup for NIFTY. No live orders, broker API permissions or automation are implied. Option buyers may lose 100% of premium paid. Always inspect real spreads, fills, charges and slippage.
 
@@ -63,7 +63,7 @@
 | VWAP | Yellow | Distinguish intraday reference |
 | EMA 9 | Blue | Fast trend line |
 | EMA 21 | Purple | Slower trend line |
-| ADX/DMI | Separate pane; ADX white, +DI green, −DI red where available | Trend-strength/direction check |
+| DMI/ADX | Separate pane; ADX pink, +DI green, −DI red | Trend-strength/direction check |
 | ATR | Separate pane; orange | Volatility measure |
 | Candles | Green and red | Price action |
 | Volume | Default bars | Confirm actual traded activity |
@@ -118,14 +118,14 @@
 
 **A key distinction:** ADX measures **trend strength**, not whether that trend is bullish or bearish. A standalone **Average Directional Index (ADX)** on TradingView generally plots only ADX. **Directional Movement (DMI)** plots ADX, +DI and −DI in one study. For determining CE vs PE, **DMI is preferable if it is available on your Kite chart.** Use **ADX or DMI, not both**, to maintain five studies.
 
-### Preferred: DMI (ADX + direction in one pane)
+### Preferred and actually installed: DMI (ADX + direction in one pane)
 
 1. Click **Indicators**.
 2. Search **Directional Movement**, **DMI** or **Directional Movement Index**.
 3. Select **Directional Movement** if Kite exposes it.
 4. Open settings. Set **DI Length = 14** and **ADX Smoothing = 14**, where both are offered.
-5. Check Style visibility of all three lines: **ADX**, **+DI**, **−DI**.
-6. Prefer a distinct ADX color and green +DI / red −DI; click **OK**.
+5. On the observed Kite TradingView DMI, there are **five available plots**: **+DI, −DI, DX, ADX, ADXR**. Leave **+DI, −DI and ADX checked**. **Uncheck DX and ADXR** to simplify the study, while retaining ADX calculation.
+6. For visual clarity: set **+DI green, −DI red and ADX pink**. Click **OK**. The Kite Inputs panel was observed to offer both **DI Length = 14** and **ADX Smoothing = 14**.
 7. Inspect the separate pane: strength (ADX) and which DI line is on top should be readable.
 
 ### Fallback: standalone ADX
@@ -167,6 +167,8 @@
 **ATR does not tell direction.** ATR often rises during **both** sharp upward and sharp downward moves.
 
 ## 8. Save and verify
+
+**Observed configuration on 2026-10-19:** The `NIFTY26OCTFUT` chart showed all five studies, 5-minute candles, nonzero volume, and DMI plotted in one lower pane plus ATR 14 in another. The layout was renamed from `VWAP Chart` to **`NIFTY 5 Indicator Setup`**. On the subsequent layout-menu inspection, **Save layout** was disabled (consistent with no unsaved changes). A manual re-open or reload confirmation **was not completed**; verify persistence on the next visit. The following steps are instructions for independent repeatability.
 
 1. Inspect all five studies' labels on the chart and lower panes.
 2. Click **Save** in the upper-right of Kite's TradingView toolbar.
@@ -444,4 +446,4 @@ Test hypotheses, not anecdotes. Compare:
 
 ---
 
-**Last documentation update:** 2026-10-19. **Kite execution status is separate from documentation:** README or file commits do not prove that ADX/DMI and ATR were actually installed, configured or saved on any user's computer.
+**Last documentation update:** 2026-10-19. **Kite visual checks were performed separately from this GitHub commit:** all five studies were present on the observed browser chart and the named layout showed no pending save action; persistence after browser reload has not been verified. Documentation alone is never evidence of a profitable strategy or live-order execution.
