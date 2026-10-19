@@ -6,11 +6,11 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-19)
 
-**Overall engineering implementation estimate: 66%** — `[████████████████░░░░░░░░]` (**34% remaining**).
+**Overall engineering implementation estimate: 67%** — `[████████████████░░░░░░░░]` (**33% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 224 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 251 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -42,6 +42,11 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - A tracked **virtual futures candidate** may produce later `EXIT REVIEW` alerts **only once its matching paper entry review is accepted by the Telegram Bot API**; unsent/expired reviews produce no linked exit. It does not know actual holdings and **cannot close an option**.
 - Read-only **daily token handoff**: an opt-in local sender reads the existing trading project's `.env` without changing it, and transfers only the access token to an approved HTTPS cloud endpoint using signed, replay-protected requests. Cloud encryption-at-rest uses a separately configured Fernet key on a persistent volume.
 - Persistent SQLite candidate dedupe and Telegram outbox, privacy-limited `/healthz`, cloud container skeleton, unit/security tests, and opt-in defaults.
+
+
+### Option premium evidence ledger (Phase 18, paper-only)
+
+The worker now persists only sanitized `ENTRY` option ASK/BID depth with each newly queued paper candidate. A later opt-in premium `STOP` or `TARGET` may add a matching `EXIT` quote. No quote means no option paper P&L row; no execution is implied. The non-mutating `python -m cloud_alerts.evidence_cli` provides an after-cost paper evidence summary from a private SQLite snapshot. See [Phase 18 observation ledger](docs/OPTION_QUOTE_EVIDENCE_LEDGER.md). **No actual data has yet been captured in a deployed cloud market session.**
 
 ## What is NOT done yet
 
@@ -141,8 +146,8 @@ See [fail-closed configuration guide](docs/FAIL_CLOSED_CONFIG.md) and the [overa
 - **Overall engineering progress: 65%, remaining: 35%**. Hosting and five-session paper operation are still unverified.
 
 
-## Phase 17 — causal replay checkpoints (66%)
+## Phase 17 — offline replay with deterministic restart checkpoints (66%)
 
-A new [offline historical replay](docs/HISTORICAL_REPLAY.md) reproduces completed-candle futures signal decisions using only information available at each simulated decision time. SHA-256 replay checkpoints detect changed warmup or past 15-minute context before restart continuation. No Telegram messaging, option P&L, Kite credentials or orders are used by this offline tool.
+The new [causal historical replay utility](docs/HISTORICAL_REPLAY.md) reconstructs completed-futures-candle decisions without future 15-minute data, uses a SHA-256 chained checkpoint that detects revised warmup history after a restart, and rejects incomplete intraday candle sequences. A local-only CLI reads exported 5m/15m OHLCV JSON; it never reads account credentials, sends Telegram notifications, or places orders. **224/224 offline tests passed**.
 
-**Local complete suite: 224/224 tests passed.** Estimated engineering progress **66% (34% remaining)**; live cloud hosting, phone receipts and five market sessions remain outstanding.
+**Overall estimated implementation: 66%, 34% remaining.** Real option quote archives, approved always-on cloud hosting, cloud Telegram receipts and five-session market trials remain outstanding.

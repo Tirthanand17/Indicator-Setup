@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 66%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-19. **Approximate engineering readiness: 67%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████░░░░░░░░] 66%
-Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 34%
+Overall engineering progress   [████████████████░░░░░░░░] 67%
+Remaining estimated scope      [░░░░░░░░░░░░░░░█████████] 33%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 25% | TLS proxy route-restriction template added; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 75% | Outbox-linked virtual entries now suppress EXIT reviews until Telegram API accepts the corresponding entry; no actual holding, fill, handset receipt or live trial |
-| P8 | Walk-forward option backtests & reliability dashboard | 30% | Offline causal replay and restart consistency hashes implemented; no independently captured option quote dataset or live outcomes |
+| P8 | Walk-forward option backtests & reliability dashboard | 40% | Immutable sanitized entry/exit option quote ledger, offline after-cost report, causal replay; actual cloud quote dataset and independent provenance absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **66.0%, rounded to 66%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **67.0%, rounded to 67%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 ## Completed in this continuation
 
@@ -167,10 +167,20 @@ Sum of current percentages / 10 = **66.0%, rounded to 66%**. **Actual readiness 
 6. See [market-data integrity gate](MARKET_DATA_INTEGRITY.md) for explicit scope and remaining live validation.
 
 
-## October 19 Phase 17 — causal replay & restart consistency (66%)
+## October 19 Phase 17 — causal historical replay and restart proof (66%)
 
-1. Added offline historical 5-minute futures replay using only completed 15-minute confirmation data available at each simulated decision time; it never sends late historical Telegram BUY reviews.
-2. Bound each decision to a SHA-256 chain covering five-minute warmup, completed decision candles and available 15-minute context. A revision before a restart checkpoint causes a mismatch rather than silently overwriting earlier evidence.
-3. Added strict input-schema checks, clock normalization, intra-session gap and duplicate rejection, and a local-only CLI. No credentials, network calls or broker orders.
-4. **224/224 tests passed on the complete local build.** GitHub includes the core modules and essential regression tests; this is synthetic research, not a verified option trading edge.
-5. P8 scaffolding **20% to 30%**; ten-phase engineering mean **66%**, **34% remaining**. P5 (always-on host) and P9 (five observed market sessions) remain unverified.
+1. Introduced [deterministic historical replay](HISTORICAL_REPLAY.md) using broker futures 5-minute history and independently completed 15-minute confirmation bars at each historical observation time. **No data from future candles may influence past decisions**.
+2. Built a SHA-256 decision chain binding all five-minute warmup history, each replayed candle, the available 15-minute prefix and decision status. Changed input history fails a resume-checkpoint comparison; consistent restart returns identical subsequent decisions. Hashes are tamper-*evident* for accidental changes, not signed broker provenance.
+3. Reject missing/duplicate/reversed candles, out-of-session bars, timestamp misalignment, nonfinite OHLCV and invalid replay JSON. The offline CLI accepts no secrets and performs no Kite, Telegram or trading API requests.
+4. Added 21 offline replay/CLI tests, including a test-discovered warmup-chain omission that was repaired. Full suite **224/224 passed**, and Python bytecode compilation passed. Synthetic futures decisions **do not establish any option win rate**.
+5. P8 research/evaluation scaffolding **20% → 30%**. Overall ten-phase estimate **65% → 66%**, leaving **34%**. Always-on hosting and five live market sessions remain unstarted. No protected desktop folder was accessed.
+
+
+## October 19 Phase 18 — paired option quote observation evidence (67%)
+
+1. Added an allowlisted, paper-only option BID/ASK snapshot schema carrying distinct exchange and worker-observed timestamps, listed contract identity, liquidity and local SHA-256 consistency hash. Neither schema validation nor a hash authenticates a provider observation.
+2. Stores the `ENTRY` quote **atomically** with the SQLite virtual paper candidate and Telegram outbox record; records a later `EXIT` quote only when the optional premium BID watcher actually receives a fresh option quote. No time-cutoff or futures-only exit is presumed to have an executable option BID.
+3. Added append-only, conflict-rejecting evidence persistence and verified non-mutating report access. The offline CLI accepts a private SQLite snapshot and caller-supplied **nonzero fees** and bounded slippage; evaluates ASK-in/BID-out using the existing hypothetical option scorer. Missing/mismatched/corrupt pairs are reported, never invented.
+4. Fixed the evaluator's event-ID validation, which previously rejected the actual `+05:30` timezone suffix in paper entry event IDs. Added a regression test for that case and full synthetic entry→virtual exit→P&L evidence integration.
+5. **251/251 local offline tests passed**, modules compile; no real broker quote data, Telegram phone receipt, live host, quote-origin audit, trades or profit edge was proven. Source hashes are not signatures and synthetic wins are not verified accuracy.
+6. P8 offline research/evidence tooling moves **30% → 40%**; overall phase-weighted estimate **66% → 67%**, with 33% estimated scope remaining. Cloud host and five-session operational validation remain outstanding. See [option quote ledger documentation](OPTION_QUOTE_EVIDENCE_LEDGER.md).

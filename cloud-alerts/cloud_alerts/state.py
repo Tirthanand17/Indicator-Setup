@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 import re
 from pathlib import Path
 import sqlite3
+from .quote_evidence import canonical_snapshot
+from .evaluation import EvidenceError
 
 class State:
     def __init__(self,path:str):
@@ -20,7 +22,11 @@ class State:
                 compared_at_utc TEXT NOT NULL, verdict TEXT NOT NULL,
                 mismatch_reasons TEXT NOT NULL,
                 PRIMARY KEY (future_symbol, candle_start_utc));
-              CREATE INDEX IF NOT EXISTS idx_shadow_compared_at ON shadow_evidence(compared_at_utc);''')
+              CREATE INDEX IF NOT EXISTS idx_shadow_compared_at ON shadow_evidence(compared_at_utc);
+              CREATE TABLE IF NOT EXISTS option_quote_observations (
+                event_id TEXT NOT NULL, phase TEXT NOT NULL, payload TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL,
+                PRIMARY KEY (event_id,phase));''')
     def _connect(self):return sqlite3.connect(self.path,timeout=10)
     def is_sent(self,event_id:str)->bool:
         with self._connect() as db:
@@ -31,7 +37,8 @@ class State:
                 (event_id,status,now.isoformat(),payload))
             return row.rowcount>0
     def claim_entry_with_candidate(self,event_id:str,status:str,now:datetime,
-                                   payload:str,candidate_json:str)->bool:
+                                   payload:str,candidate_json:str,
+                                   quote_snapshot:dict|None=None)->bool:
         """Atomically queue the paper entry and persist its virtual position.
 
         A process crash cannot leave a queued BUY without its corresponding
@@ -50,6 +57,10 @@ class State:
                 or not candidate['symbol'].startswith('NIFTY')
                 or not isinstance(candidate.get('signal_candle'),str)):
             return False
+        if quote_snapshot is not None:
+            encoded,digest=canonical_snapshot(quote_snapshot)
+            if quote_snapshot['event_id']!=event_id or quote_snapshot['phase']!='ENTRY':
+                raise EvidenceError('entry observation does not match entry event')
         # The database is the final authority for the event/candidate link.
         # A caller may omit the ID (compatibility with older research callers),
         # but a mismatched ID is rejected before anything can be persisted.
@@ -74,7 +85,52 @@ class State:
             db.execute('INSERT INTO runtime(key,value) VALUES(?,?) '
                        'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
                        ('virtual_candidate',candidate_json))
+            # The ENTRY reference belongs to the same SQLite transaction as
+            # the paper candidate and pending Telegram outbox event.
+            if quote_snapshot is not None:
+                db.execute('INSERT INTO option_quote_observations '
+                           '(event_id,phase,payload,payload_sha256) VALUES (?,?,?,?)',
+                           (event_id,'ENTRY',encoded,digest))
             return True
+
+    def record_option_quote_observation(self, snapshot:dict)->bool:
+        """Append a vetted quote snapshot; refuse altered duplicate evidence.
+
+        This is not a provider-signed record. The database may be modified by
+        an administrator; a local SHA-256 only detects inconsistent payloads.
+        """
+        encoded,digest=canonical_snapshot(snapshot)
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            prior=db.execute('SELECT payload,payload_sha256 FROM option_quote_observations '
+                'WHERE event_id=? AND phase=?',
+                (snapshot['event_id'],snapshot['phase'])).fetchone()
+            if prior is not None:
+                if prior!=(encoded,digest):
+                    raise EvidenceError('conflicting previously recorded option observation')
+                return False
+            db.execute('INSERT INTO option_quote_observations '
+                       '(event_id,phase,payload,payload_sha256) VALUES(?,?,?,?)',
+                       (snapshot['event_id'],snapshot['phase'],encoded,digest))
+            return True
+
+    def read_option_quote_observations(self)->list[dict]:
+        """Read and verify every persisted snapshot before performance scoring."""
+        import json
+        with self._connect() as db:
+            rows=db.execute('SELECT event_id,phase,payload,payload_sha256 '
+                            'FROM option_quote_observations ORDER BY event_id,phase').fetchall()
+        observations=[]
+        for event,phase,raw,digest in rows:
+            try:
+                data=json.loads(raw)
+                canonical,actual=canonical_snapshot(data)
+                if (event,phase)!=(data['event_id'],data['phase']) or canonical!=raw or actual!=digest:
+                    raise EvidenceError('local option quote evidence tampered')
+            except (ValueError,TypeError,KeyError) as exc:
+                raise EvidenceError('corrupt option quote evidence') from exc
+            observations.append(data)
+        return observations
 
     def event_delivery_status(self,event_id:str)->int|None:
         """0 queued, 1 Telegram API accepted, 2 expired; None not claimed."""

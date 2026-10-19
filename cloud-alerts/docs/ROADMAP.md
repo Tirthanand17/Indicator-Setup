@@ -12,7 +12,7 @@
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
 | P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW RUNTIME INTEGRATED + SQLite quality ledger + SYNTHETIC TESTS**; live websocket not verified | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
 | P7 | Virtual exit and option premium intrabar risk tracking | **Premium BID tracker and Telegram-accepted entry notice gate, 184 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
-| P8 | Walk-forward option-level backtesting, audits, dashboards | **NOT STARTED** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
+| P8 | Walk-forward option-level backtesting, audits, dashboards | **Offline replay + chronology/checkpoint tests; option quote archive missing** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
 
 ## Distinct sources of truth
@@ -150,11 +150,21 @@
 - [x] **203/203** offline tests pass; `compileall` passes.
 - [ ] Compare 15-minute EMA and full option depth against captured live Kite/reference data on an authorized host; validate actual market sessions.
 
+## 2026-10-19 — Phase 17 deterministic historical replay (66%)
 
-## Phase 17 — historical replay checkpoint foundation
+- [x] Offline causal 5-minute decisions with completed 15-minute context only.
+- [x] Restart checkpoint fingerprints catch warmup / later historical revision.
+- [x] Normalize IST/UTC, reject malformed or missing intraday bar data and secret-bearing JSON exports.
+- [x] Runnable offline CLI; 224/224 tests passed. No broker credentials or order pathways.
+- [ ] Capture verified option BID/ASK history and calculate after-cost results.
+- [ ] Deploy on approved always-on host and complete five market sessions.
 
-- [x] Reconstruct causal futures review signals from completed five-minute candles and independent completed fifteen-minute history.
-- [x] Catch intraday data gaps, duplicate candles, altered warmup bars, changed historical context and malformed replay JSON.
-- [x] Offline-only CLI and synthetic checks; full local suite 224/224.
-- [ ] Independently acquire time-stamped option BID/ASK pairs for defensible after-cost evaluation.
-- [ ] Complete cloud host activation and five real market-session paper trials.
+
+## Phase 18 — quote-level paper evidence, 67% overall
+
+- [x] Capture sanitized broker adapter option BID/ASK and timestamps alongside queued entry reviews, without a new market-data API call.
+- [x] Capture later opt-in premium STOP/TARGET quote only when a real BID observation exists; never fabricate an option quote for a time cutoff or futures-only exit.
+- [x] Add immutable SQLite evidence snapshots, conflict detection, restart checks, and a strictly offline, read-only after-cost report with counts of unpaired and rejected evidence.
+- [x] Fix timezone-suffixed event IDs and pass 251/251 local synthetic tests.
+- [ ] Obtain independently attested live option data over five market sessions and validate actual Telegram receipts, latency, spread, depth and fee model.
+- [ ] Select and explicitly approve an always-on host before deployment; no paid services, auth secrets or broker orders added.

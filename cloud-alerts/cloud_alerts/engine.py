@@ -15,6 +15,7 @@ from .security import TokenVault
 from .state import State
 from .signals import decide
 from .telegram import Telegram,format_review
+from .quote_evidence import make_snapshot
 from .scheduler import CandlePollScheduler
 from .stream_supervisor import ShadowSupervisor
 from .premium import (PremiumHypothesis,reference_from_quote,parse_reference,
@@ -216,8 +217,16 @@ class Engine:
             candidate['premium']=reference_from_quote(
                 oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
                 created_at=now,hypothesis=self.premium_hypothesis)
+        # Record the actual observed ASK/BID alongside the paper candidate.
+        # The quotation is not a fill, and its source is explicitly unverified.
+        try:
+            quote_snapshot=make_snapshot(event_id,'ENTRY',
+                decision.candle.start+timedelta(minutes=5),now,oq)
+        except ValueError:
+            self.set_status('WAIT_DATA','Quote evidence validation failed; no paper entry')
+            return
         accepted=self.db.claim_entry_with_candidate(event_id,decision.status,now,body,
-                                    json.dumps(candidate,separators=(',',':')))
+                    json.dumps(candidate,separators=(',',':')),quote_snapshot=quote_snapshot)
         if not accepted:
             self.set_status('WAIT_DATA','Entry claim rejected: duplicate or existing paper position')
             return
@@ -294,6 +303,14 @@ class Engine:
         if reason=='HOLD':
             self.premium_status='MONITORING'
             return
+        if quote is not None and isinstance(position.get('entry_event_id'),str):
+            try:
+                snapshot=make_snapshot(position['entry_event_id'],'EXIT',quote.updated,now,quote)
+                self.db.record_option_quote_observation(snapshot)
+            except Exception:
+                # Evidence failure is not proof of a fill or a reason to omit a
+                # risk EXIT review; the offline report will show it as unpaired.
+                self.premium_status='QUOTE_EVIDENCE_WRITE_FAILED'
         event_id='VIRTUAL_OPTION_EXIT:'+position['signal_candle']+':'+reason
         msg=exit_text(reference,reason,now,quote)
         await self._send_event(event_id,'VIRTUAL_OPTION_EXIT_'+reason,now,msg)

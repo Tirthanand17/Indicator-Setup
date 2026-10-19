@@ -82,3 +82,41 @@ async def test_active_virtual_cannot_be_overwritten_by_next_signal(tmp_path,monk
     assert e.db.get_runtime('virtual_candidate')==saved
     assert len(e.telegram.messages)==1
     assert e.status in ('NO_TRADE','WAIT_DATA')
+
+@pytest.mark.asyncio
+async def test_paper_entry_and_premium_exit_create_only_unverified_quote_pair(tmp_path,monkeypatch):
+    from cloud_alerts.evaluation import Costs
+    from cloud_alerts.quote_evidence import pair_snapshots
+    e=setup(tmp_path,monkeypatch)
+    await e.run_once(NOW)
+    saved=e.db.read_option_quote_observations()
+    assert len(saved)==1 and saved[0]['phase']=='ENTRY'
+    assert saved[0]['ask']==100.0
+    # The reference ASK is observed; neither a real buy nor a real fill.
+    Broker.price=79.5
+    Broker.quote_at=NOW+timedelta(seconds=20)
+    await e.poll_virtual_premium(NOW+timedelta(seconds=20))
+    recorded=e.db.read_option_quote_observations()
+    assert len(recorded)==2
+    assert {row['phase'] for row in recorded}=={'ENTRY','EXIT'}
+    report=pair_snapshots(recorded,Costs(slippage_bps=8,roundtrip_charges_rs=50),
+                          min_trades=1,min_days=1)
+    assert report['scorable_quote_pairs']==1
+    assert report['summary']['status']=='UNVERIFIED_SOURCE'
+    assert report['summary']['net_pnl_rs']<0
+    assert report['actual_orders_or_fills_verified'] is False
+
+
+@pytest.mark.asyncio
+async def test_time_cutoff_without_option_bid_is_incomplete_evidence(tmp_path,monkeypatch):
+    from cloud_alerts.evaluation import Costs
+    from cloud_alerts.quote_evidence import pair_snapshots
+    e=setup(tmp_path,monkeypatch)
+    await e.run_once(NOW)
+    cutoff=NOW.replace(hour=15,minute=16)
+    await e.poll_virtual_premium(cutoff)
+    report=pair_snapshots(e.db.read_option_quote_observations(),Costs(8,50))
+    assert report['quote_observations']==1
+    assert report['scorable_quote_pairs']==0
+    assert report['incomplete_quote_pairs']==1
+    assert report['summary']['net_win_rate_pct'] is None

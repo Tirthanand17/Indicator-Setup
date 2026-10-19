@@ -60,7 +60,7 @@ def score_pair(p: PaperQuotePair, costs: Costs, *, max_delay_seconds: int = 20,
 
     The resulting hypothetical P&L is *not* evidence of a Kite execution.
     """
-    if not re.fullmatch(r'[A-Za-z0-9:_-]{8,120}',p.event_id):
+    if not re.fullmatch(r'[A-Za-z0-9:+_.-]{8,220}',p.event_id):
         raise EvidenceError('invalid event id')
     if (not re.fullmatch(r'NIFTY[A-Z0-9]{3,50}',p.option_symbol)
             or p.direction not in {'CE','PE'}
