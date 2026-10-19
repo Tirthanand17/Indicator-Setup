@@ -1,30 +1,31 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const request = obj => new Promise(resolve => chrome.runtime.sendMessage(obj, reply => {
-  if (chrome.runtime.lastError) resolve({ error: chrome.runtime.lastError.message });
-  else resolve(reply || { error: 'No response from background' });
-}));
-function escapeText(value){ return String(value == null ? '' : value); }
-function show(id, text, cls=''){ $(id).textContent = escapeText(text); $(id).className = id === 'result' || id === 'exitResult' ? 'result ' + cls : cls; }
-function putLog(logs){const e=$('logs');e.replaceChildren();(logs||[]).slice(0,15).forEach(log=>{const li=document.createElement('li');li.textContent=`${log.at || ''} — ${log.status}: ${(log.reasons||[]).join(' | ')}`;e.append(li);});}
-function formatState(x){show('chart',x.chartOpen?`Kite chart DETECTED (${x.chartSymbol||'symbol unknown'}). Closed-candle data still requires manual verification.`:'WAIT_DATA: Kite chart not detected in this browser. Open the correct NIFTY futures Kite chart.');$('armed').checked=!!x.armed;putLog(x.logs); if(x.position)show('positionStatus',`Tracking hypothetical ${x.position.direction}: entry ${x.position.entry}, stop ${x.position.stop}, target ${x.position.target}. Values are per option unit.`);}
-async function refresh(){const x=await request({type:'GET_STATE'});if(x.error){show('chart',x.error);return;}formatState(x);}
-function numberOf(id){return $(''+id).value.trim() === '' ? '' : Number($(id).value);}
-function setDefaultTime(){const d=new Date();d.setMinutes(Math.floor(d.getMinutes()/5)*5,0,0);const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);$('candleEnd').value=local.toISOString().slice(0,16);}
-$('armed').addEventListener('change',async e=>{const r=await request({type:'SET_ARMED',armed:e.target.checked});if(r.error)alert(r.error);});
-$('test').addEventListener('click',async()=>{const r=await request({type:'TEST_NOTICE'});if(r.error)alert('Notification failed: '+r.error);});
-$('signalForm').addEventListener('submit',async e=>{
- e.preventDefault();const local=$('candleEnd').value;
- const end=new Date(local); if(!local || !Number.isFinite(end.getTime())) {show('result','Invalid candle time','bad');return;}
- const observation={symbol:$('symbol').value.trim().toUpperCase(),candleEnd:end.toISOString(),closed:$('closed').checked,optionChecks:$('optionChecks').checked,
- structure:$('structure').value,higherTimeframe:$('higherTimeframe').value};
- for(const k of ['close','vwap','ema9','ema21','plusDI','minusDI','adx','priorAdx','atr','volume']) observation[k]=numberOf(k);
- const r=await request({type:'SUBMIT_CANDLE',observation}); if(r.error) {show('result','Error: '+r.error,'bad');return;}
- const reasons=(r.result.reasons||[]).join('\n• ');
- show('result',`${r.result.status}\n• ${reasons}\nDesktop notification: ${r.notification?.delivered?'sent':r.notification?.reason||'not sent'}`,r.result.status==='REVIEW_CE'?'good':r.result.status==='REVIEW_PE'?'bad':'');
- refresh();
-});
-$('positionForm').addEventListener('submit',async e=>{e.preventDefault();const position={direction:$('direction').value,entry:numberOf('entry'),stop:numberOf('stop'),target:numberOf('target')};const r=await request({type:'SET_POSITION',position});show('positionStatus',r.error||`Paper ${r.position.direction} saved. It will NOT update without manually entered option BID.`);});
-$('clearPos').addEventListener('click',async()=>{const r=await request({type:'CLEAR_POSITION'});show('positionStatus',r.error||'No position tracked.');});
-$('checkExit').addEventListener('click',async()=>{const bid=numberOf('bid');const r=await request({type:'CHECK_EXIT',bid});if(r.error){show('exitResult',r.error,'bad');return;}show('exitResult',`${r.result.status}\n${r.result.reason || ''}\nDesktop alert: ${r.notification?.delivered?'sent':r.notification?.reason||'not sent'}`,r.result.notify?'bad':'');refresh();});
-setDefaultTime();refresh();setInterval(refresh,15000);
+const req = m => new Promise(resolve => chrome.runtime.sendMessage(m, reply => resolve(chrome.runtime.lastError ? {error:chrome.runtime.lastError.message} : (reply||{error:'No response'}))));
+const fmt = value => Number.isFinite(value)?value.toLocaleString('en-IN',{maximumFractionDigits:4}):'—';
+const tm = ms => ms?new Date(ms).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour12:true,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+async function refresh(){
+  const x=await req({type:'GET_STATE'});
+  if(x.error){$('chart').textContent=x.error;return;}
+  $('armed').checked=!!x.armed;
+  $('autoEnabled').checked=!!x.autoEnabled;
+  $('chart').textContent=x.chartOpen?'Kite NIFTY futures chart: '+x.chartSymbol+' | Reader: '+(x.lastReadAt&&Date.now()-x.lastReadAt<15000?'RUNNING':'WAIT_DATA'):'WAIT_DATA — open your 5-minute NIFTY futures Kite chart';
+  $('updated').textContent=x.lastReadAt?'Last visible chart reading: '+tm(x.lastReadAt)+' IST':'Waiting for automatic readings from nested TradingView frame.';
+  const v=x.latest, root=$('values');root.replaceChildren();
+  if(v){
+    for(const [key,value] of [['Symbol',v.symbol],['Futures last (forming)',fmt(v.close)],['Volume',fmt(v.volume)],['VWAP yellow',fmt(v.vwap)],['EMA 9 blue',fmt(v.ema9)],['EMA 21 purple',fmt(v.ema21)],['DMI +DI green',fmt(v.plusDI)],['DMI −DI red',fmt(v.minusDI)],['DMI ADX pink',fmt(v.adx)],['ATR 14 orange',fmt(v.atr)]]){
+      const el=document.createElement('div'),label=document.createElement('small'),number=document.createElement('strong');
+      el.className='metric';label.textContent=key;number.textContent=value;el.append(label,number);root.append(el);
+    }
+  }else root.textContent='No valid indicator snapshot yet.';
+  const result=$('result');result.textContent=x.status||'WAIT_DATA';
+  result.className='result '+(x.status==='REVIEW_CE'?'good':x.status==='REVIEW_PE'?'bad':'muted');
+  $('reasons').textContent=(x.reasons||[]).join(' · ');
+  $('closedBar').textContent=x.lastCandle?'Last near-close observed candle ended '+tm(x.lastCandle.end)+' IST; sample taken '+tm(x.lastCandle.observedAt)+' IST. Collected '+x.barCount+' bars. NOT an exchange-confirmed close.':'No near-close candle collected yet. Initial warm-up normally takes at least 20–25 minutes.';
+  $('virtual').textContent=x.virtual?'VIRTUAL PAPER '+x.virtual.direction+' (NOT Kite holdings): futures reference '+fmt(x.virtual.entry)+'; invalidation '+fmt(x.virtual.stop)+'; illustrative target '+fmt(x.virtual.target)+'. Exit alerts are futures-based only.':'No virtual candidate active; no broker holdings are read.';
+  const logs=$('logs');logs.replaceChildren();(x.logs||[]).slice(0,20).forEach(z=>{const li=document.createElement('li');li.textContent=tm(z.at)+' · '+z.status+' · '+(z.reasons||[]).join('; ');logs.append(li);});
+}
+$('autoEnabled').addEventListener('change',async e=>{await req({type:'SET_AUTOMATIC',enabled:e.target.checked});refresh();});
+$('armed').addEventListener('change',async e=>{await req({type:'SET_ARMED',armed:e.target.checked});refresh();});
+$('test').addEventListener('click',async()=>{const x=await req({type:'TEST_NOTICE'});if(x.error)alert(x.error);});
+$('reset').addEventListener('click',async()=>{await req({type:'RESET_MONITOR'});refresh();});
+refresh();setInterval(refresh,3000);
