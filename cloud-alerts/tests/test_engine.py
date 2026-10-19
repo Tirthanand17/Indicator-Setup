@@ -37,7 +37,7 @@ async def test_during_weekend_no_signals(tmp_path):
 @pytest.mark.asyncio
 async def test_outbox_durable_no_duplicate(tmp_path):
     e=engine(tmp_path)
-    t=datetime(2026,10,19,11,tzinfo=IST)
+    t=datetime.now(IST)
     await e._send_event('unique','REVIEW_CE',t,'PAPER TEST ONLY')
     await e._send_event('unique','REVIEW_CE',t,'duplicate')
     assert e.telegram.messages==['PAPER TEST ONLY']
