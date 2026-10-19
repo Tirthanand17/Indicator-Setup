@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 49%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 53%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -11,7 +11,7 @@
 | P4 | Telegram cloud delivery, expiry-aware retry/outbox, health endpoint | **Implemented (unvalidated live)** | Real paired phone receives TEST and market candidate exactly once in normal run |
 | P5 | Deploy on approved 24×7 host with persistent storage | **NOT STARTED** | Explicit host and cost approval, safe TLS and secret store, laptop-off proof |
 | P6 | KiteTicker streaming / 5m shadow aggregation and REST reconciliation | **SHADOW RUNTIME INTEGRATED + SQLite quality ledger + SYNTHETIC TESTS**; live websocket not verified | Exchange timestamps, reconnect/backfill, REST comparison metrics, p95 latency |
-| P7 | Virtual exit and option premium intrabar risk tracking | **VIRTUAL FUTURES EXIT prototype only** | Real option bid/ask observations, IV and liquidity checks, no holdings assumption |
+| P7 | Virtual exit and option premium intrabar risk tracking | **Opt-in premium BID tracker + virtual STOP/TARGET/TIME review, 88 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
 | P8 | Walk-forward option-level backtesting, audits, dashboards | **NOT STARTED** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
 
@@ -31,4 +31,4 @@
 - Allow a read-only token sender to access the existing trading `.env` on Nirala when a fresh daily token appears. Its code and launch configuration live OUTSIDE the protected trading folder.
 - Perform explicit broker-market/Telegram integration tests **in paper-only mode**; no order placement is ever authorized by this repo.
 
-**Date:** 2026-10-19.
+**Date:** 2026-10-19. See [P7 virtual premium exit monitor](PREMIUM_EXIT_MONITOR.md).
