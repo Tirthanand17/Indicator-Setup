@@ -207,9 +207,16 @@ class Engine:
             except Exception:
                 logger.warning('Optional shadow stream unavailable; continuing REST-only')
         candle_from=now-timedelta(days=12)
+        # Requests Session is not guaranteed thread-safe. Two parallel history
+        # calls must NEVER operate on the same KiteConnect.reqsession object.
+        # Create one read-only SDK/session per worker thread. Keep the original
+        # client exclusively for the NFO instrument and option quote reads.
+        def fetch_history(interval:str):
+            isolated=KiteReadOnly(self.api_key,token)
+            return isolated.historical(fut.token,interval,candle_from,now)
         series5,series15=await asyncio.gather(
-            asyncio.to_thread(kite.historical,fut.token,'5minute',candle_from,now),
-            asyncio.to_thread(kite.historical,fut.token,'15minute',candle_from,now))
+            asyncio.to_thread(fetch_history,'5minute'),
+            asyncio.to_thread(fetch_history,'15minute'))
         # Explicit completed-candle rule: broker may include still-forming final row.
         completed5=[b for b in series5 if b.start+timedelta(minutes=5,seconds=8)<=now]
         completed15=[b for b in series15 if b.start+timedelta(minutes=15,seconds=8)<=now]
