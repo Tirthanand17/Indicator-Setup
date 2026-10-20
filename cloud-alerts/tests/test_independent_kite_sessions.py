@@ -19,12 +19,17 @@ from test_simulated_broker_pipeline import (
 class TrackedKite(FakeKite):
     instances = []
     observations = []
+    closed_ids = set()
     lock = Lock()
 
     def __init__(self, key, token):
         super().__init__(key, token)
         with self.lock:
             self.instances.append(self)
+
+    def close(self):
+        with self.lock:
+            self.closed_ids.add(id(self))
 
     def historical(self, token, interval, start, end):
         with self.lock:
@@ -36,6 +41,7 @@ class TrackedKite(FakeKite):
 def clear_tracking():
     TrackedKite.instances.clear()
     TrackedKite.observations.clear()
+    TrackedKite.closed_ids.clear()
 
 
 @pytest.mark.asyncio
@@ -50,6 +56,7 @@ async def test_two_concurrent_history_queries_use_distinct_kite_sdk_sessions(tmp
     assert {interval for _,interval in observations} == {'5minute', '15minute'}
     assert len(observations) == 2
     assert observations[0][0] != observations[1][0]
+    assert {sdk_id for sdk_id,_ in observations} == TrackedKite.closed_ids
     assert len(TrackedKite.instances) >= 3  # metadata, 5m, 15m
     assert not instance.telegram.sent
 
@@ -83,6 +90,7 @@ async def test_history_broker_error_fails_closed_without_paper_buy(tmp_path, mon
     assert instance.status == 'WAIT_DATA'
     assert not instance.telegram.sent
     assert instance.db.get_runtime('virtual_candidate') is None
+    assert len(TrackedKite.closed_ids) == 2  # release sockets on provider failure
 
 
 @pytest.mark.asyncio
