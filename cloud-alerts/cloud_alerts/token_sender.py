@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse,hashlib,json,os,secrets,sys,time,urllib.parse,requests
 from .security import signature
+from .https_acceptance import validate_public_endpoint
 
 KITE_KEYS=frozenset({'ZERODHA_KITE_API_KEY','ZERODHA_KITE_ACCESS_TOKEN'})
 MAX_ENV_BYTES=1024*1024
@@ -38,14 +39,14 @@ def read_env_values(path:Path)->dict[str,str]:
 
 
 def validate_endpoint(endpoint:str)->None:
-    """Allow one explicit HTTPS token endpoint, without URL user-info/query."""
-    u=urllib.parse.urlsplit(endpoint)
-    if u.scheme!='https' or not u.hostname or u.username or u.password or u.fragment or u.query or u.path!='/internal/token':
-        raise ValueError('Token handoff requires exact HTTPS endpoint https://host/internal/token')
+    """Reject nonpublic/ambiguous hosts; match the production HTTPS probe policy.
+
+    This is structural URL validation, not host approval or proof of DNS safety.
+    """
     try:
-        if not (u.port is None or 1<=u.port<=65535):raise ValueError()
-    except ValueError:
-        raise ValueError('Token handoff endpoint port invalid') from None
+        validate_public_endpoint(endpoint)
+    except (TypeError, ValueError):
+        raise ValueError('Token handoff requires approved public HTTPS 443 FQDN /internal/token') from None
 
 
 def push_once(path:Path,endpoint:str,relay_key:str,expected_key:str)->str:
@@ -65,9 +66,14 @@ def push_once(path:Path,endpoint:str,relay_key:str,expected_key:str)->str:
              'X-Relay-Signature':signature(relay_key,ts,nonce,raw),
              'Content-Type':'application/json'}
     try:
-        response=requests.post(endpoint,data=raw,headers=headers,timeout=10,allow_redirects=False)
-        if response.status_code!=200 or response.json().get('status')!='TOKEN_ACCEPTED':
-            raise RuntimeError('Cloud did not confirm token acceptance')
+        # Do not forward the daily bearer token through ambient HTTP(S)/ALL_PROXY.
+        # No redirects, user CA overrides or unverified TLS.
+        with requests.Session() as session:
+            session.trust_env = False
+            response=session.post(endpoint,data=raw,headers=headers,timeout=10,
+                                  allow_redirects=False,verify=True)
+            if response.status_code!=200 or response.json().get('status')!='TOKEN_ACCEPTED':
+                raise RuntimeError('Cloud did not confirm token acceptance')
     except (requests.RequestException,ValueError) as exc:
         raise RuntimeError('Cloud token relay unavailable') from None
     return hashlib.sha256(token.encode()).hexdigest()[:12]
