@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 36). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 37). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -26,6 +26,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 37 — fail-closed official Kite SDK REST HTTPS transport (80% retained)
+
+1. Verified current GitHub Phase 36 head `bbedcd8c` and inspected Kite REST wrapper plus the officially documented pykiteconnect v5 source. Confirmed Phase 36 isolated token/Telegram HTTPS requests, but the **Kite market-data SDK** maintained a separate Requests session with environment-inherited proxy/CA defaults and redirect following.
+2. Enhanced only the new cloud project's `KiteReadOnly`: before setting the broker bearer token, require official `https://api.kite.trade` root, SSL enabled, debug OFF, SDK proxies empty and reviewed Requests session; enforce **trust_env=False** and **max_redirects=0**, failing closed if the SDK transport is unsupported. No trade methods, calls, credentials or protected folder operations added.
+3. Added **11 synthetic offline Kite SDK transport tests** and exercised all 11 successfully in a small isolated local Python pytest environment. Separate Requests redirect control check passed. The full GitHub repository **was not cloned locally** due to DNS/network restrictions, so the **combined 490-test regression suite remains UNVERIFIED**. Last fully documented suite: **451/451 in Phase 34**; P35 +10, P36 +18, P37 +11.
+4. Published [Kite SDK outbound REST security evidence](KITE_SDK_DIRECT_TLS.md), documenting v5 upstream coupling, proxy/TLS failure behavior and required tests before actual deployment. Optional KiteTicker WebSocket remains separate and disabled by default. No GitHub Actions credits consumed.
+5. **Progress stays 80% engineering estimate** because no approved live cloud VM, HTTPS ingress, secure token relay to a production host, confirmed Telegram phone receipt, Nirala-OFF continuity or P9 five-session market evidence exists. Real-money execution remains OFF.
 
 ## Phase 36 — credential-bearing outbound HTTPS transport isolation (80% retained)
 
