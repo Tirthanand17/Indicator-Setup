@@ -1,6 +1,8 @@
 # Phase-by-phase delivery board
 
-**Approximate milestone-weighted implementation progress: 75%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Latest local validation (20 Oct 2026):** 402/402 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+
+**Approximate milestone-weighted implementation progress: 79%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|

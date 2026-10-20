@@ -2,6 +2,10 @@
 
 **Current status:** blueprint and tested local code, **not connected to a cloud host**. No paid services, deployments, Kite API authentication, or broker orders were initiated. Host selection and connection require operator approval. These commands are for later operator-reviewed setup; do NOT run live without reviewing security, costs and logs.
 
+## Offline process/network rehearsal — safe to run before host selection
+
+From `cloud-alerts/`, run `python -m cloud_alerts.loopback_smoke --json`. This creates two **localhost-only** Uvicorn processes, validates a synthetic signed token handoff, encrypted disk state, replay rejection after restart, and private file permissions. It never uses your `.env`, real Kite/Telegram tokens or network hosts. **This is not a Docker/Caddy/TLS or cloud deployment test** and does not relax the production HTTPS sender and persistent-storage requirements. See [rehearsal details](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+
 ## 1 — Choose the cloud host first
 
 See [HOSTING_EVALUATION.md](HOSTING_EVALUATION.md) for verified current provider policy, OCI/Google Always Free candidates, specific account eligibility dependencies and zero-additional-charge rules. No cloud host has been approved and provisioned.

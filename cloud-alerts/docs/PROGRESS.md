@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20. **Approximate engineering readiness: 78%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20. **Approximate engineering readiness: 79%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████████░░░░░] 78%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 22%
+Overall engineering progress   [████████████████████░░░░] 79%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 21%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -18,14 +18,22 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
 | P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 62% | TLS ingress, private WAL recovery, bounded crash supervision and safe in-process SQLite restart reconciliation; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 72% | Added a tested real-process localhost Uvicorn handoff/restart rehearsal with synthetic credentials, encrypted state and persistent nonce replay guard; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **77.5%, rounded to 78%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **78.5%, rounded half up to 79%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 30 — private localhost HTTP and process restart rehearsal (79%)
+
+1. Reproduced GitHub Phase 29 head `110d5e0` and **396/396** baseline tests. Docker/Caddy were unavailable locally, so no container or public TLS claims were made.
+2. Added `cloud_alerts.loopback_smoke`: it starts actual separate Uvicorn processes on `127.0.0.1` only, with synthetic/generated API/HMAC/Fernet credentials and monitoring disabled; it tests signed token ingress, rejection of HMAC tampering/replays, encrypted state at rest, process restart, and replay rejection **again after restart**.
+3. Uses an explicit child-process environment allow-list and bypasses HTTP proxy settings; private state/SQLite permissions are checked. Real credentials, public networks, Kite requests, Telegram sends and broker orders are absent.
+4. Six new tests, including inherited-secret isolation, HTTPS-only production sender restriction and failure-log redaction. Full suite **402/402 passed**; the manual real-loopback command also passed. See [loopback rehearsal](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+5. P5 **62% → 72% preparation only**; 10-phase mean 77.5 → 78.5, displayed as **79%**. **No approved VM, durable cloud volume, real HTTPS/token handoff, phone receipts or five real paper sessions exist yet**.
 
 ## Phase 28 — atomic recovery before each in-process worker restart (77%)
 

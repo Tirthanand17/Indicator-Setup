@@ -6,11 +6,13 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-20)
 
-**Overall engineering implementation estimate: 78%** — `[███████████████████░░░░░]` (**22% remaining**).
+**Overall engineering implementation estimate: 79%** — `[████████████████████░░░░]` (**21% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 396 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 402 local Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 30 update (20 October 2026):** Completed an actual two-process **localhost HTTP** rehearsal with synthetic keys only: signed token ingestion, persistent replay rejection, encrypted-token recovery across server restart, and private file permissions. The existing HTTPS sender continues refusing plaintext HTTP. **402/402 tests pass.** No cloud host, Docker build, live Kite credentials, or Telegram network call was involved. Run `python -m cloud_alerts.loopback_smoke --json`; see [scope and results](docs/LOOPBACK_LIFECYCLE_REHEARSAL.md).
 
 **Phase 29 update (20 October 2026):** Official NSE F&O calendar guards now block normal market polls and historical replay during the Dussehra holiday on 20 October, including the January 15 special closure added by a follow-up NSE circular. The audit no longer falsely treats a weekday market holiday as 73 missed boundaries. Unknown calendar years fail closed; this **pinned local snapshot is not a live NSE feed**. Offline check: `python -m cloud_alerts.calendar_cli --date 2026-10-20`. **396/396 local tests passed.** Cloud alerts remain OFF. See [official holiday guardrails](docs/NSE_FO_HOLIDAY_CALENDAR.md).
 
@@ -30,6 +32,8 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 **Phase 25 update:** real-mode Telegram send/acceptance timestamps now use fresh clock samples after slow REST calls. Option BID/ASK quote freshness, virtual entry reference and observation evidence use the actual quote response clock, with post-15:00 IST entries blocked. **346/346 local tests passed**. No cloud validation yet. See [live response-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md).
 
 ## Start here
+
+- [Actual localhost HTTP process/restart rehearsal, synthetic keys only](docs/LOOPBACK_LIFECYCLE_REHEARSAL.md)
 
 - [Official NSE F&O holiday guardrails and offline status checker](docs/NSE_FO_HOLIDAY_CALENDAR.md)
 - [Read-only daily Kite token handoff and offline end-to-end test](docs/DAILY_TOKEN_HANDOFF_VALIDATION.md)
