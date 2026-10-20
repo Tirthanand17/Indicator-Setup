@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 38). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 39). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -26,6 +26,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 39 — pin reviewed Kite SDK and release all REST sessions (80% retained)
+
+1. Verified Phase 38 GitHub head `b15c618` and the historical **451/451** full-suite baseline from Phase 34. Rechecked upstream KiteConnect source and latest version. `requirements.txt` previously permitted arbitrary new SDK v5 releases despite Phase 37's reviewed private transport attributes; now pinned to official `kiteconnect==5.2.2` (other dependencies still not fully locked).
+2. Closed **every** read-only market SDK HTTP session: the original per-poll instruments/quote client now closes in `Engine._collect_once` even on exceptions/NO_TRADE; Phase 38's independent concurrent historical clients remain separately closed; optional 20-second virtual-premium quote SDK now opens and closes inside its own thread. Read-only policy unchanged, no order execution.
+3. Added **six synthetic lifecycle regressions**: four main-worker paths and two premium-watcher paths. Executed **12/12 isolated transport/close tests** locally, including a new SDK-close test. **The six newly committed Engine tests and the complete suite have NOT been run**; no source clone available because this runner cannot resolve GitHub, and GitHub Actions credits/laptop were not used. Assuming stable collection, **500** is an expected case count, **not 500 passed**.
+4. Published [Kite REST session lifecycle and version pin](KITE_REST_SESSION_LIFECYCLE.md). No real Kite/Telegram messages, protected Nirala file reads, hosting changes, or charges.
+5. Overall implementation estimate remains **80% engineering / 20% unfinished** until an approved ₹0 host, real TLS daily token relay, read-only Kite/Telegram live verification, laptop-OFF continuous alerts and five actual paper-market sessions establish operation. P9 remains **0% live-tested**.
 
 ## Phase 38 — isolated concurrent official Kite history SDK sessions (80% retained)
 
