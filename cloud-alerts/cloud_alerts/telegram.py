@@ -30,11 +30,15 @@ class Telegram:
     def send(self,text:str)->None:
         # Keep token out of logs/exceptions. It is present only in HTTPS Bot API URL.
         try:
-            response=requests.post('https://api.telegram.org/bot'+self.bot_token+'/sendMessage',
-                json={'chat_id':self.chat_id,'text':text[:3900],'disable_notification':False,'protect_content':True},
-                timeout=7,allow_redirects=False)
-            if response.status_code!=200:raise RuntimeError('Telegram returned non-200 status')
-            body=response.json()
-            if body.get('ok') is not True:raise RuntimeError('Telegram rejected the message')
+            # Telegram URL contains the bot credential. Never inherit ambient proxies
+            # or REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE that can redirect sensitive traffic.
+            with requests.Session() as session:
+                session.trust_env = False
+                response=session.post('https://api.telegram.org/bot'+self.bot_token+'/sendMessage',
+                    json={'chat_id':self.chat_id,'text':text[:3900],'disable_notification':False,'protect_content':True},
+                    timeout=7,allow_redirects=False,verify=True)
+                if response.status_code!=200:raise RuntimeError('Telegram returned non-200 status')
+                body=response.json()
+                if body.get('ok') is not True:raise RuntimeError('Telegram rejected the message')
         except Exception:
             raise RuntimeError('Telegram delivery failed; check outbound network and bot settings') from None
