@@ -421,9 +421,18 @@ class Engine:
                 self.premium_status='WAIT_TOKEN';return
             try:
                 contract=reference_contract(reference)
-                kite=KiteReadOnly(self.api_key,token)
+                # Premium monitoring may poll every 20 seconds. Create, use,
+                # and close the SDK in one thread; no long-lived leaked pool.
+                def fetch_premium_bid():
+                    quote_client=KiteReadOnly(self.api_key,token)
+                    try:
+                        return quote_client.full_quote(contract.symbol)
+                    finally:
+                        close=getattr(quote_client,'close',None)
+                        if callable(close):
+                            close()
                 raw_quote=await asyncio.wait_for(
-                    asyncio.to_thread(kite.full_quote,contract.symbol),timeout=8)
+                    asyncio.to_thread(fetch_premium_bid),timeout=8)
                 # A captured 20-second polling-slot timestamp is NOT the moment
                 # the quote returned. The option watcher must use fresh time,
                 # just like the five-minute entry quote checker.
