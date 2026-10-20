@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 34). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 35). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -26,6 +26,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 35 — OCI Free-only resource plan gate and real-host dependency (80% retained)
+
+1. Inspected the newer Phase 34 GitHub head `0faa40e5`; **451/451** was the documented Phase 34 offline test result, rather than this session's full re-run. Rechecked the Docker/HTTPS, preflight, token, Telegram and privacy boundaries. No approved VM exists.
+2. Added a standalone, offline `cloud_alerts.oci_plan_guard` JSON CLI that rejects Free-only A1 plan overages, wrong home region, unverified chargeable network/DNS/IP components, non-Free account modes, unexpected/secret fields and unacknowledged 7-day idle reclamation risk. Its success result explicitly **never** certifies real cost, quota, account ownership, capacity or provisioning.
+3. Added **10 focused synthetic tests**, all passed on the isolated local code; an end-to-end **461/461** regression run is **NOT VERIFIED** because the full historical repository/dependencies were unavailable to this runner. No GitHub Actions credits were spent.
+4. Cross-checked official Oracle Free-only limits: **2 A1 OCPUs/12 GB RAM and 200 GB combined boot/block storage**, subject to home region and existing usage. Oracle **may reclaim idle Always Free instances**, so a lightweight bot has a genuine continuity risk; don't treat this as a production uptime guarantee. Added [OCI operator gate](OCI_ALWAYS_FREE_OPERATOR_GATE.md). Render Free still fails storage/idle requirements.
+5. Host activation, real HTTPS/daily token handoff, Telegram handset receipt, laptop-off stability and P9 five real market sessions remain **0% live-verified**. **Engineering progress stays 80%**. The next required action is a user-controlled check of an existing OCI Free-only tenancy or a separately approved free-tier signup, *without disclosing credentials or card details*. No cloud accounts or billable resources were created.
 
 ## Phase 34 — planned Windows user-logon token watch without protected-file edits (80% retained)
 
