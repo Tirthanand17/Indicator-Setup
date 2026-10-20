@@ -193,7 +193,19 @@ class Engine:
                 self.db.record_rest_attempt(now,outcome)
 
     async def _collect_once(self,now:datetime,token:str)->None:
+        # Own and release the metadata/quote SDK as well as the two transient
+        # historical clients. Otherwise a 24/7 worker leaks HTTP connections.
         kite=KiteReadOnly(self.api_key,token)
+        try:
+            await self._collect_with_kite(now,token,kite)
+        finally:
+            # Legacy synthetic fakes may omit close(); the production wrapper
+            # guarantees an explicit Requests-session close without HTTP I/O.
+            close=getattr(kite,'close',None)
+            if callable(close):
+                close()
+
+    async def _collect_with_kite(self,now:datetime,token:str,kite:KiteReadOnly)->None:
         if self.instrument_rows is None or self.instrument_date!=now.date():
             self.instrument_rows=await asyncio.to_thread(kite.instruments_nfo)
             self.instrument_date=now.date()
