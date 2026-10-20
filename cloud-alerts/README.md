@@ -6,11 +6,13 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-20)
 
-**Overall engineering implementation estimate: 76%** — `[███████████████████░░░░░]` (**24% remaining**).
+**Overall engineering implementation estimate: 77%** — `[███████████████████░░░░░]` (**23% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
 **Tests:** 359 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 28 update:** a supervised in-process worker restart now performs atomic SQLite safety reconciliation before polling again. Expired Telegram entries and their virtual paper candidates are cleared, valid current-day candidates are preserved, and corrupted references fail closed. Sanitized recovery counts appear in `/healthz` with no alert text or secrets. **363/363 offline tests passed**. Hosting and phone validation remain pending. See [restart safety](docs/IN_PROCESS_RESTART_RECONCILIATION.md).
 
 **Phase 27 update:** a supervised market-data coroutine now restarts after an unexpected worker crash or exit, with bounded backoff and a fail-closed health state. Repeated early crashes trigger a generic SIGTERM of the current container process, allowing an existing `restart: unless-stopped` policy to work. The previous REST freshness indicator is invalidated after a crash, preventing a false-green operational report. **359/359 offline tests passed**; this is not proof of live hosting. See [background worker recovery](docs/BACKGROUND_WORKER_SUPERVISION.md).
 

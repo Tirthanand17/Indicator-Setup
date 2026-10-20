@@ -73,8 +73,14 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             # of early crashes triggers a controlled process shutdown; Docker
             # may then restart the container under its configured policy.
             def invalidate_previous_decision():
+                # This callback runs only after the previous market worker
+                # exits. Reapply the same SQLite recovery invariants used at
+                # ASGI startup BEFORE the supervisor starts another worker.
+                # In particular, an expired unsent BUY cannot retain a virtual
+                # EXIT candidate across an in-process worker restart.
                 engine.last_data_at=None
                 engine.set_status('WORKER_RECOVERING','Background monitoring worker restarting')
+                app.state.last_worker_recovery=state.reconcile_startup(datetime.now(IST))
 
             task=asyncio.create_task(supervisor.run(
                 engine.run_forever,on_failure=invalidate_previous_decision),
@@ -101,6 +107,12 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
                 task.cancel()
                 try:await task
                 except asyncio.CancelledError:pass
+                except RuntimeError:
+                    # The fatal supervisor already signalled process shutdown.
+                    # Do not let a generic recovery failure obscure graceful
+                    # resource cleanup while SIGTERM is being handled.
+                    if supervisor.state != 'FATAL':
+                        raise
                 if shadow is not None:
                     await shadow.shutdown()
                 app.state.worker_task=None
@@ -110,6 +122,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     app.state.worker_supervisor=supervisor
     app.state.worker_task=None
     app.state.startup_recovery=None
+    app.state.last_worker_recovery=None
     @app.get('/healthz')
     async def healthz():
         data=engine.health()
@@ -117,6 +130,15 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
         alive=task is not None and not task.done() and supervisor.running
         data['worker_running']=alive
         data['worker_supervisor']=supervisor.summary()
+        # Sanitized counters from the latest in-process recovery; no messages,
+        # tokens, timestamps of individual events, or database contents.
+        recovery=app.state.last_worker_recovery
+        data['last_worker_reconciliation']=(
+            {'performed': True,
+             'expired_queued_notifications': recovery['expired_queued_notifications'],
+             'cleared_stale_virtual_candidates': recovery['cleared_stale_virtual_candidates'],
+             'preserved_active_candidate': recovery['preserved_active_candidate']}
+            if recovery is not None else {'performed': False})
         # Do not report a green health probe if FastAPI is serving requests
         # but the background market-data task has crashed.
         return JSONResponse(data,status_code=200 if alive else 503,

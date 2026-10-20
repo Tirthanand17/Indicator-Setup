@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20. **Approximate engineering readiness: 76%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20. **Approximate engineering readiness: 77%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████████░░░░░] 76%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 24%
+Overall engineering progress   [███████████████████░░░░░] 77%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 23%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -18,14 +18,23 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
 | P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 52% | TLS ingress, private WAL recovery and bounded background-worker crash supervision; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 62% | TLS ingress, private WAL recovery, bounded crash supervision and safe in-process SQLite restart reconciliation; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **75.5%, rounded to 76%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **76.5%, rounded to 77%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 28 — atomic recovery before each in-process worker restart (77%)
+
+1. Reproduced published Phase 27 commit `8851770` and **359/359** existing local tests. Found that the supervised worker can restart within the same FastAPI lifespan without rerunning `State.reconcile_startup`, leaving persisted Telegram outbox and virtual-entry state unchecked after a crash.
+2. The supervisor's failure callback now invalidates stale REST freshness, **atomically reconciles SQLite state before a replacement coroutine starts**, expires old pending alerts and clears unsafe associated virtual candidates. Correctly linked current-day accepted/pending candidates survive.
+3. Corrupt or unlinked persisted state causes the supervisor to fail closed with generic FATAL shutdown instead of restarting a potentially unsafe worker. During termination FastAPI completes cleanup without repeating the sanitized fatal exception.
+4. `/healthz` exposes only whitelisted reconciliation counts and no message text or Kite/Telegram secrets.
+5. Four new synthetic integration regressions, including after-startup crash, protected current-day entry, pending retry and corrupt-state fatal handling. Full suite **363/363 passed**, compilation passed. No broker, Telegram or cloud network calls in tests.
+6. Preparatory phase P5 **52% → 62%**, ten-phase estimate **75.5% → 76.5%, rounded to 77%**. Live cloud host activation, real TLS token relay, handset receipt and five full paper sessions remain **unverified**. See [in-process restart reconciliation](IN_PROCESS_RESTART_RECONCILIATION.md).
 
 ## Phase 27 — bounded crash supervision and safe green-state reset (76%)
 

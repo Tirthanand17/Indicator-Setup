@@ -263,3 +263,16 @@
 - [ ] Collect five authenticated real paper trading sessions and unbiased option performance evidence; no real orders.
 
 **Overall estimate: 76% implemented, 24% remaining. Cloud alerts are NOT operational.**
+
+
+## Phase 28 — worker restart state reconciliation (2026-10-20)
+
+- [x] Re-run atomic outbox/virtual candidate recovery on **every** supervised worker crash, not just a process startup.
+- [x] Preserve accepted or recent queued current-day candidates while discarding expired unsent entries and their virtual positions.
+- [x] Fatal-stop rather than restart with corrupt or unlinked current-day state.
+- [x] Expose only sanitized restart recovery counters and maintain a red operational gate until new REST data is observed.
+- [x] Run four additional synthetic integration regressions and full suite: **363/363 passed**.
+- [ ] Validate a real cloud worker restart, TLS token handoff and phone TEST on an approved always-on host.
+- [ ] Collect five complete market sessions, option quotes and after-cost evidence.
+
+**Estimated engineering completion: 77%, 23% remaining. Real cloud alerts: NOT DEPLOYED.**
