@@ -15,6 +15,8 @@ def test_real_http_handoff_replay_and_restart_pass():
     assert report['result'] == 'PASS'
     assert report['mode'] == 'SYNTHETIC_LOCALHOST_HTTP_ONLY'
     assert 'PERSISTED_NONCE_REPLAY_REJECTION' in report['checks']
+    assert 'OUT_OF_ORDER_RELAY_REJECTED_AFTER_RESTART' in report['checks']
+    assert 'LATEST_TOKEN_ENCRYPTED_AND_PERSISTED' in report['checks']
     assert 'PRIVATE_STATE_FILE_PERMISSIONS' in report['checks']
     assert not report['cloud_deployment_validated']
     assert not report['tls_validated']

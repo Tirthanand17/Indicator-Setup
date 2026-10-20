@@ -13,7 +13,7 @@ from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse
 from .engine import Engine
 from .state import State
-from .security import TokenVault,verify_relay
+from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
 from .stream_supervisor import ShadowSupervisor
 from .runtime_guard import single_worker
@@ -203,7 +203,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             if not isinstance(body,dict) or body.get('api_key')!=cfg.api_key:
                 raise ValueError('API identity mismatch')
             token=body['access_token']
-            vault.put(token,now)
+            vault.put(token,now,relay_at=int(ts))
+        except TokenRollbackError:
+            raise HTTPException(409,'older or ambiguous daily token handoff') from None
         except (ValueError,KeyError,TypeError):
             raise HTTPException(422,'invalid daily Kite token submission') from None
         return JSONResponse({'status':'TOKEN_ACCEPTED'},headers={'Cache-Control':'no-store'})

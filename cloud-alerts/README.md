@@ -6,11 +6,13 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-20)
 
-**Overall engineering implementation estimate: 79%** — `[████████████████████░░░░]` (**21% remaining**).
+**Overall engineering implementation estimate: 80%** — `[████████████████████░░░░]` (**20% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 414 local Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 421 local Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 32 update (20 October 2026):** Signed daily token handoffs now resist **out-of-order token rollback**, including after a worker restart, and enforce the true 06:00 IST session expiry even for requests crossing that boundary. A newer authenticated token wins; an old signed request cannot replace it. The synthetic two-process localhost rehearsal covers token rotation and rollback, and **421/421 tests pass**. This is still NOT a deployed host or phone alert. See [signed token order and expiry](docs/SIGNED_TOKEN_ROLLBACK_GUARD.md) and [approved-host decision gate](docs/HOST_ACTIVATION_DECISION.md).
 
 **Phase 31 update (20 October 2026):** The market-data worker now prioritizes completed five-minute REST polling over backlogged Telegram retries and optional option-premium checks. An outbox delivery pass makes at most two Telegram network attempts, preserves queued messages and enforces the existing 180-second expiry. This reduces the risk of phone HTTP delays starving fresh market-data checks. **414/414 offline tests passed.** The weighted estimate remains **79%** because cloud operation is still unverified. See [bounded dispatch report](docs/BOUNDED_TELEGRAM_DISPATCH.md).
 
@@ -34,6 +36,9 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 **Phase 25 update:** real-mode Telegram send/acceptance timestamps now use fresh clock samples after slow REST calls. Option BID/ASK quote freshness, virtual entry reference and observation evidence use the actual quote response clock, with post-15:00 IST entries blocked. **346/346 local tests passed**. No cloud validation yet. See [live response-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md).
 
 ## Start here
+
+- [Signed token handoff: rollback prevention across process restart](docs/SIGNED_TOKEN_ROLLBACK_GUARD.md)
+- [Hosting choice and explicit zero-extra-cost approval gate](docs/HOST_ACTIVATION_DECISION.md)
 
 - [Bounded Telegram dispatch and market-data scheduling priority](docs/BOUNDED_TELEGRAM_DISPATCH.md)
 - [Actual localhost HTTP process/restart rehearsal, synthetic keys only](docs/LOOPBACK_LIFECYCLE_REHEARSAL.md)

@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 31). **Approximate engineering readiness: 79%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 32). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [████████████████████░░░░] 79%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 21%
+Overall engineering progress   [████████████████████░░░░] 80%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 20%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -15,7 +15,7 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 |---|---|---:|---|
 | P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
-| P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
+| P2 | Daily token relay, HMAC and encrypted vault | 95% | Signed relay-timestamp ordering prevents token rollback and 06:00 expiry confusion across restart; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
 | P4 | Telegram delivery, dedupe/outbox, health | 97% | Two-send maximum per pass prevents Telegram outbox backlog from monopolizing REST polling; still no actual phone receipt or live host |
 | P5 | Approved always-on hosting, persistence and laptop-off test | 77% | Real-process localhost token/restart rehearsal and priority-safe single-worker scheduling; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
@@ -24,8 +24,17 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **79.2%, rounded to 79%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **79.7%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 32 — signed-token ordering and host approval gate (80% engineering estimate)
+
+1. Verified remote GitHub Phase 31 head `fe1f140` and **414/414** baseline local tests. Investigated two correctly HMAC-authenticated daily token transfers arriving in the wrong order. Previously, a distinct older signed submission could overwrite the newer encrypted Kite access token even though nonce replay checks passed.
+2. Persist the signed relay Unix timestamp inside the Fernet-encrypted vault; reject older and ambiguous same-second distinct tokens with HTTP `409`. Equal-time duplicate payload with a different valid nonce is idempotent. The server does not reveal credentials or claim the token works with Kite.
+3. Reject near-06:00 IST requests signed before the expiry boundary that arrive after it. Permit new-day sessions after previous token expiry. Keep compatibility for existing encrypted vaults without the new metadata; reject corrupted metadata.
+4. Added seven unit/integration regressions plus a real two-process localhost rehearsal that verifies a newer token rotates, an older signed token is rejected after restart, and the latest token survives encrypted. **421/421 offline tests passed**, localhost smoke passed, source compiled. No real broker, Telegram, external host or protected-folder access occurred.
+5. Verified official hosting limits: Render Free sleeps and loses local state; OCI Always Free VM can be suitable **only if** the user's tenancy, available shape, quota and all cost components are separately verified and the host is approved. No service or billable resource was created. See [host activation decision](HOST_ACTIVATION_DECISION.md).
+6. P2 engineering **90% → 95%**, ten-phase mean **79.2% → 79.7%, rounded to 80%**. This is still NOT cloud availability or a trading win rate. P9 remains 0%. See [signed handoff reliability](SIGNED_TOKEN_ROLLBACK_GUARD.md).
 
 ## Phase 31 — bounded phone delivery and market-data-first scheduling (79% retained)
 

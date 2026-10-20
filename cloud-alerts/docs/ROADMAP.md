@@ -1,8 +1,8 @@
 # Phase-by-phase delivery board
 
-**Latest local validation (20 Oct 2026):** 414/414 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+**Latest local validation (20 Oct 2026):** 421/421 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
 
-**Approximate milestone-weighted implementation progress: 79%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+**Approximate milestone-weighted implementation progress: 80%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|
@@ -16,6 +16,18 @@
 | P7 | Virtual exit and option premium intrabar risk tracking | **Premium BID tracker and Telegram-accepted entry notice gate, 184 offline tests**; no live broker quote trial | Real option BID/ASK over actual sessions, 20s latency evidence, phone delivery and no holdings assumption |
 | P8 | Walk-forward option-level backtesting, audits, dashboards | **Offline replay + chronology/checkpoint tests; option quote archive missing** | Gross/net P&L and win %, drawdowns, cost realism, out-of-sample evidence |
 | P9 | Multi-day production-readiness paper trials | **NOT STARTED** | 5+ sessions, phone receipts, latency and missed alerts documented |
+
+## Phase 32 — token rotation and host activation
+
+- [x] Block older signed access-token submissions arriving after newer accepted daily tokens.
+- [x] Record ordering timestamp only inside the encrypted vault; persist across restarts.
+- [x] Prevent pre-06:00 signed submissions from becoming a post-expiry valid session.
+- [x] Verify migration of older encrypted vault files; treat corrupt metadata as invalid.
+- [x] Synthetic two-process localhost rotation/rollback rehearsal; 421/421 tests passed.
+- [x] Verify official Render/OCI/GCP hosting constraints without deploying anything.
+- [ ] Connect/identify **an approved** Always Free-eligible VM and validate individual billing components (not merely a marketing label).
+- [ ] Test deployed TLS, real daily read-only Kite relay and labeled Telegram phone receipt.
+- [ ] Five full paper sessions plus option-level after-cost evaluation.
 
 ## Distinct sources of truth
 

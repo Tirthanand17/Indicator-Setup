@@ -146,6 +146,28 @@ def run_smoke(*, timeout: float = 12.0) -> dict:
             replay_after_restart, _ = _request(base + '/internal/token', content=raw, headers=headers)
             if after_restart != 200 or replay_after_restart != 409:
                 raise RuntimeError('restarted worker did not retain persisted replay protection')
+            # Newer signed credential should rotate cleanly after restart;
+            # an older signed credential (with a NEW nonce) may not roll back.
+            later_token = 'SYNTHETIC' + secrets.token_urlsafe(36)
+            later_raw = json.dumps({'api_key': api_key, 'access_token': later_token},
+                                   separators=(',', ':')).encode('ascii')
+            later_ts = str(int(timestamp) + 1)
+            later_nonce = secrets.token_hex(24)
+            later_headers = {'Content-Type': 'application/json',
+                'X-Relay-Timestamp': later_ts,
+                'X-Relay-Nonce': later_nonce,
+                'X-Relay-Signature': signature(relay_key,later_ts,later_nonce,later_raw)}
+            rotated, _ = _request(base + '/internal/token',content=later_raw,headers=later_headers)
+            outdated_headers=dict(headers)
+            outdated_headers['X-Relay-Nonce']=secrets.token_hex(24)
+            outdated_headers['X-Relay-Signature']=signature(
+                relay_key,timestamp,outdated_headers['X-Relay-Nonce'],raw)
+            rollback, _ = _request(base + '/internal/token',content=raw,headers=outdated_headers)
+            if rotated!=200 or rollback!=409:
+                raise RuntimeError('signed out-of-order relay rollback guard failed')
+        latest = TokenVault(state_dir / 'token.enc',vault_key)
+        if not latest.load(datetime.now(timezone.utc)) or latest.get(datetime.now(timezone.utc))!=later_token:
+            raise RuntimeError('latest encrypted cloud token did not survive restart')
 
     return {
         'mode': 'SYNTHETIC_LOCALHOST_HTTP_ONLY',
@@ -159,7 +181,9 @@ def run_smoke(*, timeout: float = 12.0) -> dict:
         'checks': ['LOOPBACK_HEALTH', 'ALERTS_DISABLED', 'SIGNED_TOKEN_ACCEPTED',
                    'REPLAY_REJECTED', 'TAMPER_REJECTED', 'ENCRYPTED_STATE',
                    'SERVER_RESTART_AND_STATE_RECOVERY', 'PERSISTED_NONCE_REPLAY_REJECTION',
-                   'PRIVATE_STATE_FILE_PERMISSIONS'],
+                   'PRIVATE_STATE_FILE_PERMISSIONS', 'SIGNED_NEWER_TOKEN_ROTATION',
+                   'OUT_OF_ORDER_RELAY_REJECTED_AFTER_RESTART',
+                   'LATEST_TOKEN_ENCRYPTED_AND_PERSISTED'],
     }
 
 
