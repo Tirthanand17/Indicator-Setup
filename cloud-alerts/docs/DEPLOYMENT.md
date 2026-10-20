@@ -70,7 +70,7 @@ python -m cloud_alerts.token_sender --env-file "<EXISTING_TRADING_FOLDER>\.env" 
 python -m cloud_alerts.token_sender --env-file "<EXISTING_TRADING_FOLDER>\.env" --watch
 ```
 
-**Note:** `--watch` must actually be running when you update the `.env`. A cloud server cannot read your local `.env` after the PC is off. A future Windows Task Scheduler job may start `--watch` at login, using scripts located **outside** the trading folder. This is NOT enabled by the repository code.
+**Note:** `--watch` must actually be running when you update the `.env`. A cloud server cannot read your local `.env` after the PC is off. An **opt-in** Windows user-logon Task Scheduler installer has now been added under [`deploy/windows`](../deploy/windows), with user-only DPAPI-encrypted HMAC configuration in `LOCALAPPDATA`. It is **NOT installed or enabled**, and it refuses to register a task until both `-Install` and `-ConfirmApprovedHost` are explicitly selected for an already-approved HTTPS cloud endpoint. See [Windows local relay setup](WINDOWS_AUTOMATIC_DAILY_TOKEN_RELAY.md). It cannot perform broker login or transmit after the laptop is off.
 
 **Confirmation:** local sender prints only `Token handoff accepted by cloud`; `/healthz` should progress from `WAIT_TOKEN` to `WAIT_DATA`, then `NO_TRADE` / `REVIEW_CE` / `REVIEW_PE` as valid market data arrives. On provider restart, cloud reloads ciphertext from persistent volume, as long as its vault key is unchanged and session valid.
 
@@ -137,3 +137,8 @@ See [daily handoff end-to-end validation](DAILY_TOKEN_HANDOFF_VALIDATION.md). Of
 ## Additional deployment gate — Phase 33 (offline-tested only)
 
 After your cloud host, pricing, DNS and TLS have been **explicitly approved**, run `python -m cloud_alerts.https_acceptance --endpoint https://YOUR_APPROVED_FQDN/internal/token --confirm-network-checks --json` from an authorized terminal. This verifies a restricted HTTPS surface without any real credentials. A PASS does **not** prove host uptime, storage persistence, signed token handoff, Telegram phone receipt or zero billing. When monitoring is enabled but today's Kite token is absent, a once-per-market-day **NOT A TRADE SIGNAL** warning can be queued to Telegram; this requires a working configured bot. See [Phase 33 acceptance requirements](SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md).
+
+
+## Phase 34 — optional Windows automatic token watcher (operator must install)
+
+See [WINDOWS_AUTOMATIC_DAILY_TOKEN_RELAY.md](WINDOWS_AUTOMATIC_DAILY_TOKEN_RELAY.md) for the read-only Windows sign-in scheduler and DPAPI-encrypted local relay secret. The default invocation is a non-writing, non-network preview. Installation requires explicit cloud-host approval and both `-Install` and `-ConfirmApprovedHost`. No task has been installed on Nirala and no Windows PowerShell runtime test was performed. Linux static checks and 451 Python tests passed; overall readiness estimate is **unchanged at 80%**.

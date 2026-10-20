@@ -317,3 +317,10 @@
 ### Phase 33 (2026-10-20) — operational token warning and HTTPS activation probe
 
 Completed offline: one-per-market-day missing-token warning, strict TLS ingress probe (operator opt-in, no real credentials), durable dedupe and replay tests. **443/443 local tests passed.** Engineering estimate remains **80%**. Still blocked: approved cloud tenancy/VM, host DNS/TLS, real cloud token and Telegram phone receipt, five live paper sessions. See [Phase 33](SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md).
+
+
+## Phase 34 (20 October 2026): opt-in Windows logon token watcher
+
+- Added a Windows Task Scheduler installer and dedicated read-only watcher with user-scoped DPAPI secret storage, outside the protected trading project. Defaults to plan-only, requires explicit cloud-host confirmation, and does not auto-start during installation.
+- Added 8 Linux-side regression checks (including a synthetic `.env` read-only parser test), total **451/451**. The PowerShell scripts have NOT been executed on Windows.
+- The next gate is a verified ₹0-cost always-on host; then operator-approved Windows install + production HTTPS/Telegram/market trials. **Overall readiness 80% unchanged**.

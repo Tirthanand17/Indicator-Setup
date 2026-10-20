@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 33). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 34). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -25,6 +25,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+
+
+## Phase 34 — planned Windows user-logon token watch without protected-file edits (80% retained)
+
+1. Verified GitHub Phase 33 head `6d5ca3f` and reproduced **443/443** Python tests. Reconfirmed the cloud remained disabled and no account-approved always-on host had been provisioned.
+2. Added `deploy/windows/Install-DailyTokenRelay.ps1` and `Watch-DailyToken.ps1`: an operator-only, current-user scheduled task starts the already-tested Python `.env --watch` sender at login. Installer validates the exact approved HTTPS endpoint and refuses to register unless both explicit approval switches are given. It writes only into Windows `LOCALAPPDATA`; original trading folder is used as a read-only `.env` source.
+3. Relay HMAC key is requested interactively and encrypted under the Windows user's DPAPI key; the task action contains only paths, no credentials. It does not log in to Zerodha, start any cloud service or send a token at installation time. It requires Windows to remain on through handoff.
+4. Added eight Linux-based safety and synthetic sender tests; **451/451 Python tests PASS**. **Windows PowerShell syntax, Task Scheduler registration and DPAPI execution remain untested on Windows** pending a separately authorized deployment. No live broker, phone or hosting activity.
+5. P2/P5 operational adoption is still pending, so the milestone-weighted **engineering completion remains 80%** and live host + phone acceptance P9 remains 0%. See [Windows operator runbook](WINDOWS_AUTOMATIC_DAILY_TOKEN_RELAY.md).
 
 
 ## Phase 33 — missing-token phone warning and HTTPS ingress acceptance tool (80% retained)
