@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 37). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 38). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -26,6 +26,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 38 — isolated concurrent official Kite history SDK sessions (80% retained)
+
+1. Verified GitHub Phase 37 head `b6a338f`, audited live `Engine._collect_once` and the upstream official Kite SDK request implementation. Confirmed parallel 5m and 15m history reads were dispatched via `asyncio.to_thread` **on the same SDK/Requests Session**. This was a thread-safety risk for authoritative OHLCV feeds.
+2. Updated the single worker to create **separate read-only KiteConnect sessions inside each history thread**, preserving parallel 5m/15m fetch latency, Phase 37's direct HTTPS policy, existing option quote path, 24-second overall budget and no order methods. A historical failure continues to fail closed with `WAIT_DATA`.
+3. Added **4 offline regression tests** for distinct 5m/15m SDK sessions, quote-client separation, synthetic broker-history error suppression and subsequent-poll session freshness. The tests and updated engine code were committed and read back from GitHub, but the full suite was **NOT executed** because the repository cannot be cloned in the current container (GitHub DNS blocked) and GitHub Actions credits must not be spent. With Phase 35–38 additions, 494 is a **possible collected-test count**, not **494/494 passed**.
+4. Published [independent Kite REST sessions report](INDEPENDENT_KITE_REST_SESSIONS.md). No real token, brokerage request, public cloud host, Telegram message, user's Nirala laptop, protected trading folder or paid resource was accessed or modified.
+5. **80% engineering estimate retained**. Blockers: user-specific approved ₹0 persistent always-on VM, live TLS signed token relay, real Kite authentication, confirmed Telegram phone receipt, laptop-off continuity and five real market sessions. Cloud worker OFF; execution of actual trades DISABLED.
 
 ## Phase 37 — fail-closed official Kite SDK REST HTTPS transport (80% retained)
 
