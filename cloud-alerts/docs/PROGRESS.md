@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 35). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 36). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -26,6 +26,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 36 — credential-bearing outbound HTTPS transport isolation (80% retained)
+
+1. Inspected GitHub Phase 35 head `8e5ccebb` and existing sender/test paths, with **no new cloud, Windows, phone, broker or GitHub Actions activity**. Found that outbound token and Telegram sends inherited environment proxy/CA variables and that token-sender URL validation was weaker than the strict HTTPS ingress probe.
+2. Updated the daily Kite token sender to reuse the strict **public HTTPS port 443 /internal/token FQDN** validator; rejected custom ports, localhost/IP/private suffixes, URL credentials and query/fragment-bearing destinations. This is a *structural URL rule*, not proof that the operator actually owns the hostname.
+3. Replaced ambient requests.post for the token handoff and Telegram sends with temporary requests.Session transports configured **trust_env=False**, **verify=True**, **allow_redirects=False**, and bounded timeouts. Broker data SDK HTTP transport is separately pending inspection.
+4. Updated signed ASGI handoff test mocks and added **17 synthetic pytest cases** for hostile proxy/CA settings, TLS rejection, redirect refusal, private/custom endpoints, read-only source and credential-sanitized errors. Tests are **committed but not executed in the full repository environment**; do not claim **478/478 passed**. Historical verified 451/451 is from Phase 34, and Phase 35 focused-test claims remain separate.
+5. Published [direct TLS isolation and limitations](OUTBOUND_TLS_ISOLATION.md). Uninterrupted laptop-off alerts still require approved non-sleeping hosting, persistence, real Kite authentication, Telegram handset receipt, five actual sessions and cost verification. **Engineering completion stays 80%; actual cloud deployment remains OFF; live orders remain DISABLED**.
 
 ## Phase 35 — OCI Free-only resource plan gate and real-host dependency (80% retained)
 
