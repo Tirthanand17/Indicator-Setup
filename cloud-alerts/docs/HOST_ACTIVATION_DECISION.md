@@ -12,6 +12,14 @@
 
 Sources (provider-owned, reviewed 20 October 2026): [Render Free limitations](https://render.com/docs/free), [Oracle Always Free resource definitions](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Google Free Tier usage limits](https://docs.cloud.google.com/free/docs/free-cloud-features).
 
+## Phase 35: OCI free-only safety clarification
+
+Official OCI Always Free documentation (reviewed 2026-10-20) limits an **Always Free-only** tenancy's A1 compute to the equivalent of **2 OCPUs and 12 GB RAM**, and includes **200 GB combined boot/block storage** in the tenancy home region. This differs from broad monthly Ampere A1 price-list allowances. Account-specific capacity, current allocation, IP/network/DNS charges and eligible labels still require a real operator console check. Do **not** infer that the account has free space or that creating a new instance would cost ₹0.
+
+**Continuity warning:** Oracle reserves the right to reclaim idle Always Free instances if CPU, network and (on A1) memory utilization are below documented thresholds during a seven-day period. The bot's lightweight activity may qualify. OCI is a **candidate for a monitored zero-spend trial**, not an unconditional 24/7 reliability guarantee. Avoid artificial usage to defeat reclaim policy. Details: [official Always Free limits and reclaim policy](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm).
+
+An offline, deliberately non-provisioning [OCI plan gate](OCI_ALWAYS_FREE_OPERATOR_GATE.md) has been added. It can reject unsafe declared configurations but **cannot independently verify billing, tenancy eligibility, capacity or uptime**. Do not deploy before separate explicit host and all-in ₹0 approval.
+
 ## Approval-ready checklist (must all be verified by an operator before activation)
 
 - Confirm a connected cloud tenancy and its account status, **home region**, exact VM shape, capacity and current free quotas. Record provider pricing for boot/block disk, backup, public IP, outgoing data, DNS, and certificates; choose no billable extras.
