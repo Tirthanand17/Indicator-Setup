@@ -42,6 +42,10 @@ class KiteReadOnly:
         self._sdk=KiteConnect(api_key=api_key,timeout=8,proxies={},disable_ssl=False,debug=False)
         _enforce_direct_kite_tls(self._sdk)
         self._sdk.set_access_token(access_token)
+    def close(self)->None:
+        """Release SDK HTTP connections; no broker/API network request."""
+        self._sdk.reqsession.close()
+
     def instruments_nfo(self)->list[dict]:return self._sdk.instruments('NFO')
     def historical(self,token:int,interval:str,start:datetime,end:datetime)->list[Candle]:
         if interval not in ('5minute','15minute'):raise ValueError('unsupported interval')
