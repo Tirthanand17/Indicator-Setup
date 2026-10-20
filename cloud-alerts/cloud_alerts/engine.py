@@ -213,7 +213,14 @@ class Engine:
         # client exclusively for the NFO instrument and option quote reads.
         def fetch_history(interval:str):
             isolated=KiteReadOnly(self.api_key,token)
-            return isolated.historical(fut.token,interval,candle_from,now)
+            try:
+                return isolated.historical(fut.token,interval,candle_from,now)
+            finally:
+                # Close each transient SDK connection even after broker faults.
+                # Fake/test adapters may not expose close(), unlike the real one.
+                close=getattr(isolated,'close',None)
+                if callable(close):
+                    close()
         series5,series15=await asyncio.gather(
             asyncio.to_thread(fetch_history,'5minute'),
             asyncio.to_thread(fetch_history,'15minute'))
