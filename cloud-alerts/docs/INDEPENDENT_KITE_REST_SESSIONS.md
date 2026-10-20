@@ -32,7 +32,7 @@ series5, series15 = await asyncio.gather(
     asyncio.to_thread(fetch_history, '15minute'))
 ```
 
-The original session remains exclusively for the day's NFO instrument read and a subsequent eligible option depth read. Each short-lived historical SDK now closes its HTTP session in a \`finally\` block after success or broker failure; the instrument/quote client lifetime is unchanged. All SDK sessions use Phase 37's official HTTPS, non-proxy, redirect-blocked, debug-off adapter. Broker GET results are still authoritative. Missing/malformed historical data or any provider error must fail closed to `WAIT_DATA`; no order methods are enabled.
+The original session remains exclusively for the day's NFO instrument read and a subsequent eligible option depth read. Each short-lived historical SDK now closes its HTTP session in a `finally` block after success or broker failure; the instrument/quote client lifetime is unchanged. All SDK sessions use Phase 37's official HTTPS, non-proxy, redirect-blocked, debug-off adapter. Broker GET results are still authoritative. Missing/malformed historical data or any provider error must fail closed to `WAIT_DATA`; no order methods are enabled.
 
 **Performance tradeoff:** This creates two extra small SDK/session objects per REST monitoring poll. Two history reads still execute concurrently, rather than serializing 5m/15m and delaying the phone alert. This does not guarantee API latency, direct Internet availability, TLS chain trust, or an actual Kite response.
 
