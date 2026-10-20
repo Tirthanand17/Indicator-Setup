@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-19. **Approximate engineering readiness: 75%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20. **Approximate engineering readiness: 76%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [██████████████████░░░░░░] 75%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 25%
+Overall engineering progress   [███████████████████░░░░░] 76%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 24%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -18,14 +18,22 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
 | P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 42% | TLS ingress blueprint and tested private WAL-consistent recovery snapshots; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 52% | TLS ingress, private WAL recovery and bounded background-worker crash supervision; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **74.5%, rounded to 75%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **75.5%, rounded to 76%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 27 — bounded crash supervision and safe green-state reset (76%)
+
+1. Reproduced GitHub commit `57e207d` and **352/352** baseline tests. Fixed an unattended-worker failure mode: the market-monitoring coroutine could crash while Uvicorn stayed alive, and Docker does not restart containers merely because the health check says unhealthy.
+2. Introduced a single-background-worker supervisor: bounded, increasing restart backoffs; no simultaneous duplicate workers; clean cancellation; repeated early failures transition to FATAL and trigger a generic SIGTERM-driven container restart via the existing `restart: unless-stopped` policy.
+3. `/healthz`, `/readyz` and `/operationalz` refuse to report monitoring as healthy while the supervisor is in backoff. A failure clears the previous worker's REST freshness evidence and marks `WORKER_RECOVERING`, ensuring a fresh market evaluation is needed before operational readiness can become green again.
+4. Added seven synthetic tests to demonstrate bounded restarts, cancellation, sanitized errors, HTTP response safety and real simulated worker recovery. **359/359 offline tests pass** with no broker or Telegram network requests. This is NOT a production VM/phone test.
+5. P5 preparatory readiness **42% → 52%**, ten-phase mean **74.5% → 75.5%, displayed as 76%**. P5 real activation, TLS relay to real cloud and P9 full-market sessions remain **unverified or zero**. See [background-worker supervision design](BACKGROUND_WORKER_SUPERVISION.md).
 
 ## Phase 26 — premium BID watcher response clock and cutoff (75%)
 

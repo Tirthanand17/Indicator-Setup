@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-import asyncio,os,json,logging
+import asyncio,os,json,logging,signal
 from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse
 from .engine import Engine
@@ -19,6 +19,7 @@ from .stream_supervisor import ShadowSupervisor
 from .runtime_guard import single_worker
 from .operational import assess_operational
 from .config_guard import configuration_blockers
+from .worker_supervisor import WorkerSupervisor
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -57,6 +58,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
                   enabled=cfg.enabled,shadow=shadow,
                   paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False))
 
+    supervisor=WorkerSupervisor()
+
     @asynccontextmanager
     async def lifespan(app:FastAPI):
         # A second Uvicorn worker using the same durable volume must fail.
@@ -65,8 +68,34 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             # Reconcile persisted paper state before any retry or market poll.
             # A malformed/unlinked candidate blocks startup until inspected.
             app.state.startup_recovery=state.reconcile_startup(datetime.now(IST))
-            task=asyncio.create_task(engine.run_forever(),name='kite-paper-alerts')
+            # Keep the FastAPI/HTTP process from silently looking healthy
+            # when its underlying background task crashed. A bounded series
+            # of early crashes triggers a controlled process shutdown; Docker
+            # may then restart the container under its configured policy.
+            def invalidate_previous_decision():
+                engine.last_data_at=None
+                engine.set_status('WORKER_RECOVERING','Background monitoring worker restarting')
+
+            task=asyncio.create_task(supervisor.run(
+                engine.run_forever,on_failure=invalidate_previous_decision),
+                name='kite-paper-alert-supervisor')
             app.state.worker_task=task
+
+            def on_supervisor_done(done:asyncio.Task):
+                if done.cancelled():
+                    return
+                try:
+                    done.result()
+                except Exception:
+                    logger=logging.getLogger('cloud_alerts')
+                    logger.critical('Read-only worker failed repeatedly; terminating unhealthy service')
+                    # Not called for regular lifespan cancellation. A process
+                    # exit is required: an unhealthy Docker HEALTHCHECK alone
+                    # does not activate `restart: unless-stopped`.
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+            task.add_done_callback(on_supervisor_done)
+            await asyncio.sleep(0)  # schedule worker before serving health
             try:yield
             finally:
                 task.cancel()
@@ -78,14 +107,16 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
 
     app=FastAPI(title='NIFTY read-only paper alerts',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
     app.state.engine=engine
+    app.state.worker_supervisor=supervisor
     app.state.worker_task=None
     app.state.startup_recovery=None
     @app.get('/healthz')
     async def healthz():
         data=engine.health()
         task=app.state.worker_task
-        alive=task is not None and not task.done()
+        alive=task is not None and not task.done() and supervisor.running
         data['worker_running']=alive
+        data['worker_supervisor']=supervisor.summary()
         # Do not report a green health probe if FastAPI is serving requests
         # but the background market-data task has crashed.
         return JSONResponse(data,status_code=200 if alive else 503,
@@ -95,7 +126,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     async def readyz():
         # Monitoring-only readiness, not the host's liveness probe: missing
         # daily login should NOT cause the cloud provider to restart workers.
-        ready=bool(engine.enabled and vault.get(datetime.now(IST)))
+        task=app.state.worker_task
+        ready=bool(engine.enabled and vault.get(datetime.now(IST)) and
+                   task is not None and not task.done() and supervisor.running)
         return JSONResponse({'ready':ready,'mode':'READ_ONLY_PAPER'},
                             status_code=200 if ready else 503,headers={'Cache-Control':'no-store'})
 
@@ -108,7 +141,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
         now = datetime.now(IST)
         report = assess_operational(
             now,
-            worker_running=bool(task is not None and not task.done()),
+            worker_running=bool(task is not None and not task.done() and supervisor.running),
             enabled=engine.enabled,
             token_present=bool(vault.get(now)),
             last_data_at=engine.last_data_at,

@@ -4,13 +4,15 @@
 
 The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) repository also includes a separate, older **screen-reading Chrome extension**. This folder is a **different architecture**: it uses the officially supported paid Kite Connect market-data API, with complete exchange-timestamped candles and actual bid/ask depth.
 
-## Development progress (2026-10-19)
+## Development progress (2026-10-20)
 
-**Overall engineering implementation estimate: 75%** — `[██████████████████░░░░░░]` (**25% remaining**).
+**Overall engineering implementation estimate: 76%** — `[███████████████████░░░░░]` (**24% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 352 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 359 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 27 update:** a supervised market-data coroutine now restarts after an unexpected worker crash or exit, with bounded backoff and a fail-closed health state. Repeated early crashes trigger a generic SIGTERM of the current container process, allowing an existing `restart: unless-stopped` policy to work. The previous REST freshness indicator is invalidated after a crash, preventing a false-green operational report. **359/359 offline tests passed**; this is not proof of live hosting. See [background worker recovery](docs/BACKGROUND_WORKER_SUPERVISION.md).
 
 ## October 19 Phase 12 — offline cloud deployment safety
 
@@ -34,6 +36,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 - [Hosting evaluation and zero-incremental-spend restrictions](docs/HOSTING_EVALUATION.md)
 - [P6 shadow integration test report](docs/VALIDATION_P6_2026-10-19.md)
 - [Phase-by-phase implementation checklist](docs/ROADMAP.md)
+- [Single-worker crash supervision and fail-closed restart readiness](docs/BACKGROUND_WORKER_SUPERVISION.md)
 - [Premium BID watcher response-time and session cutoff safety](docs/PREMIUM_RESPONSE_CLOCK.md)
 - [Live quote-response and Telegram send-time safety](docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md)
 - [Read-only five-minute REST session coverage ledger](docs/REST_SESSION_COVERAGE.md)

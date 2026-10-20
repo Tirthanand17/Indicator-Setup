@@ -252,3 +252,14 @@
 - [x] Six added synthetic regressions; **352/352 local tests pass**. Progress estimate **75%**, not live operational readiness.
 - [ ] Validate actual option BID/ASK and Telegram handset delivery from an approved always-on host with persistent secure storage.
 - [ ] Complete five full actual market-session paper trials and after-cost independent performance evidence.
+
+## Phase 27 — supervised background worker crash recovery (2026-10-20)
+
+- [x] Recover unexpected coroutine failure/clean exit with one worker and bounded, increasing backoff.
+- [x] Make health/readiness/operational routes red during restart backoff; clear stale positive REST evidence after an unexpected worker failure.
+- [x] On repeated early failures, terminate the process cleanly so the existing container restart policy may restart the whole application (unhealthy Docker health checks alone do not restart containers).
+- [x] Test bounded retries, cancellation, sanitized errors and a simulated worker crash/restart end-to-end: **359/359 offline tests pass**.
+- [ ] Verify process restarts on a suitable user-approved always-on VM, TLS token handoff, and phone-delivered Telegram TEST.
+- [ ] Collect five authenticated real paper trading sessions and unbiased option performance evidence; no real orders.
+
+**Overall estimate: 76% implemented, 24% remaining. Cloud alerts are NOT operational.**
