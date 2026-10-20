@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20. **Approximate engineering readiness: 79%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 31). **Approximate engineering readiness: 79%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 79%
@@ -17,15 +17,23 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 90% | Offline signed end-to-end relay, failure exit codes and read-only selective env parser; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
-| P4 | Telegram delivery, dedupe/outbox, health | 95% | Atomic per-notice send-time TTL checks and explicit late/untimed Telegram API acceptance classification; no real phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 72% | Added a tested real-process localhost Uvicorn handoff/restart rehearsal with synthetic credentials, encrypted state and persistent nonce replay guard; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
+| P4 | Telegram delivery, dedupe/outbox, health | 97% | Two-send maximum per pass prevents Telegram outbox backlog from monopolizing REST polling; still no actual phone receipt or live host |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 77% | Real-process localhost token/restart rehearsal and priority-safe single-worker scheduling; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **78.5%, rounded half up to 79%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **79.2%, rounded to 79%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 31 — bounded phone delivery and market-data-first scheduling (79% retained)
+
+1. Verified the 402-test v79 local baseline and existing published GitHub source. Identified that sending ten consecutive Telegram notifications with up to seven seconds of network delay each could monopolize the same worker loop that schedules five-minute market-data collection.
+2. Bounded each `_deliver_outbox` pass to **at most two outbound attempts**, preserving SQLite FIFO, expiry, acceptance-time records and durable retry status. Failed sends stop the batch, and expired events cannot be sent.
+3. Reordered the unattended loop so **a due five-minute REST candle gets first priority** over queued phone messages and the optional premium watcher; these never authorize real orders.
+4. Added twelve offline regression test cases. **414/414 local tests passed**; compilation completed. No real Kite/Telegram API call, private data, cloud service or trading order was involved.
+5. P4 engineering estimate **95 → 97%** and P5 preparatory estimate **72 → 77%**. New ten-phase mean is **79.2%, displayed as 79%**. Keeping the visible score flat is intentional: host deployment and full paper-market trial evidence remain missing. See [bounded outbox scheduling](BOUNDED_TELEGRAM_DISPATCH.md).
 
 ## Phase 30 — private localhost HTTP and process restart rehearsal (79%)
 

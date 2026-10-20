@@ -1,6 +1,6 @@
 # Phase-by-phase delivery board
 
-**Latest local validation (20 Oct 2026):** 402/402 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+**Latest local validation (20 Oct 2026):** 414/414 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
 
 **Approximate milestone-weighted implementation progress: 79%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
 
@@ -289,3 +289,14 @@
 - [x] Run entire offline suite: 396/396 tests passed. Estimated overall implementation **78%, remaining 22%**.
 - [ ] Before actual deployment, re-check NSE circular amendments and obtain a vetted always-on cloud host with ₹0 additional charges.
 - [ ] Validate a real Kite token handoff, cloud-hosted Telegram TEST, restart behavior and five full market sessions; no live orders.
+
+## Phase 31 — bounded dispatch fairness (20 Oct 2026)
+
+- [x] Give scheduled five-minute Kite REST poll priority over Telegram backlog and optional premium polling.
+- [x] Cap one outbox pass at two Telegram HTTP attempts without losing queued SQLite records.
+- [x] Preserve send-time TTL checks, retries and audit metadata; reject unsafe attempt limits.
+- [x] **414/414** local synthetic tests passed, including ten-message backlog and two-send network failure.
+- [ ] Test measured p95 market polling delay and phone receipt in an approved always-on cloud host.
+- [ ] Validate fresh daily token handoff, Kite data, persistent disk restart and five full paper sessions.
+
+**Phase 31 progress:** 79% (unchanged, weighted value 79.2%); verified cloud operation remains 0%. See [bounded dispatch report](BOUNDED_TELEGRAM_DISPATCH.md).

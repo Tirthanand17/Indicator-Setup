@@ -68,7 +68,12 @@ class Engine:
           'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
 
-    async def _deliver_outbox(self, now:datetime|None=None)->None:
+    async def _deliver_outbox(self, now:datetime|None=None, *, max_sends:int=2)->None:
+        # Bound a delivery batch: Telegram requests can each take seven seconds.
+        # A ten-message outbox must not starve the next five-minute REST poll.
+        # No exception or event body is logged, and queued events stay durable.
+        if type(max_sends) is not int or not 1 <= max_sends <= 2:
+            raise ValueError('invalid bounded Telegram delivery batch')
         # run_once() from the real worker can spend up to 24 seconds fetching
         # REST/option data before reaching this function. A captured boundary
         # timestamp cannot authorize a send that is already stale.
@@ -80,7 +85,10 @@ class Engine:
         self.db.expire_events_before(current-timedelta(seconds=180))
         # Outbox is *at least once*, not mathematically exactly once: crash after
         # Telegram accepted but before SQLite commit could duplicate a message.
+        sent_attempts=0
         for event_id,body in self.db.pending_events():
+            if sent_attempts >= max_sends:
+                break
             # Persist the attempt before the external request, so retry counts
             # survive process restarts even if Telegram raises or times out.
             # Recheck each message at actual send time. A batch-wide cutoff
@@ -88,6 +96,7 @@ class Engine:
             attempt_at=current if now is not None else datetime.now(IST)
             if not self.db.claim_fresh_delivery_attempt(event_id,attempt_at):
                 continue
+            sent_attempts += 1
             try:
                 await asyncio.to_thread(self.telegram.send,body)
                 accepted_at=current if now is not None else datetime.now(IST)
@@ -451,28 +460,30 @@ class Engine:
         while True:
             now=datetime.now(IST)
             minute=now.replace(second=0,microsecond=0)
-            # Retry queued Telegram messages even when broker data is unavailable,
-            # and expire those no longer timely. Limit retry to once a minute.
+            # Market-candle collection gets FIRST priority. Backlogged phone
+            # delivery or slow premium HTTP must not consume a fresh boundary.
+            if scheduler.claim(now):
+                await self.run_once()
+            # Retry pending alerts every minute and expire stale ones. At most
+            # two Telegram attempts per delivery pass so the worker remains
+            # responsive to upcoming market-data boundaries.
             if minute!=last_outbox_minute:
                 last_outbox_minute=minute
                 if self.shadow is not None:
                     try:
-                        await self.shadow.stop_after_session(now)
+                        await self.shadow.stop_after_session(datetime.now(IST))
                     except Exception:
                         logger.warning('Shadow socket after-hours cleanup failed')
                 if self.enabled:
                     await self._deliver_outbox()
                 else:
-                    self.db.expire_events_before(now-timedelta(seconds=180))
-            # Lightweight read-only BID polls, at most one per 20-second slot.
-            # Run in the same single worker to avoid concurrency with candle exits.
+                    self.db.expire_events_before(datetime.now(IST)-timedelta(seconds=180))
+            # Optional paper-BID monitoring is lower priority than the
+            # authoritative five-minute candle and the durable Telegram queue.
             if self.paper_premium_tracking and self.enabled:
-                slot=(now.date().isoformat(),now.hour,now.minute,now.second//20)
+                observed=datetime.now(IST)
+                slot=(observed.date().isoformat(),observed.hour,observed.minute,observed.second//20)
                 if slot!=last_premium_poll_slot:
                     last_premium_poll_slot=slot
-                    # Never pass the scheduler's captured timestamp into a
-                    # live quote watcher; time can advance during broker I/O.
                     await self.poll_virtual_premium()
-            if scheduler.claim(now):
-                await self.run_once()
             await asyncio.sleep(2)

@@ -10,7 +10,9 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 402 local Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 414 local Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 31 update (20 October 2026):** The market-data worker now prioritizes completed five-minute REST polling over backlogged Telegram retries and optional option-premium checks. An outbox delivery pass makes at most two Telegram network attempts, preserves queued messages and enforces the existing 180-second expiry. This reduces the risk of phone HTTP delays starving fresh market-data checks. **414/414 offline tests passed.** The weighted estimate remains **79%** because cloud operation is still unverified. See [bounded dispatch report](docs/BOUNDED_TELEGRAM_DISPATCH.md).
 
 **Phase 30 update (20 October 2026):** Completed an actual two-process **localhost HTTP** rehearsal with synthetic keys only: signed token ingestion, persistent replay rejection, encrypted-token recovery across server restart, and private file permissions. The existing HTTPS sender continues refusing plaintext HTTP. **402/402 tests pass.** No cloud host, Docker build, live Kite credentials, or Telegram network call was involved. Run `python -m cloud_alerts.loopback_smoke --json`; see [scope and results](docs/LOOPBACK_LIFECYCLE_REHEARSAL.md).
 
@@ -33,6 +35,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 
 ## Start here
 
+- [Bounded Telegram dispatch and market-data scheduling priority](docs/BOUNDED_TELEGRAM_DISPATCH.md)
 - [Actual localhost HTTP process/restart rehearsal, synthetic keys only](docs/LOOPBACK_LIFECYCLE_REHEARSAL.md)
 
 - [Official NSE F&O holiday guardrails and offline status checker](docs/NSE_FO_HOLIDAY_CALENDAR.md)
