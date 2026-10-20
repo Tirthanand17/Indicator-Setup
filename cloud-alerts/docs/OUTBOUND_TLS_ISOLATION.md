@@ -25,6 +25,6 @@ These controls do not protect a compromised operating system, a hostile DNS envi
 
 - Phase 34's **451/451** is historically documented, not freshly reproduced during this phase.
 - Phase 35 added 10 synthetic tests but the full baseline was not re-run.
-- Phase 36 adds **17 pytest cases** by static collection count (11 parametrized URL rejections + 6 other direct outbound tests) and updates existing test mocks.
-- **Full combined suite has not been executed**: do not present 478/478 as passing. No GitHub Actions credits or unrelated host resources were consumed. Review and execute pytest from a permitted local or approved cloud development environment before enabling alerts.
+- Phase 36 adds **18 pytest cases** by static collection count (11 parametrized URL rejections + 7 other direct outbound tests) and updates existing test mocks.
+- **Full combined suite has not been executed**: do not present 479/479 as passing. No GitHub Actions credits or unrelated host resources were consumed. Review and execute pytest from a permitted local or approved cloud development environment before enabling alerts.
 - Engineering milestone estimate remains **80%**; cloud host, domain, real TLS handoff, phone receipt, laptop-off continuity and five actual market sessions still unverified.
