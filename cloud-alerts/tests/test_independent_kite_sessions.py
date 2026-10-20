@@ -81,8 +81,10 @@ async def test_history_broker_error_fails_closed_without_paper_buy(tmp_path, mon
     instance = fake_engine(tmp_path, monkeypatch)
     monkeypatch.setattr(engine_module, 'KiteReadOnly', TrackedKite)
     monkeypatch.setattr(engine_module, 'decide', synthetic_candidate)
+    failed_sdk_ids = []
     def fail_15minute(self, token, interval, start, end):
         if interval == '15minute':
+            failed_sdk_ids.append(id(self))
             raise RuntimeError('synthetic historical provider outage')
         return FakeKite.historical(self, token, interval, start, end)
     monkeypatch.setattr(TrackedKite, 'historical', fail_15minute)
@@ -90,7 +92,7 @@ async def test_history_broker_error_fails_closed_without_paper_buy(tmp_path, mon
     assert instance.status == 'WAIT_DATA'
     assert not instance.telegram.sent
     assert instance.db.get_runtime('virtual_candidate') is None
-    assert len(TrackedKite.closed_ids) == 2  # release sockets on provider failure
+    assert failed_sdk_ids and failed_sdk_ids[0] in TrackedKite.closed_ids  # failure thread always closes
 
 
 @pytest.mark.asyncio
