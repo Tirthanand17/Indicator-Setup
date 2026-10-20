@@ -211,3 +211,10 @@ The outbox now keeps restart-safe attempted-send counts and timestamps, and a fi
 - Added the offline-only `python -m cloud_alerts.snapshot --snapshot --db ... --output ...` tool and read-only `--verify`. It creates an atomic SQLite backup including uncheckpointed WAL commits, and refuses unsafe permissions or overwriting an existing backup.
 - A snapshot contains sensitive paper-review message text and **is not encrypted by the tool**. Use it only on approved, private, encrypted-at-rest infrastructure. The separate Kite access token vault is not backed up.
 - **309/309 local offline tests passed.** No cloud host activated, no live phone receipts or broker orders. See [state snapshot and recovery runbook](docs/STATE_SNAPSHOT_RECOVERY.md).
+
+
+## Phase 33 update: token-missing warning and HTTPS acceptance (offline)
+
+- When enabled on a regular NSE F&O market session and a daily Kite token is missing, the worker now queues **one** non-trading `SESSION_WAIT_TOKEN` Telegram warning per day, with short expiry and durable restart-safe deduplication. Telegram failure cannot hide the `WAIT_TOKEN` reason; a queued/accepted warning is not evidence of live signals.
+- New `python -m cloud_alerts.https_acceptance --endpoint https://APPROVED_HOST/internal/token --confirm-network-checks --json` checks a previously approved public HTTPS ingress without credentials. **Do not run before host approval**; TLS/certificate and route tests cannot prove cloud uptime or phone delivery.
+- **443/443 offline tests passed; cloud alerts remain NOT LIVE.** See [Phase 33 safety documentation](docs/SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md) and [overall progress](docs/PROGRESS.md).

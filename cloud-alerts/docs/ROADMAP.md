@@ -312,3 +312,8 @@
 - [ ] Validate fresh daily token handoff, Kite data, persistent disk restart and five full paper sessions.
 
 **Phase 31 progress:** 79% (unchanged, weighted value 79.2%); verified cloud operation remains 0%. See [bounded dispatch report](BOUNDED_TELEGRAM_DISPATCH.md).
+
+
+### Phase 33 (2026-10-20) — operational token warning and HTTPS activation probe
+
+Completed offline: one-per-market-day missing-token warning, strict TLS ingress probe (operator opt-in, no real credentials), durable dedupe and replay tests. **443/443 local tests passed.** Engineering estimate remains **80%**. Still blocked: approved cloud tenancy/VM, host DNS/TLS, real cloud token and Telegram phone receipt, five live paper sessions. See [Phase 33](SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md).

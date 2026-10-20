@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 32). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 33). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
@@ -17,14 +17,23 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
 | P2 | Daily token relay, HMAC and encrypted vault | 95% | Signed relay-timestamp ordering prevents token rollback and 06:00 expiry confusion across restart; **no real cloud TLS handoff** |
 | P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
-| P4 | Telegram delivery, dedupe/outbox, health | 97% | Two-send maximum per pass prevents Telegram outbox backlog from monopolizing REST polling; still no actual phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 77% | Real-process localhost token/restart rehearsal and priority-safe single-worker scheduling; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
+| P4 | Telegram delivery, dedupe/outbox, health | 98% | Per-session missing-token operational warning added with durable dedupe and retry/TTL; still no actual phone receipt or live host |
+| P5 | Approved always-on hosting, persistence and laptop-off test | 79% | Strict opt-in HTTPS public-ingress acceptance probe added; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
 | P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **79.7%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+
+
+## Phase 33 — missing-token phone warning and HTTPS ingress acceptance tool (80% retained)
+
+1. Verified published Phase 32 GitHub head `6af77a9` and reran the **421-test baseline**. Found missing daily Kite tokens left the worker in `WAIT_TOKEN` without a dedicated phone warning, so users could mistake an alert-free day for a quiet market.
+2. Added a single, explicitly non-trading `SESSION_WAIT_TOKEN:YYYY-MM-DD` alert on open NSE F&O monitoring days. The same SQLite outbox prevents duplicate warning sends across retries and restarts; 180-second expiry and telemetry remain unchanged. Holidays/weekends/disabled workers/premarket do not notify. Failed Telegram sends cannot mask the primary `WAIT_TOKEN` status.
+3. Added an **explicitly opt-in** HTTPS public ingress acceptance probe, with certificate validation, no redirects/proxy environment, private-endpoint blocking checks and one unsigned `{}` request to confirm HMAC rejection. It uses **zero credentials**; the operator must provide an already-approved HTTPS domain. No real network probes were performed in development.
+4. Twenty-two additional offline regression cases: **443/443 tests passed**, module compilation passed. No real tokens, Kite calls, Telegram phone messages, broker orders, protected folder access, hosting account, or charges involved.
+5. P4 **97 → 98%**, P5 preparatory scaffolding **77 → 79%**; ten-phase mean **79.7% → 80.0%**, reported **80%** unchanged. Live deployment and multi-session real paper results are still unverified. See [daily token warning + HTTPS acceptance](SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md).
 
 
 ## Phase 32 — signed-token ordering and host approval gate (80% engineering estimate)

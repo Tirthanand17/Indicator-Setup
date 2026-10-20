@@ -158,6 +158,22 @@ class Engine:
             if not token:
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
                 outcome='WAIT_TOKEN'
+                # One operational warning per open market day. It is NOT a
+                # trade signal and cannot contain an access token or chat ID.
+                # The normal short-lived outbox handles retries and expiry;
+                # reboots cannot create duplicate same-day warnings.
+                await self._send_event(
+                    'SESSION_WAIT_TOKEN:' + now.date().isoformat(),
+                    'SESSION_WAIT_TOKEN', now,
+                    'NIFTY ALERT MONITOR — ACTION REQUIRED (NOT A TRADE SIGNAL)\n'
+                    'Today’s Kite access token has not reached the cloud worker. '
+                    'CE/PE paper alerts are PAUSED until you log in to Zerodha '
+                    'and complete the signed daily token handoff.\n'
+                    'No orders were placed. Do not assume the bot is monitoring.')
+                # Do not let a Telegram transport error mask the primary reason
+                # why market-data monitoring cannot proceed. The outbox still
+                # records any failed send attempt and its retry state.
+                self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
                 return
             # Market-data getters are blocking HTTP; offload from FastAPI loop.
             try:

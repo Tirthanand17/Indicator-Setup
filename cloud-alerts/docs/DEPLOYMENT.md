@@ -132,3 +132,8 @@ Use **`/operationalz`** as a nonsecret operator diagnostic only, never as the Do
 The token sender now has reliable process exit status. For `--check-only`, missing keys exit nonzero and no network is accessed. For `--push`, cloud rejection/timeout or config mismatch exits **2**, so PowerShell or Task Scheduler must test `$LASTEXITCODE` and **must not** announce a successful handoff or turn off the laptop on failure. The `--watch` mode retries the *same* token after a transient unsuccessful push. It parses only two Kite fields and never reads the API secret.
 
 See [daily handoff end-to-end validation](DAILY_TOKEN_HANDOFF_VALIDATION.md). Offline tests do not establish that real daily token will work at broker or that server is always on.
+
+
+## Additional deployment gate — Phase 33 (offline-tested only)
+
+After your cloud host, pricing, DNS and TLS have been **explicitly approved**, run `python -m cloud_alerts.https_acceptance --endpoint https://YOUR_APPROVED_FQDN/internal/token --confirm-network-checks --json` from an authorized terminal. This verifies a restricted HTTPS surface without any real credentials. A PASS does **not** prove host uptime, storage persistence, signed token handoff, Telegram phone receipt or zero billing. When monitoring is enabled but today's Kite token is absent, a once-per-market-day **NOT A TRADE SIGNAL** warning can be queued to Telegram; this requires a working configured bot. See [Phase 33 acceptance requirements](SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md).
