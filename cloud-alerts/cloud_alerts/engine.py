@@ -19,6 +19,7 @@ from .telegram import Telegram,format_review
 from .quote_evidence import make_snapshot
 from .scheduler import CandlePollScheduler
 from .session_coverage import boundary_for
+from .trading_calendar import session_status, regular_session, CalendarUnavailable
 from .stream_supervisor import ShadowSupervisor
 from .premium import (PremiumHypothesis,reference_from_quote,parse_reference,
                       reference_contract,evaluate_bid,exit_text)
@@ -133,7 +134,13 @@ class Engine:
             self.set_status('DISABLED');return
         # Last scheduled boundary is 15:25:08-58 IST, not exactly 15:25:00.
         # At 15:26 the worker stops, avoiding late new paper-review alerts.
-        if now.weekday()>=5 or now.time()<time(9,25) or now.time()>=time(15,26):
+        try:
+            market_state = session_status(now.date())
+        except CalendarUnavailable:
+            self.set_status('WAIT_CALENDAR','NSE F&O annual holiday calendar is not installed');return
+        if market_state != 'REGULAR':
+            self.set_status('EXCHANGE_CLOSED' if market_state == 'HOLIDAY' else 'MARKET_CLOSED');return
+        if now.time()<time(9,25) or now.time()>=time(15,26):
             self.set_status('MARKET_CLOSED');return
         self._rest_verified_at=None
         outcome='WAIT_DATA'
@@ -311,7 +318,6 @@ class Engine:
 
     async def _poll_virtual_premium_at(self,now:datetime,*,live:bool)->None:
         if not self.paper_premium_tracking or not self.enabled:return
-        if now.weekday()>=5 or now.time()<time(9,30) or now.time()>=time(15,26):return
         raw=self.db.get_runtime('virtual_candidate')
         if not raw:
             self.premium_status='IDLE';return
@@ -325,6 +331,14 @@ class Engine:
             self.db.set_runtime('virtual_candidate','')
             self.premium_status='EXPIRED_CANDIDATE_CLEARED'
             return
+        # Clear yesterday's stale paper reference even on an exchange holiday.
+        # Never query a broker or create virtual EXIT on a closed/unknown day.
+        try:
+            if not regular_session(now.date()):
+                self.premium_status='EXCHANGE_CLOSED';return
+        except CalendarUnavailable:
+            self.premium_status='WAIT_CALENDAR';return
+        if now.time()<time(9,30) or now.time()>=time(15,26):return
         entry_gate=self._entry_notice_gate(position)
         if entry_gate=='PENDING':
             self.premium_status='ENTRY_NOTICE_QUEUED'

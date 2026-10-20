@@ -9,6 +9,7 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 IST = ZoneInfo('Asia/Kolkata')
+from .trading_calendar import session_status, CalendarUnavailable
 HEALTHY_DECISIONS = frozenset({'NO_TRADE', 'REVIEW_CE', 'REVIEW_PE'})
 
 
@@ -31,11 +32,19 @@ def assess_operational(now: datetime, *, worker_running: bool, enabled: bool,
     result = {'monitoring_data_ready': False, 'reason': 'UNKNOWN',
               'mode': 'READ_ONLY_PAPER', 'phone_receipt_verified': False,
               'real_orders_enabled': False}
-    if not worker_running:
+    try:
+        calendar_state = session_status(here.date())
+    except CalendarUnavailable:
+        calendar_state = 'UNKNOWN'
+    if calendar_state == 'UNKNOWN':
+        reason = 'CALENDAR_UNAVAILABLE'
+    elif calendar_state == 'HOLIDAY':
+        reason = 'EXCHANGE_HOLIDAY'
+    elif not worker_running:
         reason = 'WORKER_NOT_RUNNING'
     elif not enabled:
         reason = 'ALERTS_DISABLED'
-    elif here.weekday() >= 5 or not time(9, 30) <= here.time() <= time(15, 25):
+    elif calendar_state != 'REGULAR' or not time(9, 30) <= here.time() <= time(15, 25):
         reason = 'OUTSIDE_MONITORING_SESSION'
     elif not token_present:
         reason = 'DAILY_TOKEN_MISSING'

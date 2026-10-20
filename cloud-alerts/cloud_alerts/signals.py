@@ -4,13 +4,20 @@ from datetime import timedelta,datetime,time
 from zoneinfo import ZoneInfo
 from .models import Candle,Indicators,Decision
 from .indicators import compute,ema
+from .trading_calendar import session_status, CalendarUnavailable
 IST=ZoneInfo('Asia/Kolkata')
 
 
 def decide(candles:list[Candle],now:datetime,confirm_15m:list[Candle], *, adx_min:float=25.,atr_buffer:float=.5)->Decision:
     if now.tzinfo is None:return Decision('WAIT_DATA','clock lacks timezone')
     local=now.astimezone(IST)
-    if local.weekday()>=5 or local.time()<time(9,30) or local.time()>time(15,0):
+    try:
+        calendar_state = session_status(local.date())
+    except CalendarUnavailable:
+        return Decision('WAIT_DATA','official NSE F&O holiday calendar unavailable')
+    if calendar_state!='REGULAR':
+        return Decision('NO_TRADE','NSE F&O market closed for normal session')
+    if local.time()<time(9,30) or local.time()>time(15,0):
         return Decision('NO_TRADE','outside configured entry session')
     if len(candles)<75 or len(confirm_15m)<30:
         return Decision('WAIT_DATA','not enough complete candle history')

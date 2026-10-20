@@ -276,3 +276,14 @@
 - [ ] Collect five complete market sessions, option quotes and after-cost evidence.
 
 **Estimated engineering completion: 77%, 23% remaining. Real cloud alerts: NOT DEPLOYED.**
+
+
+## Phase 29 — NSE F&O regular-session calendar (2026-10-20)
+
+- [x] Verify F&O holiday dates from NSE/FAOP/71777 and the January 2026 amendment NSE/FAOP/72262; block 20 October Dussehra and 15 January ad hoc closure.
+- [x] Gate the 5-minute scheduler, REST worker, premium BID watcher, streaming closeout and direct indicators before broker/Telegram work.
+- [x] Refuse market-session coverage on holidays rather than fabricate 73 failed polling boundaries; preserve open-day 73-boundary audit.
+- [x] Refuse fabricated historical holiday candles and unsupported 2027 dates; add offline `calendar_cli` with explicit pinned-snapshot status.
+- [x] Run entire offline suite: 396/396 tests passed. Estimated overall implementation **78%, remaining 22%**.
+- [ ] Before actual deployment, re-check NSE circular amendments and obtain a vetted always-on cloud host with ₹0 additional charges.
+- [ ] Validate a real Kite token handoff, cloud-hosted Telegram TEST, restart behavior and five full market sessions; no live orders.

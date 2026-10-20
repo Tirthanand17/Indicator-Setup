@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 IST = ZoneInfo('Asia/Kolkata')
+from .trading_calendar import regular_session, CalendarUnavailable
 
 class CandlePollScheduler:
     """Maximum three poll attempts for a given 5m boundary.
@@ -25,7 +26,11 @@ class CandlePollScheduler:
         if now.tzinfo is None:
             return False
         local = now.astimezone(IST)
-        if (local.weekday() >= 5 or not time(9,25) <= local.time() < time(15,26)
+        try:
+            market_open = regular_session(local.date())
+        except CalendarUnavailable:
+            return False  # Fail closed until the next official calendar is installed.
+        if (not market_open or not time(9,25) <= local.time() < time(15,26)
                 or local.minute % 5 != 0):
             return False
         boundary = local.replace(second=0,microsecond=0)

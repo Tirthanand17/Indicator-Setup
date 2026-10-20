@@ -198,7 +198,12 @@ class ShadowSupervisor:
         if now.tzinfo is None:
             raise ValueError('session clock must carry a timezone')
         local = now.astimezone(ZoneInfo('Asia/Kolkata'))
-        should_stop = (local.weekday() >= 5 or local.time() < time(9, 0)
+        from .trading_calendar import regular_session, CalendarUnavailable
+        try:
+            normal_day = regular_session(local.date())
+        except CalendarUnavailable:
+            normal_day = False
+        should_stop = (not normal_day or local.time() < time(9, 0)
                        or local.time() >= time(15, 31))
         if should_stop and self._socket is not None:
             await self.shutdown()

@@ -60,7 +60,7 @@ def test_entire_session_audit_and_missing_day_not_misrepresented(tmp_path):
     s=State(str(tmp_path/'state.sqlite3'))
     for t in expected_boundaries(DAY):
         s.record_rest_attempt(t.astimezone(IST)+timedelta(seconds=8),'REST_VALID')
-    days=[DAY,date(2026,10,20)]
+    days=[DAY,date(2026,10,21)]
     summary=coverage_report(s.read_rest_coverage(),days)
     assert summary['valid_rest_boundaries']==73
     assert summary['never_observed_boundaries']==73

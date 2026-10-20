@@ -10,6 +10,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 IST = ZoneInfo('Asia/Kolkata')
+from .trading_calendar import regular_session, session_status, CalendarUnavailable, CALENDAR_VERSION
 FIRST = time(9, 25)
 LAST = time(15, 25)
 OUTCOMES = frozenset({'REST_VALID', 'WAIT_DATA', 'WAIT_TOKEN', 'API_ERROR'})
@@ -21,15 +22,19 @@ def boundary_for(observed_at: datetime) -> datetime | None:
         raise ValueError('poll timestamp must be timezone-aware')
     local = observed_at.astimezone(IST)
     boundary = local.replace(second=0, microsecond=0)
-    if (local.weekday() >= 5 or boundary.time() < FIRST or
+    try:
+        market_open = regular_session(local.date())
+    except CalendarUnavailable:
+        return None
+    if (not market_open or boundary.time() < FIRST or
             boundary.time() > LAST or local.minute % 5):
         return None
     return boundary
 
 
 def expected_boundaries(session_day: date) -> tuple[datetime, ...]:
-    if not isinstance(session_day, date) or isinstance(session_day, datetime) or session_day.weekday() >= 5:
-        raise ValueError('explicit weekday session date required')
+    if type(session_day) is not date or session_status(session_day) != 'REGULAR':
+        raise ValueError('explicit regular NSE F&O session required, not holiday/weekend')
     first = datetime.combine(session_day, FIRST, tzinfo=IST)
     last = datetime.combine(session_day, LAST, tzinfo=IST)
     result = []
@@ -94,6 +99,8 @@ def coverage_report(records: list[tuple[str, int, str]], session_dates: list[dat
             'never_observed_boundaries': sum(d['not_observed'] for d in daily),
             'rest_coverage_pct': round(100 * ok / expect, 2),
             'all_selected_sessions_complete': all(d['complete_rest_coverage'] for d in daily),
+            'official_fo_calendar_version': CALENDAR_VERSION,
+            'calendar_live_reverified': False,
             'exchange_holidays_independently_verified': False,
             'kite_source_independently_verified': False,
             'telegram_phone_receipt_verified': False,

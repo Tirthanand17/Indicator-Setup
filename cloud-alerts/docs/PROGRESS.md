@@ -1,10 +1,10 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20. **Approximate engineering readiness: 77%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20. **Approximate engineering readiness: 78%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
-Overall engineering progress   [███████████████████░░░░░] 77%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 23%
+Overall engineering progress   [███████████████████░░░░░] 78%
+Remaining estimated scope      [░░░░░░░░░░░░░░░░░██████] 22%
 Live cloud alerts enabled      NO
 Real-money execution enabled   NO (by design)
 ```
@@ -21,10 +21,10 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P5 | Approved always-on hosting, persistence and laptop-off test | 62% | TLS ingress, private WAL recovery, bounded crash supervision and safe in-process SQLite restart reconciliation; **host activation, deployed TLS checks and laptop-off verification remain 0%** |
 | P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
 | P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
-| P8 | Walk-forward option backtests & reliability dashboard | 63% | REST session coverage, option quote coverage and Telegram API acceptance-latency audits persist through restarts; out-of-sample proof absent |
+| P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **76.5%, rounded to 77%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Sum of current percentages / 10 = **77.5%, rounded to 78%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 
 ## Phase 28 — atomic recovery before each in-process worker restart (77%)
@@ -269,3 +269,15 @@ Sum of current percentages / 10 = **76.5%, rounded to 77%**. **Actual readiness 
 3. Startup reconciliation removes current-day paper candidates linked to late, expired or unverified entry notices. A current-day candidate tied to timely accepted or still-queued entry notifications is preserved.
 4. Added 17 offline regressions (including timestamp offsets, 180-second boundary, deliberately slow batch, late or missing API timing, and virtual exit suppression). **339/339 Python tests pass**. No broker API, Telegram network delivery, cloud host or actual trading involved.
 5. P4 **90% → 95%** and P7 **75% → 80%** implementation estimates; ten-phase mean **72% → 73%**. P5 remains prep-only and P9 remains zero live-market sessions. See [dispatch freshness design](DISPATCH_FRESHNESS.md).
+
+
+## Phase 29 — official NSE F&O holiday guards (2026-10-20)
+
+1. Pin the **2026 NSE equity Futures & Options holiday calendar** to official NSE circulars [FAOP/71777](https://nsearchives.nseindia.com/content/circulars/FAOP71777.pdf) and [FAOP/72262](https://nsearchives.nseindia.com/content/circulars/FAOP72262.pdf). The second notice adds 15 January 2026 to the original annual list. **20 October 2026 is an F&O holiday for Dussehra.**
+2. The five-minute REST scheduler, engine, optional 20-second premium watcher, shadow WebSocket closeout, direct indicator decision gate, historical replay, `/operationalz`, and 73-boundary daily audit now refuse regular-session activity on known closed days.
+3. A closed date is **not** counted as 73 missing REST polls or a failed five-minute monitoring session. Offline session-audit CLI refuses holidays; legitimate open date 21 October remains 73 scheduled boundaries. Expired prior-day paper positions can still be cleared on a holiday without broker requests.
+4. Introduced `python -m cloud_alerts.calendar_cli --date 2026-10-20` to print an offline, credential-free, secret-free status with circular IDs. The status is from a **pinned local calendar, NOT live exchange availability**. If the year is unsupported (including 2027), all live regular-session polls **fail closed** pending an operator-reviewed official annual calendar update. Special Muhurat / ad hoc sessions are not assumed to follow normal hours.
+5. **396/396 offline tests passed**, including January amendment, Dussehra, 21 October open-day checks, UTC/IST equivalence, restart cleanup, replay rejection and unknown-year blocking. No broker, Telegram, orders or cloud deployment involved.
+6. P8 research/monitoring audit maturity estimate **63% → 73%**; phase-weighted total **77% → 78%**, **22% remaining**. P5 has **0 actual cloud host activation** and P9 has **0 real paper sessions**.
+
+**Calendar operational limitation:** A static calendar may become stale if NSE announces an emergency closure, newly declared holiday or revised timings. Recheck NSE circulars before actual cloud activation and after updates. A correctly parsed calendar is not proof of market data availability or Telegram phone receipt.

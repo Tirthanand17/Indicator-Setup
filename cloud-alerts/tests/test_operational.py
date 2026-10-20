@@ -65,7 +65,7 @@ def test_api_reports_token_only_readiness_not_operational_or_phone(tmp_path):
     with TestClient(build_app(cfg)) as c:
         response=c.get('/operationalz')
         assert response.status_code==503
-        assert response.json()['reason'] in {'DAILY_TOKEN_MISSING','OUTSIDE_MONITORING_SESSION'}
+        assert response.json()['reason'] in {'DAILY_TOKEN_MISSING','OUTSIDE_MONITORING_SESSION','EXCHANGE_HOLIDAY'}
         assert response.json()['phone_receipt_verified'] is False
         assert c.get('/readyz').status_code==503
         assert 'FAKE_TEST_BOT' not in response.text

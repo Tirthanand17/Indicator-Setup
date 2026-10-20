@@ -6,11 +6,13 @@ The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) 
 
 ## Development progress (2026-10-20)
 
-**Overall engineering implementation estimate: 77%** — `[███████████████████░░░░░]` (**23% remaining**).
+**Overall engineering implementation estimate: 78%** — `[███████████████████░░░░░]` (**22% remaining**).
 
 The architecture and read-only local prototypes exist; **live cloud alerts are NOT deployed or validated**. See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed phase percentages and evidence. The [WebSocket shadow-data design](docs/STREAMING_DESIGN.md) now integrates a disabled-by-default WebSocket **shadow diagnostic supervisor** with the cloud runtime. It compares untrusted stream bars against completed Kite REST candles and **never drives buy/sell alerts**.
 
-**Tests:** 359 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+**Tests:** 396 local synthetic Python tests passed (including signed token handoff, deployment preflight and recovery). Paid Kite REST had a limited real read-only API smoke check earlier on 19 October; **WebSocket and cloud Telegram delivery remain unverified**.
+
+**Phase 29 update (20 October 2026):** Official NSE F&O calendar guards now block normal market polls and historical replay during the Dussehra holiday on 20 October, including the January 15 special closure added by a follow-up NSE circular. The audit no longer falsely treats a weekday market holiday as 73 missed boundaries. Unknown calendar years fail closed; this **pinned local snapshot is not a live NSE feed**. Offline check: `python -m cloud_alerts.calendar_cli --date 2026-10-20`. **396/396 local tests passed.** Cloud alerts remain OFF. See [official holiday guardrails](docs/NSE_FO_HOLIDAY_CALENDAR.md).
 
 **Phase 28 update:** a supervised in-process worker restart now performs atomic SQLite safety reconciliation before polling again. Expired Telegram entries and their virtual paper candidates are cleared, valid current-day candidates are preserved, and corrupted references fail closed. Sanitized recovery counts appear in `/healthz` with no alert text or secrets. **363/363 offline tests passed**. Hosting and phone validation remain pending. See [restart safety](docs/IN_PROCESS_RESTART_RECONCILIATION.md).
 
@@ -29,6 +31,7 @@ The architecture and read-only local prototypes exist; **live cloud alerts are N
 
 ## Start here
 
+- [Official NSE F&O holiday guardrails and offline status checker](docs/NSE_FO_HOLIDAY_CALENDAR.md)
 - [Read-only daily Kite token handoff and offline end-to-end test](docs/DAILY_TOKEN_HANDOFF_VALIDATION.md)
 
 - [Full architecture and dataflow](docs/ARCHITECTURE.md)

@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from .models import Candle
 from .signals import decide
+from .trading_calendar import regular_session, CalendarUnavailable
 
 IST = ZoneInfo('Asia/Kolkata')
 
@@ -69,8 +70,12 @@ def _validate_history(bars: list[Candle], minutes: int) -> None:
         except (ValueError, TypeError, OverflowError) as e:
             raise ReplayError('malformed historical OHLCV') from e
         local = _utc(c.start).astimezone(IST)
-        if local.weekday() >= 5 or local.time() < time(9, 15) or local.time() >= time(15, 30):
-            raise ReplayError('historical candle outside exchange weekday hours')
+        try:
+            allowed = regular_session(local.date())
+        except CalendarUnavailable:
+            raise ReplayError('historical NSE F&O calendar missing for this year') from None
+        if not allowed or local.time() < time(9, 15) or local.time() >= time(15, 30):
+            raise ReplayError('historical candle outside exchange regular NSE F&O hours or holiday')
         if (local.hour * 60 + local.minute - 9 * 60 - 15) % minutes or local.second or local.microsecond:
             raise ReplayError('off-boundary historical candle')
         if prior is not None:
@@ -89,7 +94,7 @@ def replay_history(bars5: list[Candle], bars15: list[Candle], *,
     """Replay completed 5-minute candles using only already completed 15-minute bars.
 
     Hash chains bind every prior replayed candle and its available 15-minute
-    context. resume_after validates the entire prior prefix before emitting
+    context. `resume_after` validates the entire prior prefix before emitting
     later decisions, rather than silently trusting a possibly revised broker
     historical response. Input does not contain option quotes; do not score P&L.
     """
@@ -114,6 +119,8 @@ def replay_history(bars5: list[Candle], bars15: list[Candle], *,
         observed = _utc(bar.start) + timedelta(minutes=5, seconds=12)
         if not (begin <= observed <= end):
             continue
+        # The original historical dataset can include future bars. Never pass
+        # those future bars to decide() or to the replay hash.
         while (c15_index < len(bars15) and
                _utc(bars15[c15_index].start) + timedelta(minutes=15,seconds=8) <= observed):
             c15_index += 1
@@ -126,8 +133,12 @@ def replay_history(bars5: list[Candle], bars15: list[Candle], *,
         reviews += int(event_id is not None)
         source = json.dumps({
             'previous': chain,
+            # Commit to the complete warmup history only at the first record;
+            # subsequent records are bound by the rolling chain.
             'warmup5': [_row(x) for x in bars5[:i]] if first_record else [],
             'candle': _row(bar),
+            # Include all 15m observations newly available by this decision;
+            # final state is bound to the full prefix at each checkpoint.
             'confirm15': [_row(x) for x in available15],
             'decision': [verdict.status, verdict.reason, event_id],
         }, separators=(',', ':'), allow_nan=False)
