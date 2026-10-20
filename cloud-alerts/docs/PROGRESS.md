@@ -1,11 +1,12 @@
 # Overall progress board — NIFTY cloud phone alerts
 
-**As of:** 2026-10-20 (Phase 39). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-20 (Phase 40). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
 
 ```text
 Overall engineering progress   [████████████████████░░░░] 80%
 Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 20%
 Live cloud alerts enabled      NO
+Actual live acceptance        0/5 gates verified
 Real-money execution enabled   NO (by design)
 ```
 
@@ -26,6 +27,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 40 — block code-only percentage inflation; prioritize approved host (80% retained)
+
+1. **Acknowledged stalled 80%**: Phase 35–39 improvements did not prove that the laptop-independent Telegram bot is working. Added a distinct **0/5 actual live acceptance gates** metric for host/TLS, signed token, actual Kite market data, handset delivery with Nirala OFF, and five NSE F&O sessions. Engineering 80% is unchanged rather than artificially increasing the figure.
+2. Verified the connected GitHub repository and a Render connection exposing **one workspace named `Ai finance agents`**. Workspace-specific inspection requires the user's explicit confirmation of that workspace, and no services were inspected or changed. Official Render Free is unsuitable for durable unattended Python state because of 15-minute sleep and ephemeral storage.
+3. Verified alternate architecture constraints: OCI Always Free supports existing Docker/Python under eligible tenancy/capacity (which remain unknown), subject to possible idle reclamation; Cloudflare Workers Free has free cron, D1 and $0 usage within limits but requires a substantial port of the Python worker, with 10ms CPU per invocation. No cloud signup, public endpoint, DNS configuration or charges.
+4. Re-ran two available focused isolated suites in the current runner: **12/12 SDK transport cases** and **10/10 OCI plan cases** passed. These are **22 focused tests**, not the full repository's approximately 500 tests. The container cannot resolve GitHub directly, and no Actions credits or private Nirala laptop access were used.
+5. Published [Phase 40 hosting decision and live acceptance gates](PHASE40_HOST_ACTIVATION_TRUTH.md). **No cloud deployment, real Kite token relay, real phone receipt, off-laptop continuity or five real sessions exists yet.** Next host action requires user approval of a specific existing workspace/service or tenancy; actual broker order execution stays disabled.
 
 ## Phase 39 — pin reviewed Kite SDK and release all REST sessions (80% retained)
 
