@@ -19,6 +19,22 @@ TOKEN='DUMMY_NO_REAL_AUTH_TOKEN_1234567890'
 ENDPOINT='https://approved.example/internal/token'
 
 
+def _intercept_direct_https(monkeypatch, callback):
+    """Replace just the network sender; assert the real method cannot inherit proxies."""
+    class FakeSession:
+        def __init__(self):
+            self.trust_env = True
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def post(self, *args, verify=None, **kwargs):
+            assert self.trust_env is False
+            assert verify is True
+            return callback(*args, **kwargs)
+    monkeypatch.setattr('cloud_alerts.token_sender.requests.Session', FakeSession)
+
+
 def fake_env(path:Path)->bytes:
     data=(f'AEGIS_PRIVATE_PASSWORD=IGNORE_SECRET\nZERODHA_KITE_API_KEY={API}\n'
           f'ZERODHA_KITE_API_SECRET=ALSO_IGNORE\nZERODHA_KITE_ACCESS_TOKEN="{TOKEN}"\n')
@@ -60,7 +76,7 @@ def test_sender_to_real_asgi_handler_and_encrypted_vault(tmp_path,monkeypatch):
             r=client.post('/internal/token',content=data,headers=headers)
             captured.append((data,headers,r.status_code))
             return SimpleNamespace(status_code=r.status_code,json=lambda:r.json())
-        monkeypatch.setattr('cloud_alerts.token_sender.requests.post',post)
+        _intercept_direct_https(monkeypatch,post)
         fingerprint=push_once(source,ENDPOINT,HMAC,API)
         assert fingerprint==hashlib.sha256(TOKEN.encode()).hexdigest()[:12]
         assert len(captured)==1 and captured[0][2]==200
@@ -81,7 +97,7 @@ def test_failed_one_shot_push_returns_nonzero_and_hides_token(tmp_path,monkeypat
     monkeypatch.setenv('KITE_ALERT_TOKEN_ENDPOINT',ENDPOINT)
     monkeypatch.setenv('TOKEN_RELAY_HMAC_KEY',HMAC)
     def fail(*a,**kw):raise requests.Timeout('potential response secret')
-    monkeypatch.setattr('cloud_alerts.token_sender.requests.post',fail)
+    _intercept_direct_https(monkeypatch,fail)
     code=run(['--env-file',str(source),'--push'])
     out=capsys.readouterr()
     assert code!=0 and 'NOT CONFIRMED' in out.err
@@ -94,7 +110,7 @@ def test_one_shot_success_reports_only_generic_confirmation(tmp_path,monkeypatch
     source=tmp_path/'protected.env';fake_env(source)
     for key,value in [('KITE_API_KEY',API),('KITE_ALERT_TOKEN_ENDPOINT',ENDPOINT),('TOKEN_RELAY_HMAC_KEY',HMAC)]:
         monkeypatch.setenv(key,value)
-    monkeypatch.setattr('cloud_alerts.token_sender.requests.post',
+    _intercept_direct_https(monkeypatch,
       lambda *a,**k:SimpleNamespace(status_code=200,json=lambda:{'status':'TOKEN_ACCEPTED'}))
     assert run(['--env-file',str(source),'--push'])==0
     out=capsys.readouterr()
@@ -104,7 +120,7 @@ def test_one_shot_success_reports_only_generic_confirmation(tmp_path,monkeypatch
 def test_check_only_fails_nonzero_without_writing_or_network(tmp_path,monkeypatch,capsys):
     p=tmp_path/'protected.env';p.write_text('ZERODHA_KITE_API_KEY=FAKE\n')
     before=p.read_bytes()
-    monkeypatch.setattr('cloud_alerts.token_sender.requests.post',lambda *a,**k:pytest.fail('no network permitted'))
+    monkeypatch.setattr('cloud_alerts.token_sender.requests.Session',lambda:pytest.fail('no network permitted'))
     assert run(['--env-file',str(p),'--check-only'])==2
     assert 'False' in capsys.readouterr().out
     assert p.read_bytes()==before
@@ -119,7 +135,7 @@ def test_watcher_retries_same_token_after_failed_transfer(tmp_path,monkeypatch,c
         attempts.append('try')
         if len(attempts)==1:raise requests.Timeout('private')
         return SimpleNamespace(status_code=200,json=lambda:{'status':'TOKEN_ACCEPTED'})
-    monkeypatch.setattr('cloud_alerts.token_sender.requests.post',post)
+    _intercept_direct_https(monkeypatch,post)
     calls=[]
     def stop_after_recovery(seconds):
         calls.append(seconds)
