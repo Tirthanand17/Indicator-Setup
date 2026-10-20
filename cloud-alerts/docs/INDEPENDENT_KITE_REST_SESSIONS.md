@@ -21,7 +21,12 @@ The two asynchronous worker threads now each instantiate an independent **read-o
 ```python
 def fetch_history(interval: str):
     isolated = KiteReadOnly(self.api_key, token)
-    return isolated.historical(fut.token, interval, candle_from, now)
+    try:
+        return isolated.historical(fut.token, interval, candle_from, now)
+    finally:
+        close = getattr(isolated, 'close', None)
+        if callable(close):
+            close()
 series5, series15 = await asyncio.gather(
     asyncio.to_thread(fetch_history, '5minute'),
     asyncio.to_thread(fetch_history, '15minute'))
