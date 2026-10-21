@@ -88,3 +88,20 @@ def test_cost_policy_does_not_insert_actual_trade_status_or_order_record(tmp_pat
     with sqlite3.connect(worker.path) as db:
         assert not any('order' in row[0].lower() for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+
+def test_analytics_actual_paper_book_history_never_scores_missing_exit(tmp_path):
+    from cloud_alerts.paper_analytics import realized_analytics
+    worker=book(tmp_path)
+    entry=worker.enter('signal-analytics-1',quote(),NOW,account_id='PAPER_50K')
+    end=NOW+timedelta(minutes=25)
+    worker.exit(entry['trade_id'],quote(bid=142,ask=143,at=end),end)
+    other=worker.enter('signal-analytics-2',quote(at=end+timedelta(minutes=1)),
+                       end+timedelta(minutes=1),account_id='PAPER_100K')
+    assert other['status']=='OPEN'
+    worker.finish_session(NOW.replace(hour=15,minute=30))
+    stats=realized_analytics(worker.path,NOW.replace(hour=15,minute=30))
+    a,b=stats['accounts']
+    assert a['closed_trades']==1 and a['wins']==1
+    assert b['closed_trades']==0 and b['unverifiable']==1
+    assert b['win_rate_pct'] is None
+    assert stats['strategy_profitability_validated'] is False
