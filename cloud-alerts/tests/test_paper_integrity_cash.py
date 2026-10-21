@@ -71,3 +71,15 @@ def test_orphan_paper_position_is_rejected(cashdb):
                    ('X:s1','PAPER_MISSING','OPEN',10000,None,None))
     with pytest.raises(RuntimeError,match='entry journal'):
         audit_cash_reconciliation(cashdb)
+
+def test_negative_cash_from_disk_fails_closed(cashdb):
+    with sqlite3.connect(cashdb) as db:
+        db.execute("UPDATE paper_accounts SET cash_paise=-1 WHERE account_id='PAPER_50K'")
+    with pytest.raises(RuntimeError,match='integer paise'):
+        audit_cash_reconciliation(cashdb)
+
+def test_textual_money_from_disk_fails_closed_without_type_coercion(cashdb):
+    with sqlite3.connect(cashdb) as db:
+        db.execute("UPDATE paper_accounts SET cash_paise='corrupt' WHERE account_id='PAPER_100K'")
+    with pytest.raises(RuntimeError,match='integer paise'):
+        audit_cash_reconciliation(cashdb)
