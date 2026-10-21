@@ -3,7 +3,7 @@
 Keeps strategy/quote/portfolio gate outcomes without inventing missed P&L.
 """
 from __future__ import annotations
-from datetime import datetime,timezone
+from datetime import datetime,date,timezone
 from pathlib import Path
 from dataclasses import asdict,is_dataclass
 import json,math,re,sqlite3
@@ -66,18 +66,26 @@ class SignalAudit:
                     raise ValueError('conflicting same-clock strategy evidence')
             return result.rowcount==1
 
-    def recent(self,limit:int=100)->list[dict]:
+    def recent(self,limit:int=100,*,day:date|None=None)->list[dict]:
         if type(limit) is not int or not 1<=limit<=200:
             raise ValueError('invalid audit page limit')
+        if day is not None and type(day) is not date:
+            raise ValueError('invalid audit day')
+        where=' WHERE substr(observed_at_utc,1,10)=?' if day is not None else ''
+        params=(day.isoformat(),limit) if day is not None else (limit,)
         with sqlite3.connect(self.path,timeout=10) as db:
-            rows=db.execute('SELECT future_symbol,candle_start_utc,observed_at_utc,stage,outcome,reason_code,option_symbol,indicators_json FROM paper_signal_evaluations ORDER BY observed_at_utc DESC,stage DESC LIMIT ?',(limit,)).fetchall()
+            rows=db.execute('SELECT future_symbol,candle_start_utc,observed_at_utc,stage,outcome,reason_code,option_symbol,indicators_json FROM paper_signal_evaluations'+where+' ORDER BY observed_at_utc DESC,stage DESC LIMIT ?',params).fetchall()
         return [dict(future_symbol=r[0],candle_start_utc=r[1],observed_at_utc=r[2],
                      stage=r[3],outcome=r[4],reason_code=r[5],option_symbol=r[6],
                      indicators=json.loads(r[7])) for r in rows]
 
-    def summary(self)->dict:
+    def summary(self,*,day:date|None=None)->dict:
+        if day is not None and type(day) is not date:
+            raise ValueError('invalid audit day')
+        where=' WHERE substr(observed_at_utc,1,10)=?' if day is not None else ''
+        params=(day.isoformat(),) if day is not None else ()
         with sqlite3.connect(self.path,timeout=10) as db:
-            rows=db.execute('SELECT stage,outcome,COUNT(*) FROM paper_signal_evaluations GROUP BY stage,outcome').fetchall()
+            rows=db.execute('SELECT stage,outcome,COUNT(*) FROM paper_signal_evaluations'+where+' GROUP BY stage,outcome',params).fetchall()
         counts={f'{stage}:{outcome}':count for stage,outcome,count in rows}
         return {'observations':sum(counts.values()),'counts':counts,
                 'strategy_qualified':sum(n for stage,outcome,n in rows if stage=='STRATEGY' and outcome in ('REVIEW_CE','REVIEW_PE')),
