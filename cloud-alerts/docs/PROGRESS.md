@@ -39,6 +39,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 
+## Phase 43 — actual Nirala checkout and full Windows suite (RED; 53% retained)
+
+1. Connected to **Nirala online** through the linked Desktop Commander Personal account. Cloned real Phase 43 branch into `%TEMP%\indicator-phase43-qa-20261021`, with isolated Python venv. No Desktop or protected Kite trading-folder mutations, no production services.
+2. Ran `python -m compileall -q cloud_alerts tests` — PASS. Windows Python **3.11** (production Docker targets **Linux Python 3.12**). Added conditional `tzdata` to project requirements so Windows can load `Asia/Kolkata`.
+3. **Full GitHub checkout pytest executed: 458 PASSED, 120 FAILED, 4 SKIPPED; red.** Failure signatures are dominated by Linux-only `os.fchmod`, `os.geteuid`, deliberate Linux/POSIX lock requirement, Windows symlink/file-lock constraints and local loopback smoke; do NOT fake POSIX security to force Windows green. No verified all-green Linux suite.
+4. Independently ran the paper research subset against actual source: **68/68 PASSED**, including new journal, fees, quote audit and realized-only analytics. **Two real State/PaperBook recovery integration tests PASSED** (5 in same integration file deselected); these overlap the full-suite pass total and are not additive.
+5. No merge, GitHub CI, paid host, real Kite key, phone send or real order. See [Full Windows QA results, failure classification and next Linux runner command](PHASE43_NIRALA_WINDOWS_QA_20261021.md).
+6. Expanded engineering estimate **53%**, original alert preparation **80%**, paper subsystem historical estimate **43%**; **live acceptance remains 0/5**. Next: authorized isolated Linux Python 3.12 full pytest, patch legitimate failures, merge then cloud acceptance.
+
 ## Phase 43 addition — protect research P&L against corrupt journal (53% retained)
 
 1. Private FastAPI paper summary now removes potentially incorrect cash/P&L/trade counts if exact journal reconciliation fails. The authenticated trade-history and analytics APIs reject invalid balances with 503 instead of publishing results that look trustworthy. The phone-friendly page fetches/reconciles summary before drawing equity charts; on failure it shows a cash-integrity warning and no trade performance.
