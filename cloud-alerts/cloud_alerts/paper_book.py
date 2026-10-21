@@ -303,3 +303,43 @@ class PaperBook:
             row['actual_fill_verified']=False
             result.append(row)
         return result
+
+    def finish_session(self, now: datetime) -> int:
+        """Mark unclosed option positions unverifiable after 15:26 IST.
+
+        No fictional exit price, cash release or win/loss is recorded.
+        Unresolved accounts remain blocked by their risk gate until reconciled.
+        """
+        if now.tzinfo is None or now.utcoffset() is None or now.astimezone(IST).time()<time(15,26):
+            raise ValueError('session not completed')
+        cutoff=now.astimezone(IST).date().isoformat()
+        with self._db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            cur=db.execute("UPDATE paper_positions SET status='EXIT_UNVERIFIABLE', "
+                           "exit_reason='NO_EXECUTABLE_BID_AT_SESSION_END' "
+                           "WHERE status='OPEN' AND substr(entry_at,1,10)<=?",(cutoff,))
+            return cur.rowcount
+
+    def daily_report(self, now: datetime) -> dict:
+        """Read-only actual-observation count; no performance verification claim."""
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError('timezone needed')
+        day=now.astimezone(IST).date().isoformat()
+        with self._db() as db:
+            accounts=[]
+            for a in db.execute('SELECT account_id,initial_paise,cash_paise FROM paper_accounts ORDER BY initial_paise'):
+                name,initial,cash=a
+                closed=db.execute("SELECT COUNT(*),COALESCE(SUM(net_pnl_paise),0),"
+                                  "SUM(CASE WHEN net_pnl_paise>0 THEN 1 ELSE 0 END) "
+                                  "FROM paper_positions WHERE account_id=? AND status='CLOSED' "
+                                  "AND substr(exit_at,1,10)=?",(name,day)).fetchone()
+                unresolved=db.execute("SELECT COUNT(*) FROM paper_positions WHERE account_id=? "
+                                      "AND status!='CLOSED'",(name,)).fetchone()[0]
+                rejected=db.execute('SELECT COUNT(*) FROM paper_rejections WHERE account_id=? AND substr(at,1,10)=?',
+                                    (name,day)).fetchone()[0]
+                accounts.append({'id':name,'initial_rs':rupees(initial),'cash_rs':rupees(cash),
+                                 'closed':closed[0],'wins':closed[2] or 0,
+                                 'net_realized_rs':rupees(closed[1]),'unresolved':unresolved,
+                                 'rejected_signals':rejected})
+            return {'day':day,'accounts':accounts,'mode':'PAPER_ONLY',
+                    'actual_fills_verified':False,'unresolved_not_counted_as_loss_or_win':True}
