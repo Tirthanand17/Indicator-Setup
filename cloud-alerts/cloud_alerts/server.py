@@ -69,8 +69,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     if paper_enabled and (len(paper_key)<32 or len(set(paper_key))<8):
         raise RuntimeError('Paper dashboard requires a separate strong access key')
     paper_book=PaperBook(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
-    if getattr(cfg,'paper_autotrade_enabled',False) and not paper_enabled:
-        raise RuntimeError('Automatic paper trading requires secured dashboard configuration')
+    if getattr(cfg,'paper_autotrade_enabled',False) and (
+            not paper_enabled or not getattr(cfg,'enabled',False)):
+        raise RuntimeError('Automatic paper trading requires enabled monitoring and secured dashboard')
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
                   enabled=cfg.enabled,shadow=shadow,
                   paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False),
