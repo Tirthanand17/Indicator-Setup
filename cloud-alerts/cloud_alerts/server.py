@@ -5,7 +5,7 @@ Host must be always-on and have persistent storage, not a sleeping free web tier
 """
 from __future__ import annotations
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime,date
 from pathlib import Path
 from zoneinfo import ZoneInfo
 import asyncio,os,json,logging,signal,hmac,secrets
@@ -182,9 +182,14 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/opportunities')
     async def paper_opportunities(request:Request):
         _authorize_paper(request)
+        query_day=request.query_params.get('date')
+        try:
+            selected=date.fromisoformat(query_day) if query_day else None
+        except ValueError:
+            raise HTTPException(400,'Invalid calendar date') from None
         return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
-                             'audit':paper_audit.summary(),
-                             'evaluations':paper_audit.recent(100)},
+                             'audit':paper_audit.summary(day=selected),
+                             'evaluations':paper_audit.recent(100,day=selected)},
                             headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/trades')
