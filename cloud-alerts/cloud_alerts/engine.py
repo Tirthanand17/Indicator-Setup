@@ -163,6 +163,28 @@ class Engine:
         self._rest_verified_at=None
         outcome='WAIT_DATA'
         try:
+            # Entirely local accounting reconciliation needs no broker login.
+            # Repair last session's interrupted paper entries even if today's
+            # Kite token is absent; do not backdate simulated quote fills.
+            # Reconcile interrupted 50k/100k paper basket entries BEFORE
+            # any next opportunity. Delayed missing entries are rejections,
+            # never backdated hypothetical fills or cash movements.
+            if self.paper_integrity_enforced:
+                try:
+                    repaired=recover_missing_outcomes(self.db.path,now)
+                    coverage=audit_entry_coverage(self.db.path)
+                    if not (repaired['new_entries_permitted']
+                            and coverage['new_entries_permitted']):
+                        self.paper_status='WAIT_PAPER_RECONCILIATION'
+                        self.set_status('WAIT_DATA','Paper account recovery grace in progress')
+                        await self._deliver_outbox(now)
+                        return
+                    if repaired['recovered']:
+                        self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
+                except (ValueError,RuntimeError,sqlite3.DatabaseError):
+                    self.paper_status='WAIT_PAPER_RECONCILIATION'
+                    self.set_status('WAIT_DATA','Paper account recovery requires review')
+                    return
             token=self.vault.get(now)
             if not token:
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
@@ -184,25 +206,6 @@ class Engine:
                 # records any failed send attempt and its retry state.
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
                 return
-            # Reconcile interrupted 50k/100k paper basket entries BEFORE
-            # any next opportunity. Delayed missing entries are rejections,
-            # never backdated hypothetical fills or cash movements.
-            if self.paper_integrity_enforced:
-                try:
-                    repaired=recover_missing_outcomes(self.db.path,now)
-                    coverage=audit_entry_coverage(self.db.path)
-                    if not (repaired['new_entries_permitted']
-                            and coverage['new_entries_permitted']):
-                        self.paper_status='WAIT_PAPER_RECONCILIATION'
-                        self.set_status('WAIT_DATA','Paper account recovery grace in progress')
-                        await self._deliver_outbox(now)
-                        return
-                    if repaired['recovered']:
-                        self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
-                except (ValueError,RuntimeError,sqlite3.DatabaseError):
-                    self.paper_status='WAIT_PAPER_RECONCILIATION'
-                    self.set_status('WAIT_DATA','Paper account recovery requires review')
-                    return
             # Market-data getters are blocking HTTP; offload from FastAPI loop.
             try:
                 await asyncio.wait_for(self._collect_once(now,token),timeout=24)
