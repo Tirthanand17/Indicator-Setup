@@ -175,6 +175,8 @@ async function refresh(){
   let warning="";
   if(recovery?.cash_reconciliation?.status==="FAIL_CLOSED")
     warning=" · PAPER CASH INTEGRITY FAILURE — SIMULATED ENTRIES BLOCKED";
+  else if(recovery?.status==="FAIL_CLOSED")
+    warning=" · PAPER REVIEW LEDGER INVALID — SIMULATED ENTRIES BLOCKED";
   else if(recovery?.status==="NOT_ACTIVATED")
     warning=" · PAPER AUTOMATION NOT ACTIVATED";
   else if(recovery && !recovery.new_entries_permitted)
