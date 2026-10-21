@@ -86,3 +86,39 @@ async def test_local_crash_recovery_runs_even_without_today_kite_token(tmp_path,
     assert worker.paper_book.open_positions()==[]
     with sqlite3.connect(worker.db.path) as db:
         assert db.execute("SELECT COUNT(*) FROM paper_rejections WHERE reason='CRASH_GAP_NO_SIMULATED_FILL'").fetchone()[0]==2
+
+def test_after_hours_crash_recovery_uses_no_broker_or_fabricated_fill(tmp_path,monkeypatch):
+    worker=create_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    worker.paper_integrity_enforced=True
+    initialize_activation(worker.db.path,NOW-timedelta(minutes=10))
+    source='SYNTHETIC_REVIEW_NEAR_CLOSE'
+    worker.db.claim_event(source,'REVIEW_CE',NOW-timedelta(minutes=3),'PAPER ONLY')
+    def broker_forbidden(*_args,**_kwargs):
+        raise AssertionError('after-hours recovery must not access a Kite token')
+    monkeypatch.setattr(worker.vault,'get',broker_forbidden)
+    after_close=NOW.replace(hour=16,minute=0)
+    assert worker.reconcile_paper_journal(after_close) is True
+    assert audit_entry_coverage(worker.db.path)['status']=='COMPLETE'
+    assert worker.paper_book.open_positions()==[]
+    assert all(a['available_cash_rs']==a['initial_rs']
+               for a in worker.paper_book.dashboard()['accounts'])
+    with sqlite3.connect(worker.db.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM paper_rejections WHERE reason='CRASH_GAP_NO_SIMULATED_FILL'").fetchone()[0]==2
+
+
+def test_after_hours_grace_blocks_summary_until_reconciled(tmp_path,monkeypatch):
+    worker=create_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    worker.paper_integrity_enforced=True
+    initialize_activation(worker.db.path,NOW-timedelta(minutes=10))
+    near_close=NOW.replace(hour=15,minute=29,second=0)
+    worker.db.claim_event('SIMULATED_LATE_REVIEW','REVIEW_PE',near_close,'PAPER ONLY')
+    assert worker.reconcile_paper_journal(near_close+timedelta(seconds=45)) is False
+    assert worker.paper_status=='WAIT_PAPER_RECONCILIATION'
+    assert audit_entry_coverage(worker.db.path)['missing_account_outcomes']==2
+    # The minute loop requires reconcile_paper_journal() success before
+    # report_paper_session(), so no premature summary may be queued.
+    later=near_close+timedelta(minutes=4)
+    assert worker.reconcile_paper_journal(later) is True
+    assert audit_entry_coverage(worker.db.path)['status']=='COMPLETE'
