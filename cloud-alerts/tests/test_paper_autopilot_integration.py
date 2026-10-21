@@ -211,3 +211,20 @@ def test_private_dashboard_reports_balanced_cash_only_to_authenticated_request(t
             'status':'FAIL_CLOSED','cash_entries_permitted':False}
         assert integrity['new_entries_permitted'] is False
         assert 'token' not in broken.text.lower()
+
+def test_private_integrity_api_fails_closed_on_corrupt_review_clock(tmp_path):
+    import sqlite3
+    from cloud_alerts.paper_integrity import initialize_activation
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        initialize_activation(str(conf.root/'alerts.sqlite3'),NOW)
+        with sqlite3.connect(conf.root/'alerts.sqlite3') as db:
+            db.execute("INSERT INTO events(event_id,status,at,payload) VALUES(?,?,?,?)",
+                       ('CORRUPT_REVIEW','REVIEW_CE','INVALID_TIME','PAPER TEST'))
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        response=client.get('/paper/api/summary',headers=auth)
+        assert response.status_code==200
+        state=response.json()['paper_recovery_integrity']
+        assert state['status']=='FAIL_CLOSED'
+        assert state['new_entries_permitted'] is False
+        assert state['cash_reconciliation']['status']=='BALANCED'
