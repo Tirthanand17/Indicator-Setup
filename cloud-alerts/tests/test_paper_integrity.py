@@ -122,3 +122,20 @@ def test_future_dated_review_fails_closed(ledger):
     event(ledger,offset=1000)
     with pytest.raises(RuntimeError):
         recover_missing_outcomes(ledger,NOW)
+
+def test_local_recovery_after_trading_cutoff(ledger):
+    initialize_activation(ledger,NOW)
+    event(ledger,'CLOSE_TIME_REVIEW',offset=1)
+    result=recover_missing_outcomes(ledger,NOW+timedelta(hours=8))
+    assert result['recovered']==2
+    assert audit_entry_coverage(ledger)['status']=='COMPLETE'
+    with sqlite3.connect(ledger) as db:
+        assert db.execute('SELECT COUNT(*) FROM paper_positions').fetchone()[0]==0
+
+
+def test_local_recovery_over_nontrading_days(ledger):
+    initialize_activation(ledger,NOW)
+    event(ledger,'BEFORE_WEEKEND_REVIEW',offset=1)
+    result=recover_missing_outcomes(ledger,NOW+timedelta(days=3))
+    assert result['recovered']==2
+    assert audit_entry_coverage(ledger)['status']=='COMPLETE'
