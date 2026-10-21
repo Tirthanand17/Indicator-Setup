@@ -127,3 +127,31 @@ async def test_stale_bid_never_books_a_simulated_exit(tmp_path,monkeypatch):
     assert worker.paper_status=='WAIT_FRESH_EXIT_QUOTE'
     assert all(r['status']=='OPEN' for r in worker.paper_book.trade_history())
     assert all(a['equity_rs'] is None for a in worker.paper_book.dashboard()['accounts'])
+
+@pytest.mark.asyncio
+async def test_paper_daily_report_is_durable_and_never_invents_exit(tmp_path,monkeypatch):
+    worker=fake_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    await worker.run_once(NOW)
+    cutoff=NOW.replace(hour=15,minute=30)
+    await worker.report_paper_session(cutoff)
+    rows=worker.paper_book.trade_history()
+    assert len(rows)==2
+    assert all(r['status']=='EXIT_UNVERIFIABLE' for r in rows)
+    assert all(r['net_pnl_rs'] is None for r in rows)
+    assert all(a['equity_rs'] is None for a in worker.paper_book.dashboard()['accounts'])
+    assert worker.db.is_sent('PAPER_DAILY:'+NOW.date().isoformat())
+    await worker.report_paper_session(cutoff)
+    assert worker.db.outbox_summary()['queued']<=2
+
+@pytest.mark.asyncio
+async def test_paper_autopilot_disabled_keeps_original_signal_mode(tmp_path,monkeypatch):
+    worker=fake_engine(tmp_path,monkeypatch)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    assert worker.paper_book is None
+    await worker.run_once(NOW)
+    assert worker.status=='REVIEW_CE'
+    assert worker.db.is_sent('PAPER_DAILY:'+NOW.date().isoformat()) is False
+    await worker.poll_paper_positions(NOW)
+    assert worker.paper_status=='DISABLED'
