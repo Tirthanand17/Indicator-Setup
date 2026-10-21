@@ -1,0 +1,129 @@
+"""Phase 41 integration: paper autopilot remains gated, no live broker calls."""
+from __future__ import annotations
+
+from datetime import timedelta
+from pathlib import Path
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
+import pytest
+from cryptography.fernet import Fernet
+from fastapi.testclient import TestClient
+
+from cloud_alerts.paper_book import PaperBook
+from cloud_alerts.server import build_app
+from cloud_alerts import engine as engine_module
+from cloud_alerts.config_guard import configuration_blockers
+from test_simulated_broker_pipeline import engine as fake_engine, FakeKite, NOW, synthetic_candidate
+
+
+def settings(root, **changes):
+    data=dict(api_key='TESTKEY',bot_token='FAKE_BOT',chat_id='FAKE_CHAT',
+              relay_key='r'*64,vault_key=Fernet.generate_key().decode(),
+              root=root,enabled=False,shadow_enabled=False,
+              paper_premium_tracking=False,paper_autotrade_enabled=False,
+              paper_dashboard_enabled=True,
+              paper_dashboard_key='SecureSyntheticDashboardKey_2!'*2,
+              validate=lambda:None)
+    data.update(changes)
+    return SimpleNamespace(**data)
+
+
+def test_disabled_dashboard_hides_routes(tmp_path):
+    conf=settings(tmp_path,paper_dashboard_enabled=False)
+    with TestClient(build_app(conf)) as client:
+        assert client.get('/paper/dashboard').status_code==404
+        assert client.get('/paper/api/summary').status_code==404
+        assert client.get('/paper/api/trades').status_code==404
+
+
+def test_private_dashboard_has_strong_auth_no_cookies_or_cache(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        assert client.get('/paper/api/summary').status_code==404
+        assert client.get('/paper/api/summary',headers={'X-Paper-Dashboard-Key':'bad'}).status_code==404
+        page=client.get('/paper/dashboard')
+        assert page.status_code==200
+        assert 'script-src' in page.headers['Content-Security-Policy']
+        assert '__NONCE__' not in page.text
+        assert 'localStorage' not in page.text
+        assert page.headers['Cache-Control']=='no-store'
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        response=client.get('/paper/api/summary',headers=auth)
+        assert response.status_code==200
+        assert response.headers['Cache-Control']=='no-store'
+        d=response.json()
+        assert d['actual_orders'] is False
+        assert [a['initial_rs'] for a in d['accounts']]==[50000,100000]
+        assert client.get('/paper/api/trades',headers=auth).json()['trades']==[]
+
+
+def test_autopilot_requires_both_dashboard_and_enabled_market(tmp_path):
+    with pytest.raises(RuntimeError,match='Automatic paper trading'):
+        build_app(settings(tmp_path,paper_autotrade_enabled=True))
+    with pytest.raises(RuntimeError,match='Automatic paper trading'):
+        build_app(settings(tmp_path,paper_autotrade_enabled=True,
+                           paper_dashboard_enabled=False,enabled=True))
+
+
+def test_autopilot_config_rejects_disabled_or_unsecured_dependencies():
+    cfg={'ALERTS_ENABLED':'false','PAPER_AUTOTRADE_ENABLED':'true',
+         'PAPER_DASHBOARD_ENABLED':'false'}
+    assert 'INVALID_PAPER_AUTOTRADE_DEPENDENCIES' in configuration_blockers(cfg)
+    assert 'INVALID_PAPER_DASHBOARD_KEY' in configuration_blockers(
+        {**cfg,'PAPER_DASHBOARD_ENABLED':'true','PAPER_DASHBOARD_KEY':'short'})
+
+
+@pytest.mark.asyncio
+async def test_live_market_decision_opens_independent_paper_accounts(tmp_path,monkeypatch):
+    worker=fake_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    await worker.run_once(NOW)
+    assert worker.status=='REVIEW_CE'
+    positions=worker.paper_book.open_positions()
+    assert len(positions)==2
+    assert {r['account_id'] for r in positions}=={'PAPER_50K','PAPER_100K'}
+    assert all(r['status']=='OPEN' and r['option_symbol']=='NIFTYTESTCE' for r in positions)
+    assert worker.paper_book.dashboard()['actual_orders'] is False
+    pending=[row[0] for row in worker.db.pending_events()]
+    assert any(row.startswith('PAPER_ENTRY:') for row in pending)
+
+
+@pytest.mark.asyncio
+async def test_paper_bid_exit_uses_real_quote_depth_and_recovers_no_duplicate(tmp_path,monkeypatch):
+    worker=fake_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    await worker.run_once(NOW)
+    at=NOW+timedelta(seconds=20)
+    def target_bid(self,symbol):
+        return {'instrument_token':779,'timestamp':at,
+                'depth':{'buy':[{'price':142.0,'quantity':195}],
+                         'sell':[{'price':143.0,'quantity':195}]}}
+    monkeypatch.setattr(FakeKite,'full_quote',target_bid)
+    await worker.poll_paper_positions(at)
+    d=worker.paper_book.dashboard()
+    assert all(a['open_positions']==0 and a['realized_pnl_rs']>0 for a in d['accounts'])
+    before=worker.paper_book.trade_history()
+    assert all(r['status']=='CLOSED' and r['exit_reason']=='TARGET' for r in before)
+    await worker.poll_paper_positions(at)
+    assert worker.paper_book.trade_history()==before
+    assert all('NO ORDERS PLACED' in m or 'PAPER' in m for m in worker.telegram.sent)
+
+
+@pytest.mark.asyncio
+async def test_stale_bid_never_books_a_simulated_exit(tmp_path,monkeypatch):
+    worker=fake_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    monkeypatch.setattr(engine_module,'decide',synthetic_candidate)
+    await worker.run_once(NOW)
+    at=NOW+timedelta(seconds=21)
+    def stale_quote(self,symbol):
+        return {'instrument_token':779,'timestamp':NOW,
+                'depth':{'buy':[{'price':142.0,'quantity':195}],
+                         'sell':[{'price':143.0,'quantity':195}]}}
+    monkeypatch.setattr(FakeKite,'full_quote',stale_quote)
+    await worker.poll_paper_positions(at)
+    assert worker.paper_status=='WAIT_FRESH_EXIT_QUOTE'
+    assert all(r['status']=='OPEN' for r in worker.paper_book.trade_history())
+    assert all(a['equity_rs'] is None for a in worker.paper_book.dashboard()['accounts'])
