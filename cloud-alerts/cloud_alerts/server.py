@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse,HTMLResponse
 from .engine import Engine
 from .paper_book import PaperBook
 from .paper_dashboard_view import page as paper_dashboard_page
+from .signal_audit import SignalAudit
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -69,6 +70,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     if paper_enabled and (not paper_key.isascii() or len(paper_key)<32 or len(set(paper_key))<8):
         raise RuntimeError('Paper dashboard requires a separate strong access key')
     paper_book=PaperBook(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
+    paper_audit=SignalAudit(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
     if getattr(cfg,'paper_autotrade_enabled',False) and (
             not paper_enabled or not getattr(cfg,'enabled',False)):
         raise RuntimeError('Automatic paper trading requires enabled monitoring and secured dashboard')
@@ -169,6 +171,14 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     async def paper_summary(request:Request):
         _authorize_paper(request)
         return JSONResponse(paper_book.dashboard(),headers={'Cache-Control':'no-store'})
+
+    @app.get('/paper/api/opportunities')
+    async def paper_opportunities(request:Request):
+        _authorize_paper(request)
+        return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
+                             'audit':paper_audit.summary(),
+                             'evaluations':paper_audit.recent(100)},
+                            headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/trades')
     async def paper_trades(request:Request):
