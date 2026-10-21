@@ -4,7 +4,9 @@
 
 **Phase 41 implementation added:** two separate SQLite paper accounts (₹50,000 / ₹1,00,000), capital and risk checks, modeled option ASK/BID entries and exits, restart-safe cash records, Telegram outbox entries, a 20-second premium monitor integration, a post-session report and an opt-in dashboard at /paper/dashboard. **All are disabled by default and the cloud is NOT deployed.** [Phase 41 details](docs/AUTOMATED_PAPER_PORTFOLIO_PHASE41.md).
 
-**Progress for EXPANDED objective: 51% provisional engineering / NEW paper subsystem 35% / previous alerts-only engineering 80% / live acceptance 0 of 5.** Tested locally: 18/18 focused ledger tests; 9 new integration tests are committed but unexecuted. This is not a profitable-strategy claim. [Progress and blockers](docs/PROGRESS.md).
+**Progress for EXPANDED objective: 53% provisional engineering / NEW paper subsystem 43% / previous alerts-only engineering 80% / live acceptance 0 of 5.** Tested locally: 18/18 focused ledger tests; 9 new integration tests are committed but unexecuted. This is not a profitable-strategy claim. [Progress and blockers](docs/PROGRESS.md).
+
+**Phase 42 update (21 October):** A dated Zerodha/NSE options cost model replaces the flat ₹50 default for new simulated orders; paper lot sizing enforces remaining daily risk after prior losses; an append-only five-indicator decision audit records liquidity/risk rejections and supports trading-date selection; and the private dashboard now presents separate portfolio realized P&L curves, CE/PE statistics, drawdowns, streaks, and day/week/month modeled returns. **13/13 focused local fee/audit/analytics tests passed**, but the complete Python/FastAPI integration suite is still NOT verified. [Phase 42 evidence and open work](docs/AUTOMATED_PAPER_PORTFOLIO_PHASE42.md). Cloud/autopilot still disabled pending approval and live checks.
 
 **Status: architecture and a testable read-only prototype; NOT deployed or live validated.** This code intentionally cannot place orders. No browser extension, open Kite chart or powered-on laptop is required *after the daily token has been securely handed to an always-on cloud worker*.
 
