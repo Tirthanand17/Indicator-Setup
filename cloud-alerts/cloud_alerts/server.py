@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime,date
 from pathlib import Path
 from zoneinfo import ZoneInfo
-import asyncio,os,json,logging,signal,hmac,secrets
+import asyncio,os,json,logging,signal,hmac,secrets,sqlite3
 from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse,HTMLResponse
 from .engine import Engine
@@ -16,7 +16,7 @@ from .paper_book import PaperBook
 from .paper_dashboard_view import page as paper_dashboard_page
 from .signal_audit import SignalAudit
 from .paper_analytics import realized_analytics
-from .paper_integrity import initialize_activation, audit_entry_coverage
+from .paper_integrity import initialize_activation, audit_entry_coverage, audit_cash_reconciliation
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -179,7 +179,17 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     async def paper_summary(request:Request):
         _authorize_paper(request)
         response=paper_book.dashboard()
-        response['paper_recovery_integrity']=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        integrity=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        try:
+            integrity['cash_reconciliation']=audit_cash_reconciliation(
+                str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            # A private read-only API must show the safety blocker without
+            # echoing potentially sensitive/invalid on-disk ledger contents.
+            integrity['cash_reconciliation']={
+                'status':'FAIL_CLOSED','cash_entries_permitted':False}
+            integrity['new_entries_permitted']=False
+        response['paper_recovery_integrity']=integrity
         return JSONResponse(response,headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/analytics')
