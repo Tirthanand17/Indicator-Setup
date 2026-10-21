@@ -171,8 +171,14 @@ async function refresh(){
   currentAccounts=summary.accounts;latestTrades=history.trades;
   accountsView(summary);statsView(analytics);drawChart(analytics);tradesView(latestTrades);
   auditView(opportunities);
+  const recovery=summary.paper_recovery_integrity;
+  let warning="";
+  if(recovery?.status==="NOT_ACTIVATED")warning=" · PAPER AUTOMATION NOT ACTIVATED";
+  else if(recovery && !recovery.new_entries_permitted)
+    warning=" · PAPER ENTRIES BLOCKED: "+recovery.missing_account_outcomes+" unresolved recovery outcomes";
+  else if(recovery)warning=" · Account integrity checked: "+recovery.reviews_checked+" signal(s)";
   el("status").textContent="Updated "+new Date().toLocaleTimeString("en-IN")+
-   " · "+(summary.mode||"PAPER ONLY")+" · simulated fills only";
+   " · "+(summary.mode||"PAPER ONLY")+" · simulated fills only"+warning;
  }catch(e){el("status").textContent=e.message;}
 }
 el("auditFilter").addEventListener("click",()=>refresh());
