@@ -16,6 +16,7 @@ from .paper_book import PaperBook
 from .paper_dashboard_view import page as paper_dashboard_page
 from .signal_audit import SignalAudit
 from .paper_analytics import realized_analytics
+from .paper_integrity import initialize_activation, audit_entry_coverage
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -75,10 +76,16 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     if getattr(cfg,'paper_autotrade_enabled',False) and (
             not paper_enabled or not getattr(cfg,'enabled',False)):
         raise RuntimeError('Automatic paper trading requires enabled monitoring and secured dashboard')
+    if getattr(cfg,'paper_autotrade_enabled',False):
+        # Never silently consider old alert-only REVIEW rows simulated trades.
+        # A preexisting paper position without this activation marker requires
+        # explicit review; price history can NEVER recreate a valid fill.
+        initialize_activation(str(cfg.root/'alerts.sqlite3'),datetime.now(IST))
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
                   enabled=cfg.enabled,shadow=shadow,
                   paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False),
-                  paper_book=(paper_book if getattr(cfg,'paper_autotrade_enabled',False) else None))
+                  paper_book=(paper_book if getattr(cfg,'paper_autotrade_enabled',False) else None),
+                  paper_integrity_enforced=bool(getattr(cfg,'paper_autotrade_enabled',False)))
 
     supervisor=WorkerSupervisor()
 
@@ -171,7 +178,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/summary')
     async def paper_summary(request:Request):
         _authorize_paper(request)
-        return JSONResponse(paper_book.dashboard(),headers={'Cache-Control':'no-store'})
+        response=paper_book.dashboard()
+        response['paper_recovery_integrity']=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        return JSONResponse(response,headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/analytics')
     async def paper_analytics(request:Request):
