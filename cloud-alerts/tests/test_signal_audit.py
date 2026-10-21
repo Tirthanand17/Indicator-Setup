@@ -43,3 +43,12 @@ def test_bounded_read_only_history(tmp_path):
     a.record(FUT,CANDLE,NOW,'STRATEGY','NO_TRADE','ADX_NOT_RISING')
     assert len(a.recent(1))==1
     with pytest.raises(ValueError):a.recent(5000)
+
+def test_date_filtered_causal_audit_does_not_include_adjacent_day(tmp_path):
+    from datetime import date
+    audit=SignalAudit(str(tmp_path/'date.db'))
+    audit.record(FUT,CANDLE,NOW,'STRATEGY','REVIEW_CE','FIVE_INDICATORS')
+    assert audit.summary(day=date(2026,10,21))['strategy_qualified']==1
+    assert audit.summary(day=date(2026,10,20))['strategy_qualified']==0
+    assert audit.recent(day=date(2026,10,20))==[]
+    with pytest.raises(ValueError):audit.summary(day='2026-10-21')
