@@ -15,6 +15,7 @@ from .engine import Engine
 from .paper_book import PaperBook
 from .paper_dashboard_view import page as paper_dashboard_page
 from .signal_audit import SignalAudit
+from .paper_analytics import realized_analytics
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -171,6 +172,12 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     async def paper_summary(request:Request):
         _authorize_paper(request)
         return JSONResponse(paper_book.dashboard(),headers={'Cache-Control':'no-store'})
+
+    @app.get('/paper/api/analytics')
+    async def paper_analytics(request:Request):
+        _authorize_paper(request)
+        return JSONResponse(realized_analytics(str(cfg.root/'alerts.sqlite3'),datetime.now(IST)),
+                            headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/opportunities')
     async def paper_opportunities(request:Request):
