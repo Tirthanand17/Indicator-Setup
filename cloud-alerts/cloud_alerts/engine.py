@@ -13,7 +13,7 @@ from .contracts import select_future,select_option,validate_quote
 from .kite_readonly import KiteReadOnly
 from .models import Decision,Contract
 from .signal_audit import SignalAudit
-from .paper_integrity import audit_entry_coverage,recover_missing_outcomes
+from .paper_integrity import audit_entry_coverage,recover_missing_outcomes,audit_cash_reconciliation
 from .security import TokenVault
 from .state import State
 from .signals import decide
@@ -224,6 +224,10 @@ class Engine:
                 self.set_status('WAIT_DATA','Paper recovery clock is invalid')
             return False
         try:
+            # Before altering even a rejection ledger, confirm that the
+            # separate 50k and 100k account cash exactly matches recorded
+            # simulated debits/credits. Corruption cannot authorize trades.
+            audit_cash_reconciliation(self.db.path)
             result=recover_missing_outcomes(self.db.path,now)
             coverage=audit_entry_coverage(self.db.path)
             if not (result['new_entries_permitted'] and coverage['new_entries_permitted']):
