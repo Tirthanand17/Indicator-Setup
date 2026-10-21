@@ -4,7 +4,7 @@ Prototype uses Kite historical 5minute / 15minute REST candles and quote depth.
 For millisecond/second tick updates, see the *planned* KiteTicker WebSocket stage.
 """
 from __future__ import annotations
-import asyncio,json,os,logging
+import asyncio,json,os,logging,sqlite3
 from contextvars import ContextVar
 from datetime import datetime,timedelta,time
 from zoneinfo import ZoneInfo
@@ -13,6 +13,7 @@ from .contracts import select_future,select_option,validate_quote
 from .kite_readonly import KiteReadOnly
 from .models import Decision,Contract
 from .signal_audit import SignalAudit
+from .paper_integrity import audit_entry_coverage,recover_missing_outcomes
 from .security import TokenVault
 from .state import State
 from .signals import decide
@@ -30,10 +31,12 @@ logger=logging.getLogger('cloud_alerts')
 class Engine:
     def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False,
                  shadow:ShadowSupervisor|None=None, paper_premium_tracking:bool=False,
-                 premium_hypothesis:PremiumHypothesis|None=None, paper_book=None):
+                 premium_hypothesis:PremiumHypothesis|None=None, paper_book=None,
+                 paper_integrity_enforced:bool=False):
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
         self.shadow=shadow
         self.paper_book=paper_book
+        self.paper_integrity_enforced=paper_integrity_enforced and paper_book is not None
         self.signal_audit=SignalAudit(db.path) if paper_book is not None else None
         self.paper_status='DISABLED' if paper_book is None else 'IDLE'
         self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
@@ -69,6 +72,7 @@ class Engine:
           'mode':'READ_ONLY_PAPER','order_execution':False,
           'paper_premium_tracking':self.paper_premium_tracking,'premium_status':self.premium_status,
           'paper_automation_enabled':self.paper_book is not None,'paper_status':self.paper_status,
+          'paper_account_integrity_enforced':self.paper_integrity_enforced,
           'premium_quote_at':self.last_premium_quote_at.isoformat() if self.last_premium_quote_at else None,
           'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
@@ -180,6 +184,25 @@ class Engine:
                 # records any failed send attempt and its retry state.
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
                 return
+            # Reconcile interrupted 50k/100k paper basket entries BEFORE
+            # any next opportunity. Delayed missing entries are rejections,
+            # never backdated hypothetical fills or cash movements.
+            if self.paper_integrity_enforced:
+                try:
+                    repaired=recover_missing_outcomes(self.db.path,now)
+                    coverage=audit_entry_coverage(self.db.path)
+                    if not (repaired['new_entries_permitted']
+                            and coverage['new_entries_permitted']):
+                        self.paper_status='WAIT_PAPER_RECONCILIATION'
+                        self.set_status('WAIT_DATA','Paper account recovery grace in progress')
+                        await self._deliver_outbox(now)
+                        return
+                    if repaired['recovered']:
+                        self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
+                except (ValueError,RuntimeError,sqlite3.DatabaseError):
+                    self.paper_status='WAIT_PAPER_RECONCILIATION'
+                    self.set_status('WAIT_DATA','Paper account recovery requires review')
+                    return
             # Market-data getters are blocking HTTP; offload from FastAPI loop.
             try:
                 await asyncio.wait_for(self._collect_once(now,token),timeout=24)
