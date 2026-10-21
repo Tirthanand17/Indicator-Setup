@@ -12,6 +12,7 @@ from pathlib import Path
 from .contracts import select_future,select_option,validate_quote
 from .kite_readonly import KiteReadOnly
 from .models import Decision,Contract
+from .signal_audit import SignalAudit
 from .security import TokenVault
 from .state import State
 from .signals import decide
@@ -33,6 +34,7 @@ class Engine:
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
         self.shadow=shadow
         self.paper_book=paper_book
+        self.signal_audit=SignalAudit(db.path) if paper_book is not None else None
         self.paper_status='DISABLED' if paper_book is None else 'IDLE'
         self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
         self.premium_hypothesis=premium_hypothesis or PremiumHypothesis()
@@ -270,6 +272,19 @@ class Engine:
             except Exception:
                 logger.warning('Optional shadow evidence persistence failed; REST-only strategy unaffected')
         decision=decide(completed5,now,completed15)
+        if self.signal_audit is not None:
+            # Authoritative completed-candle strategy gate, without browser
+            # screenshots or inferred missed-option P&L. Nonfinite evidence
+            # fails closed rather than silently disappearing from the ledger.
+            reason=('FIVE_INDICATOR_REVIEW' if decision.status in ('REVIEW_CE','REVIEW_PE')
+                    else 'ADX_NOT_RISING' if decision.reason=='ADX not strong and rising'
+                    else 'INDICATOR_CONTEXT_MISMATCH' if 'VWAP EMA DMI' in decision.reason
+                    else 'INVALID_UNDERLYING_STOP' if 'underlying stop' in decision.reason
+                    else 'MISSING_OR_INVALID_DATA' if decision.status=='WAIT_DATA'
+                    else 'NO_QUALIFYING_SETUP')
+            seen_at=(datetime.now(IST) if self._live_delivery_clock.get() else now)
+            self.signal_audit.record(fut.symbol,completed5[-1].start,seen_at,
+                'STRATEGY',decision.status,reason,indicators=decision.indicators)
         self.last_data_at=now
         if decision.status=='WAIT_DATA':
             self.set_status('WAIT_DATA',decision.reason)
@@ -293,6 +308,10 @@ class Engine:
                 active=json.loads(previous_virtual)
                 if active.get('expiry_date')==now.date().isoformat():
                     self.db.set_runtime('last_processed_candle',stamp)
+                    if self.signal_audit is not None:
+                        self.signal_audit.record(fut.symbol,completed5[-1].start,now,
+                            'ELIGIBILITY','POSITION_ALREADY_OPEN','EXISTING_VIRTUAL_CANDIDATE',
+                            indicators=decision.indicators)
                     self.set_status('NO_TRADE','Existing virtual candidate awaiting exit review')
                     await self._deliver_outbox(now)
                     return
@@ -311,10 +330,21 @@ class Engine:
             # valid newer exchange timestamps as future dated.
             observed_at=(datetime.now(IST) if self._live_delivery_clock.get() else now)
             if observed_at.date()!=now.date() or observed_at.time()>time(15,0):
+                if self.signal_audit is not None:
+                    self.signal_audit.record(fut.symbol,completed5[-1].start,now,'QUOTE',
+                        'REJECTED_LIQUIDITY','ENTRY_TIME_CUTOFF',indicators=decision.indicators)
                 self.set_status('NO_TRADE','Option quote returned after entry cutoff')
                 return
             oq=validate_quote(opt,raw,observed_at,max_age_seconds=15,max_spread_pct=2)
+            if self.signal_audit is not None:
+                self.signal_audit.record(fut.symbol,completed5[-1].start,observed_at,
+                    'QUOTE','ACCEPTED_SIGNAL','FRESH_EXECUTABLE_OPTION_DEPTH',
+                    option_symbol=opt.symbol,indicators=decision.indicators)
         except (ValueError,TypeError,KeyError):
+            if self.signal_audit is not None:
+                self.signal_audit.record(fut.symbol,completed5[-1].start,now,'QUOTE',
+                    'REJECTED_LIQUIDITY','STALE_OR_UNTRADEABLE_DEPTH',
+                    indicators=decision.indicators)
             self.set_status('NO_TRADE','No liquid fresh executable option quote; skip alert')
             return
         except Exception:
@@ -347,8 +377,16 @@ class Engine:
         accepted=self.db.claim_entry_with_candidate(event_id,decision.status,observed_at,body,
                     json.dumps(candidate,separators=(',',':')),quote_snapshot=quote_snapshot)
         if not accepted:
+            if self.signal_audit is not None:
+                self.signal_audit.record(fut.symbol,completed5[-1].start,observed_at,
+                    'ELIGIBILITY','POSITION_ALREADY_OPEN','DUPLICATE_OR_ACTIVE_CANDIDATE',
+                    option_symbol=opt.symbol,indicators=decision.indicators)
             self.set_status('WAIT_DATA','Entry claim rejected: duplicate or existing paper position')
             return
+        if self.signal_audit is not None:
+            self.signal_audit.record(fut.symbol,completed5[-1].start,observed_at,
+                'ELIGIBILITY','ACCEPTED_SIGNAL','VIRTUAL_CANDIDATE_ATOMICALLY_SAVED',
+                option_symbol=opt.symbol,indicators=decision.indicators)
         self.db.set_runtime('last_processed_candle',stamp)
         # Paper accounts are counterfactuals: each one independently sizes from
         # the same observed book depth and owns its own cash/position ledger.
@@ -358,6 +396,14 @@ class Engine:
             for account in ('PAPER_50K','PAPER_100K'):
                 try:
                     result=self.paper_book.enter(event_id,oq,observed_at,account_id=account)
+                    if self.signal_audit is not None:
+                        outcome=('SIMULATED_OPEN' if result['status']=='OPEN'
+                                 else 'POSITION_ALREADY_OPEN' if result['status']=='DUPLICATE'
+                                 else 'REJECTED_RISK')
+                        self.signal_audit.record(fut.symbol,completed5[-1].start,observed_at,
+                            'PORTFOLIO_50K' if account=='PAPER_50K' else 'PORTFOLIO_100K',
+                            outcome,'PAPER_'+result['status'],
+                            option_symbol=opt.symbol,indicators=decision.indicators)
                     if result['status']=='OPEN':
                         self.paper_status='POSITION_OPEN'
                     elif result['status']=='REJECTED':
