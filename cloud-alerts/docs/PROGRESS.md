@@ -46,6 +46,15 @@ The existing user's alternative CI provider is **CircleCI**, previously used for
 **Run status:** GitHub commit-status API returned `statuses: []`, and GitHub workflow-runs returned `[]` after the config commit. This does not prove CircleCI project registration or an executed Linux job. CircleCI is not exposed as a connected action in this ChatGPT tool context, so a successful CircleCI job **has not been verified**. Do not merge pending all-green Linux evidence. Docs: https://circleci.com/docs/guides/getting-started/language-python/
 
 
+## Phase 44 continuation — zero-cost QA after Codespaces HTTP402
+
+1. User's GitHub screenshots confirm five **$0 budgets**, including Codespaces marked **Usage blocked**. A guarded 2-core Codespace creation attempt definitively returned `HTTP 402 Usage not allowed ... free usage or budget exceeded`. Rechecked `gh codespace list`: **0 Codespaces**. No spending limit changed, no new resource created, no further Codespaces attempts.
+2. Audited cloud-only `TokenVault.put`: on `os.fchmod` failure its raw `mkstemp` file descriptor was not explicitly closed, masking the real error under Windows. Patched descriptor transfer/cleanup while preserving **mandatory Linux 0600 enforcement**. Added 4 synthetic permission/sync/replace failure regressions; all **4/4 PASS on Nirala**.
+3. Added reusable `cloud-alerts/scripts/Invoke-WindowsPaperSmoke.ps1`: selected *offline only* trade/accounting/security tests under existing Nirala temporary checkout and venv, broker/Telegram environment variables temporarily cleared, with syntax compilation. Executed on latest checked-out code: **72/72 tests PASS, 0 failed**, followed by compilation success. Separately, isolated Linux Python 3.13 recovery/accounting set: **29/29 PASS**.
+4. Windows whole-suite baseline remains **458 pass, 120 fail, 4 skip** (pre-patch), primarily intentional POSIX-only OS requirements; **full Linux Python 3.12 suite still NOT EXECUTED**. These targeted green tests are not evidence of a green full suite. Keep draft PR #1 unmerged; all real broker orders disabled and hosting OFF.
+5. `.devcontainer/Run-Linux-QA.ps1` was hardened to handle benign `gh` stderr notices and preserve an actionable Codespaces HTTP failure result, but its full launch/cleanup path cannot be tested while budget is blocked. See [Phase 44 cost block and real QA proof](PHASE44_CODESPACES_OFFLINE_QA.md).
+6. **Expanded-goal engineering progress 53% unchanged, actual live acceptance 0/5**. The next valid ways to complete Linux-only tests are an approved already-funded Linux Python 3.12 runner, a future included quota reset with user approval, or a user-approved reversible Linux environment on their computer. Do not bypass cloud budget limits, OS security checks or user restrictions.
+
 ## Phase 44 — Replace exhausted CircleCI with no-cost-gated GitHub Codespaces Linux QA
 
 1. **CircleCI monthly limit exhausted per user**; disabled its branch pipeline by deleting `.circleci/config.yml`. No new CI subscription, GitHub Actions usage, spending commitments or deployments.
