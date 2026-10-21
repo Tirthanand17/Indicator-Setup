@@ -624,6 +624,12 @@ class Engine:
                     ' | Net realized Rs '+f"{account['net_realized_rs']:.2f}"+
                     ' | Unverifiable '+str(account['unresolved'])+
                     ' | Rejected '+str(account['rejected_signals']))
+            if self.signal_audit is not None:
+                audit=self.signal_audit.summary(day=observed.date())
+                lines.append('Five-indicator qualified: '+str(audit['strategy_qualified'])+
+                    ' | Liquidity rejections: '+str(audit['liquidity_rejected'])+
+                    ' | Paper risk rejections: '+str(audit['risk_rejected']))
+                lines.append('Missed-opportunity P&L unverified without historical option BID/ASK.')
             lines.append('Unknown exits were NOT scored as fills, wins, or losses.')
             lines.append('No real broker orders or exchange-confirmed fills.')
             self.db.claim_event('PAPER_DAILY:'+report['day'],'PAPER_DAILY',
