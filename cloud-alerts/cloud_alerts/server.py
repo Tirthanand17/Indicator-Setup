@@ -179,7 +179,11 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     async def paper_summary(request:Request):
         _authorize_paper(request)
         response=paper_book.dashboard()
-        integrity=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        try:
+            integrity=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            integrity={'status':'FAIL_CLOSED','new_entries_permitted':False,
+                       'missing_account_outcomes':None}
         try:
             integrity['cash_reconciliation']=audit_cash_reconciliation(
                 str(cfg.root/'alerts.sqlite3'))
