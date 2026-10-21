@@ -1,6 +1,6 @@
 # Phase 43 — autonomous partial-paper-entry crash recovery
 
-**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **29/29 focused recovery/accounting unit tests passed locally** in the current container; 9 new worker/schema/private-API integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
+**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **29/29 focused recovery/accounting unit tests passed locally** in the current container; 10 new worker/schema/private-API/frontend integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
 
 ## Audited failure mode
 
@@ -35,6 +35,16 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 - Target Docker Python is 3.12, whereas focused unit tests ran on Python 3.13. Full target-runtime validation is still mandatory.
 
 
+## Phase 43 follow-up — suppress contaminated dashboard performance
+
+The authenticated paper dashboard previously showed available cash, net realized P&L and chart data even if a cash/journal integrity check reported FAIL_CLOSED. This could mislead a researcher reviewing a damaged SQLite file.
+
+- `/paper/api/summary` now masks recorded cash, realized P&L, equity and trade counts on cash reconciliation failure, while preserving identity and the starting paper capital. It emits only sanitized FAIL_CLOSED metadata.
+- `/paper/api/trades` and `/paper/api/analytics` now return HTTP **503** after authenticated access if the cash journal does not reconcile; neither serves potentially contaminated performance figures.
+- The mobile page fetches and validates the protected summary **before** querying trade history/analytics. When cash integrity fails it displays an explicit stop message and does not plot anything.
+- Updated existing private-API regression and added one frontend fail-closed test to the project test suite. **These FastAPI integration tests remain UNRUN** in this environment.
+- 29/29 isolated recovery/cash-ledger cases still pass locally. Full Python 3.12 regression and actual deployment are not verified.
+
 ## Phase 43 extension — verify cash/journal conservation before simulation
 
 **Why:** A completed pair of account outcomes is insufficient evidence of correct cash accounting. A database edit or interrupted/out-of-band cash write could make simulated P&L or available balance false, even when every REVIEW has both outcomes.
@@ -44,7 +54,7 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 - Invoke this audit **before** the worker's existing crash-gap recovery writes or any Kite calls. A mismatch leaves new paper entry blocked with `WAIT_PAPER_RECONCILIATION` and never resets cash or invents fills.
 - The authenticated `/paper/api/summary` API now includes only sanitized cash-integrity metadata. Missing or malformed audit evidence returns a **FAIL_CLOSED** state, never a 200 response misleadingly claiming the journal is healthy. The mobile dashboard has different warnings for a corrupted cash journal and a broken REVIEW/clock history.
 - **Ran 29/29 local isolated Python 3.13 recovery/accounting tests:** 19 prior restart/crash tests, plus 10 new tests for fresh accounts, closed and unresolved ledger conservation, 1-paise tampering, wrong P&L, fictional unresolved credit, orphan accounts, extra account, negative and non-integer cash. `python -m compileall` on the local isolated sources also passed.
-- **Added 4 additional full application tests (9 Phase 43 application integration tests total), NOT EXECUTED:** actual PaperBook entry/exit conservation; worker refuses cash corruption before Kite reads; private authenticated API flags changed cash; authenticated API safely handles a corrupt REVIEW timestamp. The complete preexisting repository suite remains unexecuted; the isolated local tests are not a substitute.
+- **Added 4 additional full application tests (10 Phase 43 application integration tests total), NOT EXECUTED:** actual PaperBook entry/exit conservation; worker refuses cash corruption before Kite reads; private authenticated API flags changed cash; authenticated API safely handles a corrupt REVIEW timestamp. The complete preexisting repository suite remains unexecuted; the isolated local tests are not a substitute.
 - Main remains unchanged. No current paid runner, OCI host, public service, live Kite relay, handset receipt or real orders.
 
 ## Test ledger
@@ -57,7 +67,7 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 
 - Repository: `Tirthanand17/Indicator-Setup`.
 - Main checkpoint before this work: `c5c4d0f90e11e841991c0efe9a351fd44e3dd94c` (Phase 42, expanded scope 53%).
-- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 29 focused unit tests, 9 integration tests across the Phase 43 files, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
+- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 29 focused unit tests, 10 integration tests across the Phase 43 files, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
 - **Remaining blockers:** run entire Python/FastAPI pytest suite and repair any failures; merge only after evidence; finish fee verification and irregular end-of-day settlement treatment; complete real missed-opportunity quote coverage; approve a durable ₹0 always-on host; verify live daily read-only Kite API/HMAC relay, Telegram handset and Nirala-OFF functionality; complete at least 5 NSE trading sessions.
 - **Progress:** expanded-goal engineering **53% (unchanged)**, paper subsystem prior estimate **43%**, original alert-only prep **80%**, deployment acceptance **0/5**. Changes in a draft branch do not justify increasing the headline percentage.
 
