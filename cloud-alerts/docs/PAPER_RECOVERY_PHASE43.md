@@ -1,6 +1,6 @@
 # Phase 43 — autonomous partial-paper-entry crash recovery
 
-**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **17/17 focused recovery unit tests passed locally** in the current container; 3 full-worker/schema integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
+**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **19/19 focused recovery unit tests passed locally** in the current container; 5 full-worker/schema integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
 
 ## Audited failure mode
 
@@ -18,6 +18,14 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 - Private `/paper/api/summary` includes `paper_recovery_integrity`; the mobile dashboard highlights blocked or not-activated simulation state without exposing credentials.
 
 
+## Phase 43 continuation — after-hours recovery
+
+- Moved common recovery handling into `Engine.reconcile_paper_journal(now, market_poll=False)`, which runs locally without a Kite token, brokerage order method, or market-data HTTP request.
+- The minute-level unattended worker now reconciles partial paper REVIEW/account outcomes **outside 09:25–15:26**, including after session close and on non-trading days. It checks integrity BEFORE an end-of-day Telegram paper report and defers that report while recovery grace is pending.
+- Added two extra standalone recovery tests for missed entries found after close and over a multi-day non-trading gap. **19/19 focused local tests passed** (Python 3.13 isolated module).
+- Added **two further Engine integration tests (five in total)**: after-hours recovery without accessing the Kite vault, and report eligibility after the grace period. These remain **not executed** until the complete repository is available on a trusted Python 3.12 runner.
+- Branch is still draft PR #1. `main` remains unchanged, `PAPER_AUTOTRADE_ENABLED=false` and cloud acceptance remains 0/5.
+
 ## Additional recovery hardening in this session
 
 - Detect contradictory position-and-rejection evidence for one account/signal, and unexpected account names, before claiming completion or writing any recovery record. These cases fail closed.
@@ -28,15 +36,15 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 
 ## Test ledger
 
-**Executed locally:** `PYTHONPATH=. pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py` on the isolated recovery module and fixtures -> **17 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
+**Executed locally:** `PYTHONPATH=. pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py` on the isolated recovery module and fixtures -> **19 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
 
-**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 3 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
+**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 5 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
 
 ## Source/branch and exact continuation
 
 - Repository: `Tirthanand17/Indicator-Setup`.
 - Main checkpoint before this work: `c5c4d0f90e11e841991c0efe9a351fd44e3dd94c` (Phase 42, expanded scope 53%).
-- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 14 synthetic unit tests, 2 integration tests, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
+- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 19 focused unit tests, 5 integration tests, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
 - **Remaining blockers:** run entire Python/FastAPI pytest suite and repair any failures; merge only after evidence; finish fee verification and irregular end-of-day settlement treatment; complete real missed-opportunity quote coverage; approve a durable ₹0 always-on host; verify live daily read-only Kite API/HMAC relay, Telegram handset and Nirala-OFF functionality; complete at least 5 NSE trading sessions.
 - **Progress:** expanded-goal engineering **53% (unchanged)**, paper subsystem prior estimate **43%**, original alert-only prep **80%**, deployment acceptance **0/5**. Changes in a draft branch do not justify increasing the headline percentage.
 
