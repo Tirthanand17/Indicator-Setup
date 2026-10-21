@@ -160,6 +160,14 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
                 or not hmac.compare_digest(candidate, paper_key)):
             raise HTTPException(404,'Not found')
 
+    def _require_balanced_paper_accounts():
+        try:
+            audit_cash_reconciliation(str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            # Do not serve convincing-looking performance statistics from
+            # corrupted or inconsistent simulated broker cash.
+            raise HTTPException(503,'Paper accounting integrity unavailable') from None
+
     @app.get('/paper/dashboard')
     async def paper_dashboard():
         if paper_book is None:
@@ -193,12 +201,20 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             integrity['cash_reconciliation']={
                 'status':'FAIL_CLOSED','cash_entries_permitted':False}
             integrity['new_entries_permitted']=False
+        if integrity['cash_reconciliation']['status']!='BALANCED':
+            # Keep account identity/initial-capital visible, but do not label
+            # a corrupted saved balance or P&L as verified simulation.
+            for account in response['accounts']:
+                for field in ('available_cash_rs','realized_pnl_rs',
+                              'equity_rs','closed_trades','wins','open_positions'):
+                    account[field]=None
         response['paper_recovery_integrity']=integrity
         return JSONResponse(response,headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/analytics')
     async def paper_analytics(request:Request):
         _authorize_paper(request)
+        _require_balanced_paper_accounts()
         return JSONResponse(realized_analytics(str(cfg.root/'alerts.sqlite3'),datetime.now(IST)),
                             headers={'Cache-Control':'no-store'})
 
@@ -218,6 +234,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/trades')
     async def paper_trades(request:Request):
         _authorize_paper(request)
+        _require_balanced_paper_accounts()
         return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
                              'trades':paper_book.trade_history(limit=100)},
                             headers={'Cache-Control':'no-store'})
