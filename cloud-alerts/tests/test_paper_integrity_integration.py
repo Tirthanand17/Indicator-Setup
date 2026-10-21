@@ -9,7 +9,7 @@ import pytest
 
 from cloud_alerts.paper_book import PaperBook
 from cloud_alerts.paper_integrity import (
-    initialize_activation,audit_entry_coverage,recover_missing_outcomes)
+    initialize_activation,audit_entry_coverage,recover_missing_outcomes,audit_cash_reconciliation)
 from cloud_alerts.state import State
 from cloud_alerts.models import Contract,OptionQuote
 from test_simulated_broker_pipeline import engine as create_engine,NOW
@@ -122,3 +122,40 @@ def test_after_hours_grace_blocks_summary_until_reconciled(tmp_path,monkeypatch)
     later=near_close+timedelta(minutes=4)
     assert worker.reconcile_paper_journal(later) is True
     assert audit_entry_coverage(worker.db.path)['status']=='COMPLETE'
+
+def test_real_paperbook_entry_and_exit_cash_conserve_integer_paise(tmp_path):
+    path=str(tmp_path/'reconcile.db')
+    State(path)
+    book=PaperBook(path)
+    initialize_activation(path,NOW-timedelta(minutes=20))
+    assert audit_cash_reconciliation(path)['positions_checked']==0
+    trade=book.enter('NIFTY:VALID_SIGNAL_123',quote(NOW),NOW,
+                     account_id='PAPER_50K')
+    assert trade['status']=='OPEN'
+    open_status=audit_cash_reconciliation(path)
+    assert open_status['status']=='BALANCED'
+    assert open_status['unresolved_positions']==1
+    exit_at=NOW+timedelta(minutes=15)
+    entry_quote=quote(exit_at)
+    market_bid=OptionQuote(entry_quote.contract,142.0,143.0,65,65,exit_at)
+    close=book.exit(trade['trade_id'],market_bid,exit_at)
+    assert close['status']=='CLOSED'
+    settled=audit_cash_reconciliation(path)
+    assert settled['positions_checked']==1 and settled['unresolved_positions']==0
+
+
+@pytest.mark.asyncio
+async def test_tampered_paper_cash_blocks_market_before_kite_reads(tmp_path,monkeypatch):
+    worker=create_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    worker.paper_integrity_enforced=True
+    initialize_activation(worker.db.path,NOW-timedelta(minutes=10))
+    with sqlite3.connect(worker.db.path) as db:
+        db.execute("UPDATE paper_accounts SET cash_paise=cash_paise+1 WHERE account_id='PAPER_100K'")
+    await worker.run_once(NOW)
+    assert worker.status=='WAIT_DATA'
+    assert worker.paper_status=='WAIT_PAPER_RECONCILIATION'
+    assert worker.paper_book.open_positions()==[]
+    assert worker.telegram.sent==[]
+    from test_simulated_broker_pipeline import FakeKite
+    assert FakeKite.records==[]
