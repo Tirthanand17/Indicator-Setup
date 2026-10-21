@@ -26,13 +26,17 @@ jobs:
           name: Full offline NIFTY paper regression suite
           no_output_timeout: 10m
           command: |
-            # Explicitly discard any repository/project-level live credentials.
-            unset KITE_API_KEY ZERODHA_KITE_ACCESS_TOKEN KITE_ACCESS_TOKEN
-            unset TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID
-            unset TOKEN_RELAY_HMAC_KEY TOKEN_VAULT_KEY PAPER_DASHBOARD_KEY
+            # Fail isolated: CircleCI contexts/environment may contain
+            # arbitrary credentials. Inherit only minimal system variables,
+            # NEVER a broker, phone, cloud or account environment secret.
             cd cloud-alerts
             mkdir -p test-reports
-            .venv/bin/python -m pytest -q --tb=short --junitxml=test-reports/results.xml
+            env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 \
+              ALERTS_ENABLED=false PAPER_AUTOTRADE_ENABLED=false \
+              PAPER_DASHBOARD_ENABLED=false KITE_SHADOW_ENABLED=false \
+              PAPER_PREMIUM_TRACKING_ENABLED=false \
+              .venv/bin/python -m pytest -q --tb=short \
+              --junitxml=test-reports/results.xml
       - store_test_results:
           path: cloud-alerts/test-reports
       - store_artifacts:
