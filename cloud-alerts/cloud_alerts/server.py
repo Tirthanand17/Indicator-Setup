@@ -8,11 +8,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-import asyncio,os,json,logging,signal,hmac
+import asyncio,os,json,logging,signal,hmac,secrets
 from fastapi import FastAPI,Request,HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,HTMLResponse
 from .engine import Engine
 from .paper_book import PaperBook
+from .paper_dashboard_view import page as paper_dashboard_page
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -146,6 +147,21 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
         if paper_book is None or not hmac.compare_digest(
                 request.headers.get('x-paper-dashboard-key',''), paper_key):
             raise HTTPException(404,'Not found')
+
+    @app.get('/paper/dashboard')
+    async def paper_dashboard():
+        if paper_book is None:
+            raise HTTPException(404,'Not found')
+        nonce=secrets.token_urlsafe(24)
+        return HTMLResponse(paper_dashboard_page(nonce),headers={
+            'Cache-Control':'no-store',
+            'Content-Security-Policy':(
+                "default-src 'none'; style-src 'unsafe-inline'; "
+                "script-src 'nonce-"+nonce+"'; connect-src 'self'; "
+                "img-src 'none'; base-uri 'none'; form-action 'none'; "
+                "frame-ancestors 'none'"),
+            'X-Content-Type-Options':'nosniff',
+            'Referrer-Policy':'no-referrer'})
 
     @app.get('/paper/api/summary')
     async def paper_summary(request:Request):
