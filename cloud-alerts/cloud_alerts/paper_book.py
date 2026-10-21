@@ -55,7 +55,7 @@ class PaperBook:
               CREATE TABLE IF NOT EXISTS paper_positions (
               trade_id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES paper_accounts(account_id),
               signal_id TEXT NOT NULL, option_symbol TEXT NOT NULL, option_kind TEXT NOT NULL,
-              option_expiry TEXT NOT NULL, lot_size INTEGER NOT NULL, lots INTEGER NOT NULL,
+              option_expiry TEXT NOT NULL, option_token INTEGER NOT NULL, lot_size INTEGER NOT NULL, lots INTEGER NOT NULL,
               entry_at TEXT NOT NULL, entry_quote_at TEXT NOT NULL,
               entry_ask_paise INTEGER NOT NULL, entry_fill_paise INTEGER NOT NULL,
               entry_debit_paise INTEGER NOT NULL, entry_fee_paise INTEGER NOT NULL,
@@ -98,7 +98,7 @@ class PaperBook:
         if (quote.contract.kind not in ('CE','PE') or
             not quote.contract.symbol.startswith('NIFTY') or
             not quote.contract.symbol.endswith(quote.contract.kind) or
-            quote.contract.lot_size < 1 or not quote.contract.expiry):
+            quote.contract.lot_size < 1 or quote.contract.token < 1 or not quote.contract.expiry):
             raise ValueError('invalid listed NIFTY option contract')
         if quote.updated.tzinfo is None or quote.updated.utcoffset() is None:
             raise ValueError('option exchange time missing')
@@ -179,11 +179,11 @@ class PaperBook:
             db.execute('UPDATE paper_accounts SET cash_paise=cash_paise-? WHERE account_id=? AND cash_paise>=?',
                        (debit,account_id,debit))
             db.execute('INSERT INTO paper_positions('
-                       'trade_id,account_id,signal_id,option_symbol,option_kind,option_expiry,lot_size,lots,'
+                       'trade_id,account_id,signal_id,option_symbol,option_kind,option_expiry,option_token,lot_size,lots,'
                        'entry_at,entry_quote_at,entry_ask_paise,entry_fill_paise,entry_debit_paise,entry_fee_paise,'
                        'exit_fee_assumed_paise,slippage_bps,stop_bid_paise,target_bid_paise,status) '
-                       'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (trade_id,account_id,signal_id,c.symbol,c.kind,c.expiry,c.lot_size,lots,
+                       'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (trade_id,account_id,signal_id,c.symbol,c.kind,c.expiry,c.token,c.lot_size,lots,
                         now.astimezone(IST).isoformat(),quote.updated.astimezone(IST).isoformat(),reference,
                         fill,debit,entry_fee,exit_fee,slippage_bps,stop,target,'OPEN'))
             return {'status':'OPEN','trade_id':trade_id,'account_id':account_id,'lots':lots,
@@ -204,7 +204,7 @@ class PaperBook:
             if old['status']=='CLOSED':return {'status':'DUPLICATE','trade_id':trade_id}
             if old['option_symbol']!=quote.contract.symbol or old['option_kind']!=quote.contract.kind:
                 raise ValueError('option mismatch')
-            if old['option_expiry']!=quote.contract.expiry or old['lot_size']!=quote.contract.lot_size:
+            if old['option_expiry']!=quote.contract.expiry or old['lot_size']!=quote.contract.lot_size or old['option_token']!=quote.contract.token:
                 raise ValueError('lot/expiry mismatch')
             if now.astimezone(IST).isoformat()<=old['entry_at'] or quote.updated.astimezone(IST).isoformat()<old['entry_quote_at']:
                 raise ValueError('noncausal option exit')
