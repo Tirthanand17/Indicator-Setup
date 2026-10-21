@@ -1,17 +1,17 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-21 (Phase 41). **Expanded-objective estimated engineering completion: 51%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-21 (Phase 42). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
-Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 51%
+Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
 Legacy alert-bot engineering   [████████████████████░░░░] 80%
-NEW paper-trade functionality  [█████████░░░░░░░░░░░░░░░] 35%
+NEW paper-trade functionality  [███████████░░░░░░░░░░░░░] 43%
 Live verification              [░░░░░░░░░░░░░░░░░░░░░░░░] 0/5
 PAPER_AUTOTRADE_ENABLED        false by default
 Real order placement           impossible by design
 ```
 
-This is a **scope rebaseline**. New expanded engineering estimate uses a transparent weighted index: 50% weight on existing alerts-only preparation (80%), 30% on new paper-trading subsystem (35%), and 20% on real live delivery/validation (0%), producing 50.5%, displayed as **51%**. It does not supersede actual acceptance gates.
+This is a **scope rebaseline**. New expanded engineering estimate uses a transparent weighted index: 50% weight on existing alerts-only preparation (80%), 30% on new paper-trading subsystem (43%), and 20% on real live delivery/validation (0%), producing 52.9%, displayed as **53%**. It does not supersede actual acceptance gates.
 
 ```text
 Historical alerts-only engineering progress   [████████████████████░░░░] 80%
@@ -38,6 +38,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 42 — dated NSE option fee model, daily-loss risk, causal missed signals and advanced research analytics
+
+1. Updated new simulated trades to use a **versioned April 2026 NSE options cost policy**: Zerodha flat brokerage per buy/sell leg, NSE transaction fees, SEBI turnover fees, GST, buy stamp and sell STT (with official rounding); exact per-leg estimated charges use simulated ASK/BID fills and contract quantity. Existing fixed-charge paper records remain backwards compatible through an additive SQLite column migration. These are *estimated broker costs*, NOT verified contract notes.
+2. Updated sizing to check **remaining daily risk after earlier realized losses**, taking adverse entry/stop-exit slippage and both fees into account. Prevent a third entry from exceeding the 6%-of-starting-capital daily modeled-loss budget even when each individual trade passes its 3% rule.
+3. Created append-only signal audit and wired it into completed 5-minute strategy evaluations, validated option liquidity, existing-position suppression and separate ₹50k/₹100k paper acceptance or risk rejections. The private dashboard shows missed qualifying signals distinctly from nonqualifying setups, preserving full indicator readings and sanitized reason codes. Date filtering works after correcting the JavaScript expression; P&L of unobserved missed option fills is never invented.
+4. Added separate-account realized analytics: win rate with denominator, realized equity-change curves, day/week/month return on initial paper capital, CE/PE breakouts, drawdowns, profit factor, expectancy, streaks and unresolved-trade counts. The earlier combined-account chart was replaced by **two separately identified comparison curves**. Added protected `/paper/api/analytics` and `/paper/api/opportunities`, both requiring the existing private key; daily Telegram summaries can include same-day qualified/rejected signal counts.
+5. Added a static forbidden-order-call AST regression and broker-wrapper surface test, plus new synthetic cross-module regressions. **Executed 13/13 focused local pure-module tests** (costs 4, audit 5, analytics 4); **full repository integrated test suite NOT RUN**, and the new cross-module tests also remain unverified. No GitHub Actions credits, protected Nirala reads/writes, Kite tokens, real orders, hosting charges or phone messages.
+6. Expanded-scope **paper subsystem engineering 35% → 43%** based on concrete fee/audit/analytics code and focused tests, although production reliability is still unverified. Weighted expanded engineering index **51% → 53%** (50% × old alert prep80 + 30% × paper43 + 20% × live0); **original alert-bot preparation remains 80%**; cloud/Telegram/Nirala-OFF/five-session live gates remain **0/5 verified**. See [Phase 42 audit and limitations](AUTOMATED_PAPER_PORTFOLIO_PHASE42.md).
 
 ## Phase 41 — fully automatic PAPER options simulator, v1, not yet activated
 
