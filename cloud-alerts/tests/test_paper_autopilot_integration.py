@@ -210,6 +210,10 @@ def test_private_dashboard_reports_balanced_cash_only_to_authenticated_request(t
         assert integrity['cash_reconciliation']=={
             'status':'FAIL_CLOSED','cash_entries_permitted':False}
         assert integrity['new_entries_permitted'] is False
+        assert all(a['available_cash_rs'] is None and a['realized_pnl_rs'] is None
+                   and a['equity_rs'] is None for a in broken.json()['accounts'])
+        assert client.get('/paper/api/trades',headers=auth).status_code==503
+        assert client.get('/paper/api/analytics',headers=auth).status_code==503
         assert 'token' not in broken.text.lower()
 
 def test_private_integrity_api_fails_closed_on_corrupt_review_clock(tmp_path):
@@ -228,3 +232,12 @@ def test_private_integrity_api_fails_closed_on_corrupt_review_clock(tmp_path):
         assert state['status']=='FAIL_CLOSED'
         assert state['new_entries_permitted'] is False
         assert state['cash_reconciliation']['status']=='BALANCED'
+
+def test_dashboard_frontend_does_not_plot_invalid_paper_cash(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        page=client.get('/paper/dashboard')
+        assert page.status_code==200
+        assert 'PAPER CASH INTEGRITY FAILURE' in page.text
+        assert 'Simulated P&L hidden' in page.text
+        assert 'localStorage' not in page.text
