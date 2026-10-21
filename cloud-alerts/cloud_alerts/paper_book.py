@@ -221,6 +221,8 @@ class PaperBook:
             old=db.execute('SELECT * FROM paper_positions WHERE trade_id=?',(trade_id,)).fetchone()
             if old is None:raise ValueError('unknown paper position')
             if old['status']=='CLOSED':return {'status':'DUPLICATE','trade_id':trade_id}
+            if old['status']=='EXIT_UNVERIFIABLE':
+                return {'status':'UNVERIFIABLE','trade_id':trade_id}
             if old['option_symbol']!=quote.contract.symbol or old['option_kind']!=quote.contract.kind:
                 raise ValueError('option mismatch')
             if old['option_expiry']!=quote.contract.expiry or old['lot_size']!=quote.contract.lot_size or old['option_token']!=quote.contract.token:
@@ -260,7 +262,7 @@ class PaperBook:
     def open_positions(self)->list[dict]:
         with self._db() as db:
             db.row_factory=sqlite3.Row
-            return [dict(r) for r in db.execute("SELECT * FROM paper_positions WHERE status!='CLOSED' ORDER BY entry_at")]
+            return [dict(r) for r in db.execute("SELECT * FROM paper_positions WHERE status='OPEN' ORDER BY entry_at")]
 
     def dashboard(self)->dict:
         with self._db() as db:
