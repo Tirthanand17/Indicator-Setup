@@ -137,3 +137,24 @@ def test_existing_telegram_outbox_is_atomic_with_cash_change(tmp_path):
     assert rows[1][0].startswith('PAPER_EXIT:')
     assert all('No real order placed' in r[1] for r in rows)
     assert b.dashboard()['accounts'][0]['closed_trades']==1
+
+def test_unverifiable_end_of_session_never_invents_exit(tmp_path):
+    b=book(tmp_path);a=b.enter('signal-1',quote(),NOW,account_id='PAPER_50K')
+    with pytest.raises(ValueError):b.finish_session(NOW.replace(hour=15,minute=25))
+    cash=b.dashboard()['accounts'][0]['available_cash_rs']
+    assert b.finish_session(NOW.replace(hour=15,minute=27))==1
+    assert b.finish_session(NOW.replace(hour=15,minute=30))==0
+    assert b.dashboard()['accounts'][0]['available_cash_rs']==cash
+    assert b.trade_history()[0]['status']=='EXIT_UNVERIFIABLE'
+    assert b.trade_history()[0]['net_pnl_rs'] is None
+    assert b.enter('another-signal',quote(at=NOW+timedelta(days=1)),NOW+timedelta(days=1),account_id='PAPER_50K')['reason']=='POSITION_ALREADY_OPEN'
+
+def test_daily_report_reconciles_only_closed_and_rejected(tmp_path):
+    b=book(tmp_path)
+    first=b.enter('signal-1',quote(),NOW,account_id='PAPER_50K')
+    b.exit(first['trade_id'],quote(bid=141,ask=142,at=NOW+timedelta(minutes=25)),NOW+timedelta(minutes=25))
+    report=b.daily_report(NOW.replace(hour=15,minute=30))
+    acct=report['accounts'][0]
+    assert acct['closed']==1 and acct['wins']==1 and acct['net_realized_rs']>0
+    assert acct['unresolved']==0 and report['actual_fills_verified'] is False
+    assert report['accounts'][1]['closed']==0
