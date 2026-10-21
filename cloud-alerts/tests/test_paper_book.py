@@ -122,3 +122,18 @@ def test_history_presents_paper_only_and_no_private_credentials(tmp_path):
     b.exit(a['trade_id'],quote(bid=141,ask=142,at=t),t)
     assert b.trade_history()[0]['net_pnl_rs']>0
     with pytest.raises(ValueError):b.trade_history(limit=10000)
+
+def test_existing_telegram_outbox_is_atomic_with_cash_change(tmp_path):
+    b=book(tmp_path)
+    db=sqlite3.connect(b.path)
+    db.execute('CREATE TABLE events(event_id TEXT PRIMARY KEY,status TEXT NOT NULL,at TEXT NOT NULL,payload TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)')
+    db.commit();db.close()
+    a=b.enter('signal-1',quote(),NOW,account_id='PAPER_50K')
+    t=NOW+timedelta(minutes=21)
+    b.exit(a['trade_id'],quote(bid=141,ask=142,at=t),t)
+    db=sqlite3.connect(b.path)
+    rows=db.execute('SELECT event_id,payload FROM events ORDER BY event_id').fetchall()
+    assert len(rows)==2 and rows[0][0].startswith('PAPER_ENTRY:')
+    assert rows[1][0].startswith('PAPER_EXIT:')
+    assert all('No real order placed' in r[1] for r in rows)
+    assert b.dashboard()['accounts'][0]['closed_trades']==1
