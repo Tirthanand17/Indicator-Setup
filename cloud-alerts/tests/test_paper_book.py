@@ -9,7 +9,7 @@ IST=ZoneInfo('Asia/Kolkata')
 NOW=datetime(2026,10,21,10,0,0,tzinfo=IST)
 
 def quote(bid=99,ask=100,at=NOW,qty=195,sym='NIFTY26OCT23000CE'):
-    contract=SimpleNamespace(symbol=sym,kind='CE',lot_size=65,expiry='2026-10-27')
+    contract=SimpleNamespace(symbol=sym,kind='CE',token=777,lot_size=65,expiry='2026-10-27')
     return SimpleNamespace(contract=contract,bid=bid,ask=ask,bid_quantity=qty,ask_quantity=qty,updated=at)
 
 def book(tmp_path):return PaperBook(str(tmp_path/'test.sqlite'))
