@@ -164,7 +164,7 @@ async function refresh(){
  try{
   const selectedDay=el("auditDay").value;
   const auditUrl="/paper/api/opportunities"+
-     (/^\\d{4}-\\d{2}-\\d{2}$/.test(selectedDay)?"?date="+encodeURIComponent(selectedDay):"");
+     (/^\d{4}-\d{2}-\d{2}$/.test(selectedDay)?"?date="+encodeURIComponent(selectedDay):"");
   const [summary,history,opportunities,analytics]=await Promise.all([
     read("/paper/api/summary"),read("/paper/api/trades"),
     read(auditUrl),read("/paper/api/analytics")]);
