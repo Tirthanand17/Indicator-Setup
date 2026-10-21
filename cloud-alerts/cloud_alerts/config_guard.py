@@ -46,11 +46,20 @@ def configuration_blockers(env: Mapping[str, str]) -> tuple[str, ...]:
     except (ValueError, TypeError, UnicodeError):
         problems.append('INVALID_TOKEN_VAULT_KEY')
 
-    flags = ('ALERTS_ENABLED', 'KITE_SHADOW_ENABLED', 'PAPER_PREMIUM_TRACKING_ENABLED')
+    flags = ('ALERTS_ENABLED', 'KITE_SHADOW_ENABLED', 'PAPER_PREMIUM_TRACKING_ENABLED',
+             'PAPER_DASHBOARD_ENABLED', 'PAPER_AUTOTRADE_ENABLED')
     for name in flags:
         if env.get(name, 'false').strip().lower() not in {'true', 'false'}:
             problems.append('INVALID_BOOLEAN_' + name)
 
+    if env.get('PAPER_DASHBOARD_ENABLED','false').strip().lower() == 'true':
+        key=env.get('PAPER_DASHBOARD_KEY','')
+        if len(key)<32 or len(set(key))<8 or _is_placeholder(key):
+            problems.append('INVALID_PAPER_DASHBOARD_KEY')
+    if env.get('PAPER_AUTOTRADE_ENABLED','false').strip().lower() == 'true':
+        if (env.get('ALERTS_ENABLED','false').strip().lower()!='true'
+                or env.get('PAPER_DASHBOARD_ENABLED','false').strip().lower()!='true'):
+            problems.append('INVALID_PAPER_AUTOTRADE_DEPENDENCIES')
     if env.get('ALERTS_ENABLED', 'false').strip().lower() == 'true':
         api_key = env.get('KITE_API_KEY', '')
         if not re.fullmatch(r'[A-Za-z0-9]{16,32}', api_key):
