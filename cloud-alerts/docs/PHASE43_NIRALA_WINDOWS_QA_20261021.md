@@ -15,6 +15,15 @@
 - Two targeted integration successes are included in the full suite's 458 passes; do **not** add them to that total as distinct tests. The 68-target subset likewise overlaps the full suite.
 - Complete Windows test capture kept in the disposable QA workspace `windows-full-suite.txt`. No chat credentials or market prices were used and no live broker calls or broker orders were made.
 
+## CircleCI security hardening — current continuation
+
+- Updated `.circleci/config.yml` to invoke the entire offline Python 3.12 suite under `env -i`, passing only `HOME`, `PATH`, `LANG=C.UTF-8` and **disabled** monitoring/paper/shadow feature flags. This prevents unrelated project-level CircleCI, GitHub, Kite, Telegram and cloud secrets from being inherited by the pytest process, even if a shared CI context was previously configured.
+- The branch-filtered job remains **test-only**, with no token handoff, broker order capability, deployment or release artifact.
+- Pulled exact branch change back to Nirala's dedicated temporary checkout. Validated `.circleci/config.yml` parses as YAML with sections `version`, `jobs`, `workflows`; confirmed Git HEAD `126605e` for this change. This YAML validation is **not** equivalent to a CircleCI-run 3.12 test.
+- Verified GitHub checks `[]` and workflow runs `[]` for previous branch HEAD. **CircleCI job launch still unverified**; it needs existing CircleCI account's project/repo trigger registration. CircleCI is not an installed connected app in this chat.
+- Next operational prerequisite requiring an operator account action if not already configured: CircleCI Dashboard → Organization → Projects → set up **`Tirthanand17/Indicator-Setup`** using committed config branch `feature/phase43-paper-recovery-audit`; run/confirm the `phase43_linux_regression` job. Never enable a billed CircleCI plan or GitHub Actions without approval.
+- The project completion estimate remains **53%**, while real host/token/phone/five-session acceptance remains **0/5**. Do not merge draft PR #1 without all-green Linux Python 3.12 test output.
+
 ## Linux Python 3.12 CircleCI regression path
 
 The existing user's alternative CI provider is **CircleCI**, previously used for other trading-research repositories. In this Indicator-Setup draft branch, added a branch-filtered `.circleci/config.yml` using `cimg/python:3.12`, a small Docker resource, offline test-only environment flags, explicit unsetting of live Kite/Telegram secrets, and a JUnit test artifact. It targets **only** `feature/phase43-paper-recovery-audit`; there is no deploy/publish job or GitHub Actions use.
