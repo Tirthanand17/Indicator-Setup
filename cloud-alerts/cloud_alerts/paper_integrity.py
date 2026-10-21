@@ -47,6 +47,9 @@ def audit_cash_reconciliation(db_path:str)->dict:
             'SELECT account_id,initial_paise,cash_paise FROM paper_accounts').fetchall()
         if {r[0] for r in accounts}!=set(ACCOUNTS):
             raise RuntimeError('Paper account set changed unexpectedly')
+        if any(type(initial) is not int or type(cash) is not int
+               or initial<=0 or cash<0 for _,initial,cash in accounts):
+            raise RuntimeError('Paper account money is not valid integer paise')
         rows=db.execute(
             'SELECT account_id,status,entry_debit_paise,exit_credit_paise,'
             'net_pnl_paise FROM paper_positions').fetchall()
