@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from .contracts import select_future,select_option,validate_quote
 from .kite_readonly import KiteReadOnly
-from .models import Decision
+from .models import Decision,Contract
 from .security import TokenVault
 from .state import State
 from .signals import decide
@@ -29,10 +29,12 @@ logger=logging.getLogger('cloud_alerts')
 class Engine:
     def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False,
                  shadow:ShadowSupervisor|None=None, paper_premium_tracking:bool=False,
-                 premium_hypothesis:PremiumHypothesis|None=None):
+                 premium_hypothesis:PremiumHypothesis|None=None, paper_book=None):
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
         self.shadow=shadow
-        self.paper_premium_tracking=paper_premium_tracking
+        self.paper_book=paper_book
+        self.paper_status='DISABLED' if paper_book is None else 'IDLE'
+        self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
         self.premium_hypothesis=premium_hypothesis or PremiumHypothesis()
         self.premium_status="DISABLED" if not paper_premium_tracking else "IDLE"
         self.last_premium_quote_at=None
@@ -64,6 +66,7 @@ class Engine:
           'phone_outbox':self.db.outbox_summary(),
           'mode':'READ_ONLY_PAPER','order_execution':False,
           'paper_premium_tracking':self.paper_premium_tracking,'premium_status':self.premium_status,
+          'paper_automation_enabled':self.paper_book is not None,'paper_status':self.paper_status,
           'premium_quote_at':self.last_premium_quote_at.isoformat() if self.last_premium_quote_at else None,
           'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
@@ -347,6 +350,21 @@ class Engine:
             self.set_status('WAIT_DATA','Entry claim rejected: duplicate or existing paper position')
             return
         self.db.set_runtime('last_processed_candle',stamp)
+        # Paper accounts are counterfactuals: each one independently sizes from
+        # the same observed book depth and owns its own cash/position ledger.
+        # PaperBook writes its matching Telegram alert into State.events in
+        # the SAME SQLite transaction as the simulated cash debit.
+        if self.paper_book is not None:
+            for account in ('PAPER_50K','PAPER_100K'):
+                try:
+                    result=self.paper_book.enter(event_id,oq,observed_at,account_id=account)
+                    if result['status']=='OPEN':
+                        self.paper_status='POSITION_OPEN'
+                    elif result['status']=='REJECTED':
+                        self.paper_status='RISK_OR_LIQUIDITY_REJECTED'
+                except Exception:
+                    self.paper_status='PAPER_ENTRY_UNVERIFIABLE'
+                    logger.warning('Simulated paper entry failed; no credentials or quote logged')
         await self._deliver_outbox(now)
         if self.db.entry_notice_delivery_state(event_id)=='ACCEPTED':
             self.set_status(decision.status,'Paper review accepted in time by Telegram API')
@@ -473,6 +491,67 @@ class Engine:
         self.db.set_runtime('virtual_candidate','')
         self.premium_status='EXIT_REVIEW_'+reason
 
+    async def poll_paper_positions(self,now:datetime|None=None)->None:
+        """Automatic read-only premium BID exits for independent paper accounts.
+
+        Called by the 20-second worker slot, never from a browser/manual input.
+        Missing/malformed quotes retain cash reservation and never book P&L.
+        """
+        if self.paper_book is None or not self.enabled:
+            return
+        observed=(now or datetime.now(IST)).astimezone(IST)
+        try:
+            if not regular_session(observed.date()):
+                self.paper_status='EXCHANGE_CLOSED'
+                return
+        except CalendarUnavailable:
+            self.paper_status='WAIT_CALENDAR'
+            return
+        if not time(9,30)<=observed.time()<time(15,26):
+            return
+        positions=self.paper_book.open_positions()
+        if not positions:
+            self.paper_status='IDLE'
+            return
+        token=self.vault.get(observed)
+        if not token:
+            self.paper_status='WAIT_TOKEN'
+            return
+        # Reuse one quote per distinct contract, NOT one HTTP call per account.
+        for symbol in sorted({row['option_symbol'] for row in positions}):
+            matching=[row for row in positions if row['option_symbol']==symbol]
+            row=matching[0]
+            try:
+                contract=Contract(token=row['option_token'],symbol=symbol,
+                    expiry=row['option_expiry'],lot_size=row['lot_size'],
+                    kind=row['option_kind'])
+                def fetch_paper_quote():
+                    sdk=KiteReadOnly(self.api_key,token)
+                    try:
+                        return sdk.full_quote(symbol)
+                    finally:
+                        close=getattr(sdk,'close',None)
+                        if callable(close):
+                            close()
+                raw_quote=await asyncio.wait_for(
+                    asyncio.to_thread(fetch_paper_quote),timeout=8)
+                quote_at=(datetime.now(IST) if now is None else observed)
+                quote=validate_quote(contract,raw_quote,quote_at,
+                                     max_age_seconds=15,max_spread_pct=2)
+                for active in matching:
+                    result=self.paper_book.exit(active['trade_id'],quote,quote_at)
+                    if result['status']=='CLOSED':
+                        self.paper_status='SIMULATED_EXIT_RECORDED'
+                    elif result['status']!='HOLD':
+                        self.paper_status='WAIT_EXECUTABLE_DEPTH'
+            except Exception:
+                # A missing exit quote is not an executable exit; do not
+                # invent a backdated fill or release reserved virtual cash.
+                self.paper_status='WAIT_FRESH_EXIT_QUOTE'
+        # Ledger operations atomically queue PAPER_EXIT messages. The existing
+        # rate-bounded dispatcher handles receipt uncertainty and retries.
+        await self._deliver_outbox()
+
     async def _check_virtual_exit(self,candle,symbol:str,now:datetime)->None:
         raw=self.db.get_runtime('virtual_candidate')
         if not raw:return
@@ -531,10 +610,13 @@ class Engine:
                     self.db.expire_events_before(datetime.now(IST)-timedelta(seconds=180))
             # Optional paper-BID monitoring is lower priority than the
             # authoritative five-minute candle and the durable Telegram queue.
-            if self.paper_premium_tracking and self.enabled:
+            if (self.paper_premium_tracking or self.paper_book is not None) and self.enabled:
                 observed=datetime.now(IST)
                 slot=(observed.date().isoformat(),observed.hour,observed.minute,observed.second//20)
                 if slot!=last_premium_poll_slot:
                     last_premium_poll_slot=slot
-                    await self.poll_virtual_premium()
+                    if self.paper_premium_tracking:
+                        await self.poll_virtual_premium()
+                    if self.paper_book is not None:
+                        await self.poll_paper_positions()
             await asyncio.sleep(2)
