@@ -48,6 +48,24 @@ The PowerShell script was pulled to Nirala; PowerShell parser reported **0 synta
 
 Codespaces is an ephemeral **development/test environment**, NOT an approved always-on host. Its short idle timeout is intentionally incompatible with daily market monitoring. Production deployment requires a separately approved durable ₹0-capable host, secure signed daily Kite token relay, read-only NFO REST observations, user-observed Telegram handset receipt with Nirala off, and five full live market sessions.
 
+## Phase 44 result — Codespaces account hard block, no charges (21 October 2026)
+
+The user provided GitHub billing screenshots showing a **$0 Codespaces budget** flagged **`100% Usage blocked`**, plus $1.40 of Codespaces usage fully offset by included discounts (no billed overage shown). A single properly redirected CLI attempt to create the smallest `basicLinux32gb` Codespace on this private feature branch returned:
+
+```text
+error creating codespace: HTTP 402: Usage not allowed:
+Tirthanand17, you are out of monthly free usage or have exceeded
+your budget for Codespaces. Increase your budget to continue using Codespaces.
+```
+
+A fresh `gh codespace list -R Tirthanand17/Indicator-Setup --json name,state` returned **`[]`**. **No Codespace was created**, and **the $0 budget must not be raised or removed** to run this project. Do not repeat the blocked creation attempt unless the user explicitly changes the budget/usage situation. `Run-Linux-QA.ps1` was hardened so a GitHub billing-owner notice on stderr cannot abort the script before capturing a CLI failure; the post-fix full Codespace path is NOT tested because creation is blocked.
+
+**Working $0 fallback on Nirala:** added `cloud-alerts/scripts/Invoke-WindowsPaperSmoke.ps1` on the feature branch, runnable with a pre-existing isolated Python venv. It clears broker, token and Telegram environment values for a narrowly selected pure-paper test suite, restores them after the subprocess, and runs Python compileall. On the actual checked-out repository: **72/72 synthetic paper/recovery/fees/audit/security tests PASSED**, exit 0, including 4 new token-vault temp-file failure regressions. The encrypted-vault write path now correctly closes a raw `mkstemp` fd if mandatory `os.fchmod` fails, before removing the temporary encrypted token; no POSIX permission check was weakened. The local standalone Linux Python 3.13 integrity tests separately remain **29/29 PASS**. These cannot replace the missing full Linux Python **3.12** app suite.
+
+The historical full Nirala Windows suite was **458 pass, 120 fail, 4 skip** before adding the 4 token-vault tests, primarily owing to deliberate Linux-only security/worker locking. The full updated Windows suite has NOT been re-run; do not invent a newer full-suite total.
+
+**Completion index remains 53%, with 0/5 production acceptance gates**. Draft PR #1 remains unmerged, market monitoring/real orders OFF. Approved Linux 3.12 runner, real option quotes and five sessions remain unresolved. Do not purchase more CI credits or remove spending protections.
+
 ## Additional no-charge Linux test evidence
 
 The ChatGPT execution container is genuine Linux but only Python **3.13**, and currently has just the recovered pure `paper_integrity.py` and its focused tests, not the entire `Indicator-Setup` repository. Executed `PYTHONPATH=/mnt/data/indicator_phase43 python -m pytest -q /mnt/data/indicator_phase43/tests`: **29 passed in 1.49 seconds**. This verifies recovery logic on Linux without using CircleCI, Actions, Codespaces or any paid runner. It does **not** establish Python 3.12 compatibility or full FastAPI/Kite worker correctness.
