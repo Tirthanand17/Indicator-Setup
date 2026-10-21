@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-21 (Phase 43 — draft, unmerged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-21 (Phase 44 — draft, unmerged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -45,6 +45,14 @@ The existing user's alternative CI provider is **CircleCI**, previously used for
 
 **Run status:** GitHub commit-status API returned `statuses: []`, and GitHub workflow-runs returned `[]` after the config commit. This does not prove CircleCI project registration or an executed Linux job. CircleCI is not exposed as a connected action in this ChatGPT tool context, so a successful CircleCI job **has not been verified**. Do not merge pending all-green Linux evidence. Docs: https://circleci.com/docs/guides/getting-started/language-python/
 
+
+## Phase 44 — Replace exhausted CircleCI with no-cost-gated GitHub Codespaces Linux QA
+
+1. **CircleCI monthly limit exhausted per user**; disabled its branch pipeline by deleting `.circleci/config.yml`. No new CI subscription, GitHub Actions usage, spending commitments or deployments.
+2. Prepared `.devcontainer/devcontainer.json` (Debian Linux, Python 3.12) and `.devcontainer/run-linux-qa.sh` (automatic full pytest within 10-minute timeout, local JUnit/logs, **`env -i` secret isolation**, monitoring/paper flags disabled). GitHub personal Codespaces has a **separate** included quota from Actions and CircleCI, but actual remaining free hours/storage could not be confirmed: **no Codespace was created** to avoid potentially billable usage.
+3. Read-only Nirala GitHub CLI verified `gh codespace list` returned **0** existing Codespaces, and repository supports a **2-core `basicLinux32gb`** machine. Pulled the branch into its already authorized temporary clone; checked devcontainer JSON parses and shell script passes `bash -n`. These are **configuration validation**, not a full Linux test.
+4. Separately ran the recovered Phase 43 **29 isolated recovery/cash integrity unit tests on Linux Python 3.13: 29/29 PASSED**, but complete Linux Python 3.12 application suite is **NOT RUN**. Earlier actual Nirala Windows full suite remains **458 passed, 120 failed, 4 skipped**; targeted full-repo paper tests **68/68 passed**.
+5. The exact **budget-guarded** one-command Codespace launch and cleanup, test artifact locations and safety limitations are saved in [Phase 44 Codespaces Linux QA instructions](PHASE44_CODESPACES_OFFLINE_QA.md). Creation requires confirmation that Codespaces is within user's **remaining free allocation and $0 spending controls**. PR #1 remains draft and unmerged, paper autopilot OFF, live acceptance **0/5**, engineering estimate **53% unchanged**.
 
 ## Phase 43 — actual Nirala checkout and full Windows suite (RED; 53% retained)
 
