@@ -158,3 +158,13 @@ def test_daily_report_reconciles_only_closed_and_rejected(tmp_path):
     assert acct['closed']==1 and acct['wins']==1 and acct['net_realized_rs']>0
     assert acct['unresolved']==0 and report['actual_fills_verified'] is False
     assert report['accounts'][1]['closed']==0
+
+def test_unverified_position_cannot_be_retroactively_exited_next_day(tmp_path):
+    b=book(tmp_path)
+    trade=b.enter('signal-1',quote(),NOW,account_id='PAPER_50K')
+    b.finish_session(NOW.replace(hour=15,minute=30))
+    assert b.open_positions()==[]
+    day2=NOW+timedelta(days=1)
+    result=b.exit(trade['trade_id'],quote(bid=141,ask=142,at=day2),day2)
+    assert result['status']=='UNVERIFIABLE'
+    assert b.trade_history()[0]['net_pnl_rs'] is None
