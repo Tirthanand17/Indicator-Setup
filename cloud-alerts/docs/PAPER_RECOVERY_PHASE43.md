@@ -1,6 +1,6 @@
 # Phase 43 — autonomous partial-paper-entry crash recovery
 
-**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **14/14 isolated unit tests passed** in the current container; 2 new integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
+**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **17/17 focused recovery unit tests passed locally** in the current container; 3 full-worker/schema integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
 
 ## Audited failure mode
 
@@ -17,11 +17,20 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 - A paper account with existing simulated positions but **no activation marker** is fail-closed at activation; the program cannot safely guess when simulation mode originally began.
 - Private `/paper/api/summary` includes `paper_recovery_integrity`; the mobile dashboard highlights blocked or not-activated simulation state without exposing credentials.
 
+
+## Additional recovery hardening in this session
+
+- Detect contradictory position-and-rejection evidence for one account/signal, and unexpected account names, before claiming completion or writing any recovery record. These cases fail closed.
+- Test a synthetic SQLite failure during the second account reconciliation write: the first insert and recovery notification roll back together, leaving original cash and journal intact.
+- Move purely local crash-gap reconciliation before daily Kite token lookup. Missing a token continues to pause all new signal processing, but cannot prevent existing account journal repairs. A third worker integration case covers this path; it is committed but NOT executed with the full application.
+- Local cross-module smoke exercised one paper BUY in the 50k account and a missing 100k account outcome against a SQLite events/runtime schema and the locally available PaperBook implementation; repair preserved cash and recorded the missing outcome as MISSED. This is not the full Phase 42/43 app suite.
+- Target Docker Python is 3.12, whereas focused unit tests ran on Python 3.13. Full target-runtime validation is still mandatory.
+
 ## Test ledger
 
-**Executed locally:** `PYTHONPATH=. pytest -q tests/test_paper_integrity.py` on the isolated pure recovery module and fixtures -> **14 passed (0 failures)**. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
+**Executed locally:** `PYTHONPATH=. pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py` on the isolated recovery module and fixtures -> **17 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
 
-**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 2 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
+**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 3 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
 
 ## Source/branch and exact continuation
 
