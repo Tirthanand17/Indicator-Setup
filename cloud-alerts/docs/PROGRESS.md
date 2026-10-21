@@ -39,6 +39,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 
+## Linux Python 3.12 CircleCI regression path
+
+The existing user's alternative CI provider is **CircleCI**, previously used for other trading-research repositories. In this Indicator-Setup draft branch, added a branch-filtered `.circleci/config.yml` using `cimg/python:3.12`, a small Docker resource, offline test-only environment flags, explicit unsetting of live Kite/Telegram secrets, and a JUnit test artifact. It targets **only** `feature/phase43-paper-recovery-audit`; there is no deploy/publish job or GitHub Actions use.
+
+**Run status:** GitHub commit-status API returned `statuses: []`, and GitHub workflow-runs returned `[]` after the config commit. This does not prove CircleCI project registration or an executed Linux job. CircleCI is not exposed as a connected action in this ChatGPT tool context, so a successful CircleCI job **has not been verified**. Do not merge pending all-green Linux evidence. Docs: https://circleci.com/docs/guides/getting-started/language-python/
+
+
 ## Phase 43 — actual Nirala checkout and full Windows suite (RED; 53% retained)
 
 1. Connected to **Nirala online** through the linked Desktop Commander Personal account. Cloned real Phase 43 branch into `%TEMP%\indicator-phase43-qa-20261021`, with isolated Python venv. No Desktop or protected Kite trading-folder mutations, no production services.
