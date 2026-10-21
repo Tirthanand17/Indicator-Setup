@@ -66,6 +66,13 @@ The authenticated paper dashboard previously showed available cash, net realized
 5. No merge, GitHub CI, paid host, real Kite key, phone send or real order. See [Full Windows QA results, failure classification and next Linux runner command](PHASE43_NIRALA_WINDOWS_QA_20261021.md).
 6. Expanded engineering estimate **53%**, original alert preparation **80%**, paper subsystem historical estimate **43%**; **live acceptance remains 0/5**. Next: authorized isolated Linux Python 3.12 full pytest, patch legitimate failures, merge then cloud acceptance.
 
+## Linux Python 3.12 CircleCI regression path
+
+The existing user's alternative CI provider is **CircleCI**, previously used for other trading-research repositories. In this Indicator-Setup draft branch, added a branch-filtered `.circleci/config.yml` using `cimg/python:3.12`, a small Docker resource, offline test-only environment flags, explicit unsetting of live Kite/Telegram secrets, and a JUnit test artifact. It targets **only** `feature/phase43-paper-recovery-audit`; there is no deploy/publish job or GitHub Actions use.
+
+**Run status:** GitHub commit-status API returned `statuses: []`, and GitHub workflow-runs returned `[]` after the config commit. This does not prove CircleCI project registration or an executed Linux job. CircleCI is not exposed as a connected action in this ChatGPT tool context, so a successful CircleCI job **has not been verified**. Do not merge pending all-green Linux evidence. Docs: https://circleci.com/docs/guides/getting-started/language-python/
+
+
 ## Test ledger
 
 **Executed locally:** `PYTHONPATH=. python -m pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py tests/test_paper_integrity_cash.py` on the isolated recovery module and fixtures -> **29 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
