@@ -86,6 +86,18 @@ class PaperBook:
         return db
 
     @staticmethod
+    def _queue_telegram(db, event_id: str, status: str, now: datetime, message: str) -> None:
+        """Share the existing State.events outbox transaction, if it exists.
+
+        Fresh standalone ledgers need not create the alert subsystem's schema;
+        the cloud server always creates State first. The SQLite write stays
+        atomic with the position and cash mutation; no network under lock.
+        """
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='events'").fetchone():
+            db.execute('INSERT OR IGNORE INTO events(event_id,status,at,payload) VALUES(?,?,?,?)',
+                       (event_id,status,now.isoformat(),message))
+
+    @staticmethod
     def _market_time(now: datetime, *, entry: bool) -> None:
         if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
             raise ValueError('aware IST clock required')
@@ -186,6 +198,13 @@ class PaperBook:
                        (trade_id,account_id,signal_id,c.symbol,c.kind,c.expiry,c.token,c.lot_size,lots,
                         now.astimezone(IST).isoformat(),quote.updated.astimezone(IST).isoformat(),reference,
                         fill,debit,entry_fee,exit_fee,slippage_bps,stop,target,'OPEN'))
+            self._queue_telegram(db,'PAPER_ENTRY:'+trade_id,'PAPER_ENTRY',now,
+                f'NIFTY PAPER BUY {c.kind} — SIMULATED ONLY\n'
+                f'Account: {account_id} | Trade: {trade_id}\n'
+                f'Option: {c.symbol} | Lots: {lots} | Units: {lots*c.lot_size}\n'
+                f'ASK Rs {rupees(reference):.2f} | Simulated entry Rs {rupees(fill):.2f}\n'
+                f'Cash debited Rs {rupees(debit):.2f} including modeled entry fees.\n'
+                'No real order placed. Model assumptions and slippage apply.')
             return {'status':'OPEN','trade_id':trade_id,'account_id':account_id,'lots':lots,
                     'quantity':lots*c.lot_size,'entry_reference_rs':rupees(reference),
                     'simulated_fill_rs':rupees(fill),'debit_rs':rupees(debit),
@@ -228,6 +247,12 @@ class PaperBook:
                         fill,credit,fee,reason,pnl,trade_id,'CLOSED'))
             db.execute('UPDATE paper_accounts SET cash_paise=cash_paise+? WHERE account_id=?',
                        (credit,old['account_id']))
+            self._queue_telegram(db,'PAPER_EXIT:'+trade_id,'PAPER_EXIT',now,
+                f'NIFTY PAPER EXIT ({reason}) — SIMULATED ONLY\n'
+                f'Account: {old["account_id"]} | Trade: {trade_id}\n'
+                f'Option: {old["option_symbol"]} | BID Rs {rupees(bid):.2f}\n'
+                f'Net modeled P&L Rs {rupees(pnl):.2f} after slippage/fees.\n'
+                'No real order placed. Not an exchange-confirmed fill.')
             return {'status':'CLOSED','trade_id':trade_id,'reason':reason,
                     'exit_reference_rs':rupees(bid),'simulated_exit_fill_rs':rupees(fill),
                     'net_pnl_rs':rupees(pnl),'paper_only':True}
