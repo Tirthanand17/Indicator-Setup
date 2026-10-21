@@ -70,3 +70,19 @@ async def test_worker_blocks_new_signal_until_old_review_is_reconciled(tmp_path,
     assert worker.paper_book.open_positions()==[]
     with sqlite3.connect(worker.db.path) as db:
         assert db.execute("SELECT COUNT(*) FROM paper_rejections WHERE reason='CRASH_GAP_NO_SIMULATED_FILL'").fetchone()[0]==2
+
+@pytest.mark.asyncio
+async def test_local_crash_recovery_runs_even_without_today_kite_token(tmp_path,monkeypatch):
+    worker=create_engine(tmp_path,monkeypatch)
+    worker.paper_book=PaperBook(worker.db.path)
+    worker.paper_integrity_enforced=True
+    initialize_activation(worker.db.path,NOW-timedelta(minutes=10))
+    worker.db.claim_event('SYNTHETIC_OLD_REVIEW','REVIEW_PE',
+                          NOW-timedelta(minutes=4),'PAPER ONLY TEST')
+    monkeypatch.setattr(worker.vault,'get',lambda observed:None)
+    await worker.run_once(NOW)
+    assert worker.status=='WAIT_TOKEN'
+    assert audit_entry_coverage(worker.db.path)['status']=='COMPLETE'
+    assert worker.paper_book.open_positions()==[]
+    with sqlite3.connect(worker.db.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM paper_rejections WHERE reason='CRASH_GAP_NO_SIMULATED_FILL'").fetchone()[0]==2
