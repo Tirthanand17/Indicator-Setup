@@ -155,3 +155,16 @@ async def test_paper_autopilot_disabled_keeps_original_signal_mode(tmp_path,monk
     assert worker.db.is_sent('PAPER_DAILY:'+NOW.date().isoformat()) is False
     await worker.poll_paper_positions(NOW)
     assert worker.paper_status=='DISABLED'
+
+def test_private_signal_audit_api_denies_unauthenticated_clients(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        assert client.get('/paper/api/opportunities').status_code==404
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        response=client.get('/paper/api/opportunities',headers=auth)
+        assert response.status_code==200 and response.headers['Cache-Control']=='no-store'
+        body=response.json()
+        assert body['audit']['strategy_qualified']==0
+        assert body['audit']['missed_pnl_verifiable'] is False
+        assert body['evaluations']==[]
+        assert body['actual_orders'] is False
