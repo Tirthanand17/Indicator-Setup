@@ -46,6 +46,8 @@ footer{color:#90a8c4;font-size:.78rem;padding-bottom:28px}
 <section class="card"><h2>Recent simulated trades</h2><div class="tablewrap" id="trades">No paper history loaded.</div></section>
 <section class="card"><h2>Five-indicator decisions and missed opportunities</h2>
 <p>Recorded from completed NIFTY futures candles. A move in hindsight is not a validated missed CE/PE trade.</p>
+<div class="auth"><input id="auditDay" type="date" aria-label="Filter completed-candle decisions by trading date">
+<button id="auditFilter">Filter decisions</button></div>
 <div id="auditSummary" class="muted">No strategy observations loaded.</div>
 <div class="tablewrap" id="audits">No decision evidence loaded.</div></section>
 </main><footer>Research software only. Timezone: Asia/Kolkata. Estimates use observed option BID/ASK, configured fees and adverse slippage; no real broker execution.</footer>
@@ -160,9 +162,12 @@ function auditView(data){
 async function refresh(){
  if(!secret)return;
  try{
+  const selectedDay=el("auditDay").value;
+  const auditUrl="/paper/api/opportunities"+
+     (/^\\d{4}-\\d{2}-\\d{2}$/.test(selectedDay)?"?date="+encodeURIComponent(selectedDay):"");
   const [summary,history,opportunities,analytics]=await Promise.all([
     read("/paper/api/summary"),read("/paper/api/trades"),
-    read("/paper/api/opportunities"),read("/paper/api/analytics")]);
+    read(auditUrl),read("/paper/api/analytics")]);
   currentAccounts=summary.accounts;latestTrades=history.trades;
   accountsView(summary);statsView(analytics);drawChart(analytics);tradesView(latestTrades);
   auditView(opportunities);
@@ -170,6 +175,7 @@ async function refresh(){
    " · "+(summary.mode||"PAPER ONLY")+" · simulated fills only";
  }catch(e){el("status").textContent=e.message;}
 }
+el("auditFilter").addEventListener("click",()=>refresh());
 el("login").addEventListener("click",()=>{
  secret=el("key").value;el("key").value="";refresh();
 });
