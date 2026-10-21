@@ -11,6 +11,7 @@ from pathlib import Path
 import math
 import sqlite3
 from zoneinfo import ZoneInfo
+from .paper_charges import estimate_nse_option_leg, POLICY as COST_POLICY
 
 IST = ZoneInfo('Asia/Kolkata')
 PAISE = Decimal('0.01')
@@ -60,6 +61,7 @@ class PaperBook:
               entry_ask_paise INTEGER NOT NULL, entry_fill_paise INTEGER NOT NULL,
               entry_debit_paise INTEGER NOT NULL, entry_fee_paise INTEGER NOT NULL,
               exit_fee_assumed_paise INTEGER NOT NULL, slippage_bps INTEGER NOT NULL,
+              fee_model_version TEXT NOT NULL DEFAULT 'FIXED_RS_V1',
               stop_bid_paise INTEGER NOT NULL, target_bid_paise INTEGER NOT NULL,
               status TEXT NOT NULL CHECK(status IN ('OPEN','CLOSED','EXIT_UNVERIFIABLE')),
               exit_at TEXT, exit_quote_at TEXT, exit_bid_paise INTEGER,
@@ -71,6 +73,9 @@ class PaperBook:
               CREATE TABLE IF NOT EXISTS paper_rejections (
               account_id TEXT NOT NULL, signal_id TEXT NOT NULL, at TEXT NOT NULL,
               reason TEXT NOT NULL, PRIMARY KEY(account_id,signal_id));''')
+            columns={r[1] for r in db.execute('PRAGMA table_info(paper_positions)')}
+            if 'fee_model_version' not in columns:
+                db.execute("ALTER TABLE paper_positions ADD COLUMN fee_model_version TEXT NOT NULL DEFAULT 'FIXED_RS_V1'")
             for name, amount in amounts.items():
                 db.execute('INSERT OR IGNORE INTO paper_accounts(account_id,initial_paise,cash_paise) '
                            'VALUES(?,?,?)', (name, money(amount), money(amount)))
@@ -128,7 +133,7 @@ class PaperBook:
             raise ValueError('option contract expired')
 
     def enter(self, signal_id: str, quote, now: datetime, *, account_id: str,
-              slippage_bps: int = 8, roundtrip_fee_rs: int = 50,
+              slippage_bps: int = 8, roundtrip_fee_rs: int | None = None,
               stop_fraction: float = 0.20, target_fraction: float = 0.40) -> dict:
         """Buy hypothetical whole lots at ASK plus adverse slippage.
 
@@ -141,7 +146,7 @@ class PaperBook:
             not all(ch.isalnum() or ch in ':._+-' for ch in signal_id)):
             raise ValueError('invalid signal identifier')
         if (type(slippage_bps) is not int or not 0 <= slippage_bps <= 100 or
-            type(roundtrip_fee_rs) is not int or not 1 <= roundtrip_fee_rs <= 1000 or
+            (roundtrip_fee_rs is not None and (type(roundtrip_fee_rs) is not int or not 1 <= roundtrip_fee_rs <= 1000)) or
             not 0.05 <= stop_fraction <= 0.50 or not 0.10 <= target_fraction <= 1):
             raise ValueError('invalid paper execution assumptions')
         c=quote.contract
@@ -149,10 +154,9 @@ class PaperBook:
         fill=money(Decimal(str(quote.ask)) * (1 + Decimal(slippage_bps)/10000))
         stop=money(Decimal(str(quote.ask)) * (1 - Decimal(str(stop_fraction))))
         target=money(Decimal(str(quote.ask)) * (1 + Decimal(str(target_fraction))))
-        entry_fee=money(Decimal(roundtrip_fee_rs)/2)
-        exit_fee=money(roundtrip_fee_rs)-entry_fee
-        per_lot=c.lot_size*fill
-        risk_per_lot=c.lot_size*(fill-stop)
+        policy=('FIXED_RS_V1' if roundtrip_fee_rs is not None else COST_POLICY)
+        stop_exit_fill=money(Decimal(stop)/100*(1-Decimal(slippage_bps)/10000))
+        risk_per_lot=c.lot_size*(fill-stop_exit_fill)
         qty_limit=quote.ask_quantity//c.lot_size
         with self._db() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -173,31 +177,49 @@ class PaperBook:
             daily_loss=db.execute('SELECT COALESCE(SUM(net_pnl_paise),0) FROM paper_positions '
                                   "WHERE account_id=? AND status='CLOSED' AND substr(exit_at,1,10)=? AND net_pnl_paise<0",
                                   (account_id,now.astimezone(IST).date().isoformat())).fetchone()[0]
-            max_lots=min(qty_limit,
-                         (cash-entry_fee)//per_lot,
-                         (initial*30//100-entry_fee)//per_lot,
-                         (initial*3//100-entry_fee-exit_fee)//risk_per_lot)
+            # Evaluate EACH possible whole-lot size including variable taxes.
+            # Remaining daily risk includes losses already booked today, so
+            # paper trades cannot exceed the daily limit by accepting one more
+            # entire 3% per-trade loss when only a small budget remains.
+            remaining_daily=max(0,initial*6//100+daily_loss)
+            selection=None
+            for candidate in range(min(qty_limit,3),0,-1):
+                qty=candidate*c.lot_size
+                if roundtrip_fee_rs is None:
+                    entry_fee=estimate_nse_option_leg(Decimal(fill)/100,qty,'BUY',
+                        on_date=now.astimezone(IST).date()).total_paise
+                    exit_fee=estimate_nse_option_leg(Decimal(stop_exit_fill)/100,qty,'SELL',
+                        on_date=now.astimezone(IST).date()).total_paise
+                else:
+                    entry_fee=money(Decimal(roundtrip_fee_rs)/2)
+                    exit_fee=money(roundtrip_fee_rs)-entry_fee
+                debit=qty*fill+entry_fee
+                modeled_loss=qty*(fill-stop_exit_fill)+entry_fee+exit_fee
+                if (debit<=cash and debit<=initial*30//100
+                        and modeled_loss<=initial*3//100
+                        and modeled_loss<=remaining_daily):
+                    selection=(candidate,entry_fee,exit_fee,debit)
+                    break
             reason=('POSITION_ALREADY_OPEN' if active else
                     'MAX_TRADES_PER_DAY' if same_day>=3 else
-                    'DAILY_LOSS_LIMIT' if -daily_loss >= initial*6//100 else
-                    'INSUFFICIENT_PAPER_CAPITAL_OR_DEPTH' if max_lots<1 else '')
+                    'DAILY_LOSS_LIMIT' if remaining_daily<=0 else
+                    'RISK_OR_CAPITAL_OR_LIQUIDITY' if selection is None else '')
             if reason:
                 db.execute('INSERT OR IGNORE INTO paper_rejections VALUES(?,?,?,?)',
                            (account_id,signal_id,now.astimezone(IST).isoformat(),reason))
                 return {'status':'REJECTED','reason':reason,'account_id':account_id}
-            lots=min(max_lots, 3)
-            debit=per_lot*lots+entry_fee
+            lots,entry_fee,exit_fee,debit=selection
             trade_id=account_id+':'+signal_id
             db.execute('UPDATE paper_accounts SET cash_paise=cash_paise-? WHERE account_id=? AND cash_paise>=?',
                        (debit,account_id,debit))
             db.execute('INSERT INTO paper_positions('
                        'trade_id,account_id,signal_id,option_symbol,option_kind,option_expiry,option_token,lot_size,lots,'
                        'entry_at,entry_quote_at,entry_ask_paise,entry_fill_paise,entry_debit_paise,entry_fee_paise,'
-                       'exit_fee_assumed_paise,slippage_bps,stop_bid_paise,target_bid_paise,status) '
-                       'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       'exit_fee_assumed_paise,slippage_bps,fee_model_version,stop_bid_paise,target_bid_paise,status) '
+                       'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                        (trade_id,account_id,signal_id,c.symbol,c.kind,c.expiry,c.token,c.lot_size,lots,
                         now.astimezone(IST).isoformat(),quote.updated.astimezone(IST).isoformat(),reference,
-                        fill,debit,entry_fee,exit_fee,slippage_bps,stop,target,'OPEN'))
+                        fill,debit,entry_fee,exit_fee,slippage_bps,policy,stop,target,'OPEN'))
             self._queue_telegram(db,'PAPER_ENTRY:'+trade_id,'PAPER_ENTRY',now,
                 f'NIFTY PAPER BUY {c.kind} — SIMULATED ONLY\n'
                 f'Account: {account_id} | Trade: {trade_id}\n'
@@ -238,7 +260,10 @@ class PaperBook:
                     'TARGET' if bid>=old['target_bid_paise'] else 'HOLD')
             if reason=='HOLD':return {'status':'HOLD','trade_id':trade_id}
             fill=money(Decimal(str(quote.bid)) * (1-Decimal(old['slippage_bps'])/10000))
-            fee=old['exit_fee_assumed_paise']
+            fee=(estimate_nse_option_leg(Decimal(fill)/100,qty,'SELL',
+                   on_date=now.astimezone(IST).date()).total_paise
+                 if old['fee_model_version']==COST_POLICY
+                 else old['exit_fee_assumed_paise'])
             credit=qty*fill-fee
             if credit<0:return {'status':'WAIT_VALUE','trade_id':trade_id}
             pnl=credit-old['entry_debit_paise']
@@ -293,7 +318,7 @@ class PaperBook:
                             'option_expiry,option_token,lot_size,lots,entry_at,entry_quote_at,'
                             'entry_ask_paise,entry_fill_paise,entry_debit_paise,entry_fee_paise,'
                             'exit_at,exit_quote_at,exit_bid_paise,exit_fill_paise,exit_credit_paise,'
-                            'exit_fee_paise,exit_reason,net_pnl_paise,status FROM paper_positions '
+                            'exit_fee_paise,exit_reason,net_pnl_paise,status,fee_model_version FROM paper_positions '
                             'ORDER BY entry_at DESC,trade_id DESC LIMIT ?', (limit,)).fetchall()
         result=[]
         for r in rows:
@@ -302,6 +327,9 @@ class PaperBook:
                 if name.endswith('_paise'):
                     row[name.removesuffix('_paise')+'_rs'] = (rupees(row.pop(name)) if row[name] is not None else None)
             row['paper_only']=True
+            row['fee_estimate_audited']=False
+            row['modeled_charges_rs']=(round(row['entry_fee_rs']+row['exit_fee_rs'],2)
+                                      if row['exit_fee_rs'] is not None else None)
             row['actual_fill_verified']=False
             result.append(row)
         return result
