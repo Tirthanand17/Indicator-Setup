@@ -1,5 +1,11 @@
 # NIFTY 50 cloud alerts — official Kite Connect, no chart required
 
+**Current expanded objective (21 October 2026): 100% unattended NIFTY CE/PE PAPER BUY/SELL simulations, separate capital accounts, automatic quote monitoring, Telegram and a mobile dashboard, after a valid daily Kite token has been securely handed to an approved always-on host. ZERO real broker orders.**
+
+**Phase 41 implementation added:** two separate SQLite paper accounts (₹50,000 / ₹1,00,000), capital and risk checks, modeled option ASK/BID entries and exits, restart-safe cash records, Telegram outbox entries, a 20-second premium monitor integration, a post-session report and an opt-in dashboard at /paper/dashboard. **All are disabled by default and the cloud is NOT deployed.** [Phase 41 details](docs/AUTOMATED_PAPER_PORTFOLIO_PHASE41.md).
+
+**Progress for EXPANDED objective: 51% provisional engineering / NEW paper subsystem 35% / previous alerts-only engineering 80% / live acceptance 0 of 5.** Tested locally: 18/18 focused ledger tests; 9 new integration tests are committed but unexecuted. This is not a profitable-strategy claim. [Progress and blockers](docs/PROGRESS.md).
+
 **Status: architecture and a testable read-only prototype; NOT deployed or live validated.** This code intentionally cannot place orders. No browser extension, open Kite chart or powered-on laptop is required *after the daily token has been securely handed to an always-on cloud worker*.
 
 The existing [Indicator-Setup](https://github.com/Tirthanand17/Indicator-Setup) repository also includes a separate, older **screen-reading Chrome extension**. This folder is a **different architecture**: it uses the officially supported paid Kite Connect market-data API, with complete exchange-timestamped candles and actual bid/ask depth.
