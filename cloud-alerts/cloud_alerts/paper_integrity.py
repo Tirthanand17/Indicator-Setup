@@ -20,6 +20,20 @@ def _utc(value:str)->datetime:
     except (ValueError,TypeError,OverflowError):
         raise RuntimeError('Malformed paper audit event clock') from None
 
+def _validate_signal_outcomes(db:sqlite3.Connection,signal_id:str)->set[str]:
+    """Fail closed on unknown account or contradictory paper evidence."""
+    positions=[r[0] for r in db.execute(
+        'SELECT account_id FROM paper_positions WHERE signal_id=?',(signal_id,))]
+    rejected=[r[0] for r in db.execute(
+        'SELECT account_id FROM paper_rejections WHERE signal_id=?',(signal_id,))]
+    if any(account not in ACCOUNTS for account in positions+rejected):
+        raise RuntimeError('Unknown account in paper basket journal')
+    if (set(positions).intersection(rejected)
+            or len(positions)!=len(set(positions))
+            or len(rejected)!=len(set(rejected))):
+        raise RuntimeError('Contradictory paper position and rejection evidence')
+    return set(positions+rejected)
+
 def initialize_activation(db_path:str,now:datetime)->str:
     """Save immutable first-activation watermark; ignore earlier alert-only reviews."""
     if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
@@ -50,6 +64,11 @@ def audit_entry_coverage(db_path:str,*,max_examples:int=10)->dict:
         reviews=db.execute("SELECT event_id,at FROM events WHERE status IN ('REVIEW_CE','REVIEW_PE')").fetchall()
         recorded=set(db.execute('SELECT account_id,signal_id FROM paper_positions').fetchall())
         rejected=set(db.execute('SELECT account_id,signal_id FROM paper_rejections').fetchall())
+        # Validate all eligible REVIEW source events before claiming coverage.
+        # A contradictory row is never equivalent to a completed basket.
+        for signal_id,when in reviews:
+            if _utc(when)>=activated:
+                _validate_signal_outcomes(db,signal_id)
     checked=missing=0
     for signal_id,when in reviews:
         if _utc(when)<activated:
@@ -92,10 +111,8 @@ def recover_missing_outcomes(db_path:str,now:datetime,*,grace_seconds:int=180)->
             delta=(current-observed).total_seconds()
             if delta < -3:
                 raise RuntimeError('Paper review timestamp is in the future')
-            outcomes=set(db.execute('SELECT account_id FROM paper_positions WHERE signal_id=? '
-                'UNION SELECT account_id FROM paper_rejections WHERE signal_id=?',
-                (signal_id,signal_id)).fetchall())
-            missing=[a for a in ACCOUNTS if (a,) not in outcomes]
+            outcomes=_validate_signal_outcomes(db,signal_id)
+            missing=[a for a in ACCOUNTS if a not in outcomes]
             if not missing:
                 continue
             if delta<grace_seconds:
