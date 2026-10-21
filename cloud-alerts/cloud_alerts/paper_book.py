@@ -255,3 +255,26 @@ class PaperBook:
                                  'equity_rs':rupees(a['cash_paise']) if positions==0 else None})
             return {'mode':'PAPER_ONLY','actual_orders':False,'source':'UNVERIFIED_QUOTE_SIMULATION',
                     'accounts':accounts}
+
+    def trade_history(self, *, limit: int = 100) -> list[dict]:
+        """Dashboard-safe, strictly read-only immutable trade/event fields."""
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError('invalid history limit')
+        with self._db() as db:
+            db.row_factory=sqlite3.Row
+            rows=db.execute('SELECT trade_id,account_id,signal_id,option_symbol,option_kind,'
+                            'option_expiry,option_token,lot_size,lots,entry_at,entry_quote_at,'
+                            'entry_ask_paise,entry_fill_paise,entry_debit_paise,entry_fee_paise,'
+                            'exit_at,exit_quote_at,exit_bid_paise,exit_fill_paise,exit_credit_paise,'
+                            'exit_fee_paise,exit_reason,net_pnl_paise,status FROM paper_positions '
+                            'ORDER BY entry_at DESC,trade_id DESC LIMIT ?', (limit,)).fetchall()
+        result=[]
+        for r in rows:
+            row=dict(r)
+            for name in tuple(row):
+                if name.endswith('_paise'):
+                    row[name.removesuffix('_paise')+'_rs'] = (rupees(row.pop(name)) if row[name] is not None else None)
+            row['paper_only']=True
+            row['actual_fill_verified']=False
+            result.append(row)
+        return result
