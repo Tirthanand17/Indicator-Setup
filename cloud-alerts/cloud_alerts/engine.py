@@ -36,7 +36,7 @@ class Engine:
         self.paper_status='DISABLED' if paper_book is None else 'IDLE'
         self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
         self.premium_hypothesis=premium_hypothesis or PremiumHypothesis()
-        self.premium_status="DISABLED" if not paper_premium_tracking else "IDLE"
+        self.premium_status="DISABLED" if not self.paper_premium_tracking else "IDLE"
         self.last_premium_quote_at=None
         self.status='NOT_STARTED' if enabled else 'DISABLED'
         self.status_at=datetime.now(IST)
