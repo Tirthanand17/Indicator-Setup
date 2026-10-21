@@ -181,3 +181,12 @@ def test_private_analytics_api_auth_and_no_fabricated_winrate(tmp_path):
         assert report['strategy_profitability_validated'] is False
         assert len(report['accounts'])==2
         assert all(x['win_rate_pct'] is None for x in report['accounts'])
+
+def test_paper_opportunity_date_filter_rejects_bad_calendar_input(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        assert client.get('/paper/api/opportunities?date=not-a-date',headers=auth).status_code==400
+        response=client.get('/paper/api/opportunities?date=2026-10-21',headers=auth)
+        assert response.status_code==200
+        assert response.json()['evaluations']==[]
