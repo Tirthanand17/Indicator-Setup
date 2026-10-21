@@ -550,7 +550,7 @@ class Engine:
                 self.paper_status='WAIT_FRESH_EXIT_QUOTE'
         # Ledger operations atomically queue PAPER_EXIT messages. The existing
         # rate-bounded dispatcher handles receipt uncertainty and retries.
-        await self._deliver_outbox()
+        await self._deliver_outbox(observed if now is not None else None)
 
     async def _check_virtual_exit(self,candle,symbol:str,now:datetime)->None:
         raw=self.db.get_runtime('virtual_candidate')
