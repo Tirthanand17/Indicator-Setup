@@ -35,6 +35,7 @@ class AppSettings:
         self.shadow_enabled=os.environ.get('KITE_SHADOW_ENABLED','false').strip().lower()=='true'
         self.paper_premium_tracking=os.environ.get('PAPER_PREMIUM_TRACKING_ENABLED','false').strip().lower()=='true'
         self.paper_dashboard_enabled=os.environ.get('PAPER_DASHBOARD_ENABLED','false').strip().lower()=='true'
+        self.paper_autotrade_enabled=os.environ.get('PAPER_AUTOTRADE_ENABLED','false').strip().lower()=='true'
         self.paper_dashboard_key=os.environ.get('PAPER_DASHBOARD_KEY','')
     def validate(self):
         # Mirror deployment preflight: a direct Uvicorn invocation must not
@@ -46,6 +47,7 @@ class AppSettings:
                 'KITE_SHADOW_ENABLED':'true' if self.shadow_enabled else 'false',
                 'PAPER_PREMIUM_TRACKING_ENABLED':'true' if self.paper_premium_tracking else 'false',
                 'PAPER_DASHBOARD_ENABLED':'true' if self.paper_dashboard_enabled else 'false',
+                'PAPER_AUTOTRADE_ENABLED':'true' if self.paper_autotrade_enabled else 'false',
                 'PAPER_DASHBOARD_KEY':self.paper_dashboard_key}
         if configuration_blockers(config):
             raise RuntimeError('Invalid cloud configuration; use offline preflight for safe blocker codes')
@@ -66,9 +68,12 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     if paper_enabled and (len(paper_key)<32 or len(set(paper_key))<8):
         raise RuntimeError('Paper dashboard requires a separate strong access key')
     paper_book=PaperBook(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
+    if getattr(cfg,'paper_autotrade_enabled',False) and not paper_enabled:
+        raise RuntimeError('Automatic paper trading requires secured dashboard configuration')
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
                   enabled=cfg.enabled,shadow=shadow,
-                  paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False))
+                  paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False),
+                  paper_book=(paper_book if getattr(cfg,'paper_autotrade_enabled',False) else None))
 
     supervisor=WorkerSupervisor()
 
