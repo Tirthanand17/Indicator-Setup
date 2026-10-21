@@ -1,9 +1,20 @@
-# Overall progress board — NIFTY cloud phone alerts
+# Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-20 (Phase 40). **Approximate engineering readiness: 80%** (milestone-weighted estimate, not observed trading win rate or evidence of a live service).
+**As of:** 2026-10-21 (Phase 41). **Expanded-objective estimated engineering completion: 51%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
-Overall engineering progress   [████████████████████░░░░] 80%
+Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 51%
+Legacy alert-bot engineering   [████████████████████░░░░] 80%
+NEW paper-trade functionality  [█████████░░░░░░░░░░░░░░░] 35%
+Live verification              [░░░░░░░░░░░░░░░░░░░░░░░░] 0/5
+PAPER_AUTOTRADE_ENABLED        false by default
+Real order placement           impossible by design
+```
+
+This is a **scope rebaseline**. New expanded engineering estimate uses a transparent weighted index: 50% weight on existing alerts-only preparation (80%), 30% on new paper-trading subsystem (35%), and 20% on real live delivery/validation (0%), producing 50.5%, displayed as **51%**. It does not supersede actual acceptance gates.
+
+```text
+Historical alerts-only engineering progress   [████████████████████░░░░] 80%
 Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 20%
 Live cloud alerts enabled      NO
 Actual live acceptance        0/5 gates verified
@@ -25,8 +36,17 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 | P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
 | P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
 
-Sum of current percentages / 10 = **80.0%, rounded to 80%**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 41 — fully automatic PAPER options simulator, v1, not yet activated
+
+1. Audited existing five-indicator trading logic, current-month NIFTY contract selection, exchange-timestamped Kite bid/ask validation, one-at-a-time virtual candidate, premium watcher, SQLite outbox, crash recovery, FastAPI endpoints, CLI and hosting constraints. **Reused** all of these; did not create another broker client, credential source, or executable-order path.
+2. Added a **persistent two-portfolio cash/position journal** for ₹50,000 and ₹1,00,000 paper accounts in the current SQLite database. Simulated ASK buys, observed-BID sales, lot sizing, slippage, modeled costs, per-trade/daily risk, cash reservation, duplicate rejection, restart durability, audit history and **atomic paper-entry/exit + Telegram outbox rows** are implemented in paper_book.py. Optional ₹3,000 affordability comparison can be constructed in isolated tests; no minimum daily trade count.
+3. Integrated opt-in PAPER_AUTOTRADE_ENABLED within the existing verified REST-decision worker: eligible CE/PE REVIEW with fresh depth produces independent paper entries; a **20-second read-only quote watcher** can simulate STOP/TARGET/TIME exits. Missing or stale BID leaves no fabricated cash credit. After 15:26, unclosed positions are flagged **EXIT_UNVERIFIABLE**; overnight quotes cannot be used retroactively. Per-session 15:30 daily summary is queued by the existing Telegram outbox.
+4. Added secure mobile-responsive paper UI (/paper/dashboard), 15-second refresh, private header-authenticated JSON APIs (/paper/api/summary and /paper/api/trades), cash/P&L cards, basic equity-change visualization and simulated trade history. These endpoints are inaccessible unless PAPER_DASHBOARD_ENABLED is explicitly enabled with a strong secret; no key is saved in browser storage or URLs.
+5. **Executed 18/18 focused local synthetic ledger tests: PASS.** Committed **9 additional end-to-end API/Engine integration tests**, but they and the full existing repository suite remain **NOT EXECUTED**. No real Zerodha market calls, order endpoints, protected desktop files, cloud host, payments or Telegram phone messages. New simulator activation remains OFF. Full modeled taxation and advanced analytics/missed-trade coverage still incomplete.
+6. **Rebased progress for expanded objective** rather than misleadingly leaving 80%: earlier alerts-only engineering estimate **80%**; NEW paper subsystem **35%** (main ledger tested in isolation, full runtime unverified); actual cloud/phone/multi-session verification **0%**; weighted expanded-goal implementation **51%** (50% legacy + 30% simulator + 20% live, rounded). Profitability and trading accuracy have NOT been measured. See [Phase 41 details](AUTOMATED_PAPER_PORTFOLIO_PHASE41.md).
 
 ## Phase 40 — block code-only percentage inflation; prioritize approved host (80% retained)
 
