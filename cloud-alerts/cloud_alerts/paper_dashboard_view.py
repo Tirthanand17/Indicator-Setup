@@ -41,7 +41,7 @@ footer{color:#90a8c4;font-size:.78rem;padding-bottom:28px}
 <p id="status" role="status">No live broker data is exposed here until the simulator is enabled and connected.</p>
 <div class="note">Quotes are hypothetical references, not exchange-confirmed fills. Missing exit quotes produce unknown equity, never invented P&amp;L.</div></div>
 <section id="accounts" class="grid" aria-label="Paper accounts"></section>
-<section class="grid"><div class="card"><h2>Closed trade equity change</h2><div id="equity" class="chart muted">No verified paper quote pairs yet</div></div>
+<section class="grid"><div class="card"><h2>Realized P&L curves — separate portfolios</h2><div id="equity" class="chart muted">No verified paper quote pairs yet</div></div>
 <div class="card"><h2>Performance summary</h2><div id="stats" class="muted">Waiting for simulated trades</div></div></section>
 <section class="card"><h2>Recent simulated trades</h2><div class="tablewrap" id="trades">No paper history loaded.</div></section>
 <section class="card"><h2>Five-indicator decisions and missed opportunities</h2>
@@ -73,29 +73,47 @@ function accountsView(data){
   const r3=add(card,"div","","row");add(r3,"span","Closed trades "+a.closed_trades);add(r3,"strong","Equity "+fmt(a.equity_rs));
  }
 }
-function drawChart(trades){
+function drawChart(analytics){
  const root=el("equity");root.replaceChildren();
- const closed=[...trades].filter(x=>x.status==="CLOSED"&&Number.isFinite(x.net_pnl_rs))
-   .sort((a,b)=>a.exit_at.localeCompare(b.exit_at));
- if(!closed.length){root.textContent="No completed paper trades";return}
- const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 600 190");
- const values=[0];for(const trade of closed)values.push(values.at(-1)+trade.net_pnl_rs);
+ const curves=analytics.accounts.map(a=>({name:a.id,values:a.realized_equity_curve}))
+   .filter(a=>a.values.length>0);
+ if(!curves.length){root.textContent="No completed paper trades";return}
+ const values=curves.flatMap(a=>[0,...a.values.map(x=>x.cumulative_pnl_rs)]);
  const lo=Math.min(...values),hi=Math.max(...values),span=Math.max(hi-lo,1);
- const points=values.map((v,i)=>(20+i*560/(values.length-1)).toFixed(1)+","+(170-(v-lo)/span*145).toFixed(1)).join(" ");
- const path=document.createElementNS(NS,"polyline");
- path.setAttribute("points",points);path.setAttribute("fill","none");path.setAttribute("stroke","#27d5bd");path.setAttribute("stroke-width","3");
- svg.appendChild(path);root.appendChild(svg);
+ const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 600 190");
+ svg.setAttribute("role","img");svg.setAttribute("aria-label","Two separate realized-only portfolio curves");
+ const colors=["#27d5bd","#baaaff"];
+ for(let i=0;i<curves.length;i++){
+   const series=[0,...curves[i].values.map(x=>x.cumulative_pnl_rs)];
+   const points=series.map((v,j)=>(20+j*550/Math.max(1,series.length-1)).toFixed(1)+
+      ","+(168-(v-lo)/span*140).toFixed(1)).join(" ");
+   const line=document.createElementNS(NS,"polyline");
+   line.setAttribute("points",points);line.setAttribute("fill","none");
+   line.setAttribute("stroke",colors[i%colors.length]);line.setAttribute("stroke-width","3");
+   svg.appendChild(line);
+   const legend=add(root,"div",curves[i].name+" — realized changes only","muted");
+   legend.style.color=colors[i%colors.length];
+ }
+ root.appendChild(svg);
 }
-function statsView(trades){
+function statsView(analytics){
  const root=el("stats");root.replaceChildren();
- const closed=trades.filter(t=>t.status==="CLOSED"&&Number.isFinite(t.net_pnl_rs));
- const won=closed.filter(t=>t.net_pnl_rs>0).length;
- const net=closed.reduce((acc,t)=>acc+t.net_pnl_rs,0);
- const open=trades.filter(t=>t.status!=="CLOSED").length;
- add(root,"p","Closed: "+closed.length+" · Open/unresolved: "+open);
- add(root,"p","Net modeled P&L: "+fmt(net),net>=0?"positive":"negative");
- add(root,"p","Win rate: "+(closed.length?(100*won/closed.length).toFixed(1)+"% ("+won+"/"+closed.length+")":"Insufficient sample"));
- add(root,"p","Evidence: forward quote simulation only; actual fills 0");
+ for(const a of analytics.accounts){
+   const section=add(root,"div","","row");
+   add(section,"strong",a.id);
+   add(section,"span","Net "+fmt(a.net_realized_rs));
+   add(root,"p","Closed "+a.closed_trades+" · Win rate "+
+     (a.win_rate_pct==null?"insufficient data":a.win_rate_pct+"%")+
+     " · Max realized drawdown "+fmt(a.max_realized_drawdown_rs));
+   add(root,"p","CE "+fmt(a.pnl_by_option_kind.CE?.net_realized_rs??0)+
+     " · PE "+fmt(a.pnl_by_option_kind.PE?.net_realized_rs??0));
+   add(root,"p","Today "+a.day_return_pct_on_initial+"% · Week "+
+     a.week_return_pct_on_initial+"% · Month "+a.month_return_pct_on_initial+
+     "% of initial paper capital");
+   add(root,"p","Profit factor "+(a.profit_factor==null?"N/A":a.profit_factor)+
+     " · Unverifiable exits "+a.unverifiable);
+ }
+ add(root,"p","Realized-only research. Unknown exit quotes do not count as wins or losses.");
 }
 function tradesView(trades){
  const root=el("trades");root.replaceChildren();
@@ -142,10 +160,11 @@ function auditView(data){
 async function refresh(){
  if(!secret)return;
  try{
-  const [summary,history,opportunities]=await Promise.all([
-    read("/paper/api/summary"),read("/paper/api/trades"),read("/paper/api/opportunities")]);
+  const [summary,history,opportunities,analytics]=await Promise.all([
+    read("/paper/api/summary"),read("/paper/api/trades"),
+    read("/paper/api/opportunities"),read("/paper/api/analytics")]);
   currentAccounts=summary.accounts;latestTrades=history.trades;
-  accountsView(summary);statsView(latestTrades);drawChart(latestTrades);tradesView(latestTrades);
+  accountsView(summary);statsView(analytics);drawChart(analytics);tradesView(latestTrades);
   auditView(opportunities);
   el("status").textContent="Updated "+new Date().toLocaleTimeString("en-IN")+
    " · "+(summary.mode||"PAPER ONLY")+" · simulated fills only";
