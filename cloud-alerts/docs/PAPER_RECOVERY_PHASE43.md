@@ -1,6 +1,6 @@
 # Phase 43 — autonomous partial-paper-entry crash recovery
 
-**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **19/19 focused recovery unit tests passed locally** in the current container; 5 full-worker/schema integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
+**State on 2026-10-21:** reviewed implementation on feature branch `feature/phase43-paper-recovery-audit`; **29/29 focused recovery/accounting unit tests passed locally** in the current container; 9 new worker/schema/private-API integration tests and the entire GitHub repository regression suite remain **NOT RUN**. This branch is deliberately not merged and no live flags were changed.
 
 ## Audited failure mode
 
@@ -22,7 +22,7 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 
 - Moved common recovery handling into `Engine.reconcile_paper_journal(now, market_poll=False)`, which runs locally without a Kite token, brokerage order method, or market-data HTTP request.
 - The minute-level unattended worker now reconciles partial paper REVIEW/account outcomes **outside 09:25–15:26**, including after session close and on non-trading days. It checks integrity BEFORE an end-of-day Telegram paper report and defers that report while recovery grace is pending.
-- Added two extra standalone recovery tests for missed entries found after close and over a multi-day non-trading gap. **19/19 focused local tests passed** (Python 3.13 isolated module).
+- Added two extra standalone recovery tests for missed entries found after close and over a multi-day non-trading gap. **29/29 focused local tests passed** (Python 3.13 isolated module).
 - Added **two further Engine integration tests (five in total)**: after-hours recovery without accessing the Kite vault, and report eligibility after the grace period. These remain **not executed** until the complete repository is available on a trusted Python 3.12 runner.
 - Branch is still draft PR #1. `main` remains unchanged, `PAPER_AUTOTRADE_ENABLED=false` and cloud acceptance remains 0/5.
 
@@ -34,17 +34,30 @@ A critical rule: **never use an old quote to backdate the missing paper purchase
 - Local cross-module smoke exercised one paper BUY in the 50k account and a missing 100k account outcome against a SQLite events/runtime schema and the locally available PaperBook implementation; repair preserved cash and recorded the missing outcome as MISSED. This is not the full Phase 42/43 app suite.
 - Target Docker Python is 3.12, whereas focused unit tests ran on Python 3.13. Full target-runtime validation is still mandatory.
 
+
+## Phase 43 extension — verify cash/journal conservation before simulation
+
+**Why:** A completed pair of account outcomes is insufficient evidence of correct cash accounting. A database edit or interrupted/out-of-band cash write could make simulated P&L or available balance false, even when every REVIEW has both outcomes.
+
+**Implemented on draft PR #1:**
+- New read-only `audit_cash_reconciliation()` computes each account's expected cash in exact integer paise: initial paper capital minus all recorded simulated entry debits plus all simulated close credits. Require precisely `PAPER_50K` and `PAPER_100K` accounts with nonnegative integer cash and positive starting balances. Enforce exact `CLOSED` net P&L = exit credit − entry debit; refuse credits or P&L on `OPEN`/`EXIT_UNVERIFIABLE` trades and refuse orphan/unknown-account positions.
+- Invoke this audit **before** the worker's existing crash-gap recovery writes or any Kite calls. A mismatch leaves new paper entry blocked with `WAIT_PAPER_RECONCILIATION` and never resets cash or invents fills.
+- The authenticated `/paper/api/summary` API now includes only sanitized cash-integrity metadata. Missing or malformed audit evidence returns a **FAIL_CLOSED** state, never a 200 response misleadingly claiming the journal is healthy. The mobile dashboard has different warnings for a corrupted cash journal and a broken REVIEW/clock history.
+- **Ran 29/29 local isolated Python 3.13 recovery/accounting tests:** 19 prior restart/crash tests, plus 10 new tests for fresh accounts, closed and unresolved ledger conservation, 1-paise tampering, wrong P&L, fictional unresolved credit, orphan accounts, extra account, negative and non-integer cash. `python -m compileall` on the local isolated sources also passed.
+- **Added 4 additional full application tests (9 Phase 43 application integration tests total), NOT EXECUTED:** actual PaperBook entry/exit conservation; worker refuses cash corruption before Kite reads; private authenticated API flags changed cash; authenticated API safely handles a corrupt REVIEW timestamp. The complete preexisting repository suite remains unexecuted; the isolated local tests are not a substitute.
+- Main remains unchanged. No current paid runner, OCI host, public service, live Kite relay, handset receipt or real orders.
+
 ## Test ledger
 
-**Executed locally:** `PYTHONPATH=. pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py` on the isolated recovery module and fixtures -> **19 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
+**Executed locally:** `PYTHONPATH=. python -m pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py tests/test_paper_integrity_cash.py` on the isolated recovery module and fixtures -> **29 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
 
-**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 5 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
+**Committed, not executed:** `tests/test_paper_integrity_integration.py` adds 7 realistic State/PaperBook worker tests using the actual SQLite schemas and fake broker. The complete repository was not cloned in this environment because `github.com` and `api.github.com` DNS resolution fails. No GitHub Actions runs exist in the repository; do not spend Actions credits just to represent unverified tests as green. Check Python pytest dependencies and run the full project suite on a user-approved trusted runner before merging or activating paper automation.
 
 ## Source/branch and exact continuation
 
 - Repository: `Tirthanand17/Indicator-Setup`.
 - Main checkpoint before this work: `c5c4d0f90e11e841991c0efe9a351fd44e3dd94c` (Phase 42, expanded scope 53%).
-- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 19 focused unit tests, 5 integration tests, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
+- Working branch: `feature/phase43-paper-recovery-audit`. Files changed: new `paper_integrity.py`, 29 focused unit tests, 9 integration tests across the Phase 43 files, updated `engine.py`, `server.py` and private `paper_dashboard_view.py`, plus this ledger.
 - **Remaining blockers:** run entire Python/FastAPI pytest suite and repair any failures; merge only after evidence; finish fee verification and irregular end-of-day settlement treatment; complete real missed-opportunity quote coverage; approve a durable ₹0 always-on host; verify live daily read-only Kite API/HMAC relay, Telegram handset and Nirala-OFF functionality; complete at least 5 NSE trading sessions.
 - **Progress:** expanded-goal engineering **53% (unchanged)**, paper subsystem prior estimate **43%**, original alert-only prep **80%**, deployment acceptance **0/5**. Changes in a draft branch do not justify increasing the headline percentage.
 
