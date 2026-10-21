@@ -38,6 +38,10 @@ The user confirmed CircleCI minutes are exhausted, and GitHub Actions minutes we
 
 Codespaces is an ephemeral **development/test environment**, NOT an approved always-on host. Its short idle timeout is intentionally incompatible with daily market monitoring. Production deployment requires a separately approved durable ₹0-capable host, secure signed daily Kite token relay, read-only NFO REST observations, user-observed Telegram handset receipt with Nirala off, and five full live market sessions.
 
+## Additional no-charge Linux test evidence
+
+The ChatGPT execution container is genuine Linux but only Python **3.13**, and currently has just the recovered pure `paper_integrity.py` and its focused tests, not the entire `Indicator-Setup` repository. Executed `PYTHONPATH=/mnt/data/indicator_phase43 python -m pytest -q /mnt/data/indicator_phase43/tests`: **29 passed in 1.49 seconds**. This verifies recovery logic on Linux without using CircleCI, Actions, Codespaces or any paid runner. It does **not** establish Python 3.12 compatibility or full FastAPI/Kite worker correctness.
+
 ## Current verified milestone
 
 - Actual Nirala Python 3.11 Windows full suite: **458 pass, 120 fail, 4 skipped** (RED due primarily to explicit POSIX-only runtime requirements).
