@@ -173,7 +173,10 @@ async function refresh(){
   auditView(opportunities);
   const recovery=summary.paper_recovery_integrity;
   let warning="";
-  if(recovery?.status==="NOT_ACTIVATED")warning=" · PAPER AUTOMATION NOT ACTIVATED";
+  if(recovery?.cash_reconciliation?.status==="FAIL_CLOSED")
+    warning=" · PAPER CASH INTEGRITY FAILURE — SIMULATED ENTRIES BLOCKED";
+  else if(recovery?.status==="NOT_ACTIVATED")
+    warning=" · PAPER AUTOMATION NOT ACTIVATED";
   else if(recovery && !recovery.new_entries_permitted)
     warning=" · PAPER ENTRIES BLOCKED: "+recovery.missing_account_outcomes+" unresolved recovery outcomes";
   else if(recovery)warning=" · Account integrity checked: "+recovery.reviews_checked+" signal(s)";
