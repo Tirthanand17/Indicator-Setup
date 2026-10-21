@@ -168,3 +168,16 @@ def test_private_signal_audit_api_denies_unauthenticated_clients(tmp_path):
         assert body['audit']['missed_pnl_verifiable'] is False
         assert body['evaluations']==[]
         assert body['actual_orders'] is False
+
+def test_private_analytics_api_auth_and_no_fabricated_winrate(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        assert client.get('/paper/api/analytics').status_code==404
+        data=client.get('/paper/api/analytics',headers={
+            'X-Paper-Dashboard-Key':conf.paper_dashboard_key})
+        assert data.status_code==200 and data.headers['Cache-Control']=='no-store'
+        report=data.json()
+        assert report['real_money_orders']==0
+        assert report['strategy_profitability_validated'] is False
+        assert len(report['accounts'])==2
+        assert all(x['win_rate_pct'] is None for x in report['accounts'])
