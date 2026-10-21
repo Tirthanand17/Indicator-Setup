@@ -552,6 +552,42 @@ class Engine:
         # rate-bounded dispatcher handles receipt uncertainty and retries.
         await self._deliver_outbox(observed if now is not None else None)
 
+    async def report_paper_session(self, now:datetime|None=None)->None:
+        """Unattended post-session summary and nonfabricated quote reconciliation."""
+        if self.paper_book is None or not self.enabled:
+            return
+        observed=(now or datetime.now(IST)).astimezone(IST)
+        if observed.time()<time(15,30):
+            return
+        try:
+            if not regular_session(observed.date()):
+                return
+        except CalendarUnavailable:
+            self.paper_status='WAIT_CALENDAR'
+            return
+        # The end-of-day close NEVER credits an invented BID. Without a real
+        # fresh quote, reserved virtual capital remains unresolved.
+        try:
+            self.paper_book.finish_session(observed)
+            report=self.paper_book.daily_report(observed)
+            lines=['NIFTY PAPER DAILY SUMMARY — SIMULATED ONLY',
+                   'Session: '+report['day']]
+            for account in report['accounts']:
+                lines.append(account['id']+': Closed '+str(account['closed'])+
+                    ' | Wins '+str(account['wins'])+
+                    ' | Net realized Rs '+f"{account['net_realized_rs']:.2f}"+
+                    ' | Unverifiable '+str(account['unresolved'])+
+                    ' | Rejected '+str(account['rejected_signals']))
+            lines.append('Unknown exits were NOT scored as fills, wins, or losses.')
+            lines.append('No real broker orders or exchange-confirmed fills.')
+            self.db.claim_event('PAPER_DAILY:'+report['day'],'PAPER_DAILY',
+                                observed,'\n'.join(lines))
+            self.paper_status='DAILY_REPORT_QUEUED'
+        except Exception:
+            self.paper_status='DAILY_REPORT_FAILED'
+            return
+        await self._deliver_outbox(observed if now is not None else None)
+
     async def _check_virtual_exit(self,candle,symbol:str,now:datetime)->None:
         raw=self.db.get_runtime('virtual_candidate')
         if not raw:return
@@ -599,6 +635,8 @@ class Engine:
             # responsive to upcoming market-data boundaries.
             if minute!=last_outbox_minute:
                 last_outbox_minute=minute
+                if self.paper_book is not None and now.time()>=time(15,30):
+                    await self.report_paper_session()
                 if self.shadow is not None:
                     try:
                         await self.shadow.stop_after_session(datetime.now(IST))
