@@ -71,7 +71,7 @@ function accountsView(data){
   add(card,"div",fmt(a.available_cash_rs),"big");
   add(card,"div","Available virtual cash","muted");
   const r=add(card,"div","","row");add(r,"span","Initial "+fmt(a.initial_rs));add(r,"strong","Open "+a.open_positions);
-  const r2=add(card,"div","","row");add(r2,"span","Realized P&L");add(r2,"strong",fmt(a.realized_pnl_rs),a.realized_pnl_rs>=0?"positive":"negative");
+  const r2=add(card,"div","","row");add(r2,"span","Realized P&L");add(r2,"strong",fmt(a.realized_pnl_rs),a.realized_pnl_rs==null?"":a.realized_pnl_rs>=0?"positive":"negative");
   const r3=add(card,"div","","row");add(r3,"span","Closed trades "+a.closed_trades);add(r3,"strong","Equity "+fmt(a.equity_rs));
  }
 }
@@ -165,11 +165,24 @@ async function refresh(){
   const selectedDay=el("auditDay").value;
   const auditUrl="/paper/api/opportunities"+
      (/^\d{4}-\d{2}-\d{2}$/.test(selectedDay)?"?date="+encodeURIComponent(selectedDay):"");
-  const [summary,history,opportunities,analytics]=await Promise.all([
-    read("/paper/api/summary"),read("/paper/api/trades"),
-    read(auditUrl),read("/paper/api/analytics")]);
-  currentAccounts=summary.accounts;latestTrades=history.trades;
-  accountsView(summary);statsView(analytics);drawChart(analytics);tradesView(latestTrades);
+  // Check the journal BEFORE fetching charts/trades. A corrupt balance must
+  // not be plotted as equity or advertised as trading performance.
+  const summary=await read("/paper/api/summary");
+  currentAccounts=summary.accounts;
+  accountsView(summary);
+  if(summary.paper_recovery_integrity?.cash_reconciliation?.status!=="BALANCED"){
+    el("equity").textContent="PAPER CASH INTEGRITY FAILURE — analytics unavailable";
+    el("stats").textContent="Accounting evidence invalid. Simulated P&L hidden.";
+    el("trades").textContent="Trade history unavailable until cash reconciliation is resolved.";
+    el("audits").textContent="Account integrity requires review.";
+    el("auditSummary").textContent="New paper entries blocked.";
+    el("status").textContent="PAPER CASH INTEGRITY FAILURE — SIMULATED ENTRIES BLOCKED";
+    return;
+  }
+  const [history,opportunities,analytics]=await Promise.all([
+    read("/paper/api/trades"),read(auditUrl),read("/paper/api/analytics")]);
+  latestTrades=history.trades;
+  statsView(analytics);drawChart(analytics);tradesView(latestTrades);
   auditView(opportunities);
   const recovery=summary.paper_recovery_integrity;
   let warning="";
