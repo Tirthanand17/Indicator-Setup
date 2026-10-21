@@ -15,6 +15,13 @@
 - Two targeted integration successes are included in the full suite's 458 passes; do **not** add them to that total as distinct tests. The 68-target subset likewise overlaps the full suite.
 - Complete Windows test capture kept in the disposable QA workspace `windows-full-suite.txt`. No chat credentials or market prices were used and no live broker calls or broker orders were made.
 
+## Linux Python 3.12 CircleCI regression path
+
+The existing user's alternative CI provider is **CircleCI**, previously used for other trading-research repositories. In this Indicator-Setup draft branch, added a branch-filtered `.circleci/config.yml` using `cimg/python:3.12`, a small Docker resource, offline test-only environment flags, explicit unsetting of live Kite/Telegram secrets, and a JUnit test artifact. It targets **only** `feature/phase43-paper-recovery-audit`; there is no deploy/publish job or GitHub Actions use.
+
+**Run status:** GitHub commit-status API returned `statuses: []`, and GitHub workflow-runs returned `[]` after the config commit. This does not prove CircleCI project registration or an executed Linux job. CircleCI is not exposed as a connected action in this ChatGPT tool context, so a successful CircleCI job **has not been verified**. Do not merge pending all-green Linux evidence. Docs: https://circleci.com/docs/guides/getting-started/language-python/
+
+
 ## Decisions and blockers
 
 1. Preserve Linux-only production security and file-mode behavior. Do **NOT** fake POSIX file permissions, bypass `os.fchmod` or remove Linux worker locking just to make Windows tests green.
