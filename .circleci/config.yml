@@ -1,0 +1,49 @@
+version: 2.1
+
+# Offline-only Linux Python 3.12 verification for draft PR #1.
+# No deploy job, no broker tokens, no GitHub Actions credit use.
+jobs:
+  phase43_linux_regression:
+    docker:
+      - image: cimg/python:3.12
+    resource_class: small
+    working_directory: ~/indicator-setup
+    environment:
+      ALERTS_ENABLED: "false"
+      PAPER_AUTOTRADE_ENABLED: "false"
+      PAPER_DASHBOARD_ENABLED: "false"
+      KITE_SHADOW_ENABLED: "false"
+      PAPER_PREMIUM_TRACKING_ENABLED: "false"
+    steps:
+      - checkout
+      - run:
+          name: Install isolated Python dependencies
+          command: |
+            cd cloud-alerts
+            python -m venv .venv
+            .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt pytest pytest-asyncio httpx
+      - run:
+          name: Full offline NIFTY paper regression suite
+          no_output_timeout: 10m
+          command: |
+            # Explicitly discard any repository/project-level live credentials.
+            unset KITE_API_KEY ZERODHA_KITE_ACCESS_TOKEN KITE_ACCESS_TOKEN
+            unset TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID
+            unset TOKEN_RELAY_HMAC_KEY TOKEN_VAULT_KEY PAPER_DASHBOARD_KEY
+            cd cloud-alerts
+            mkdir -p test-reports
+            .venv/bin/python -m pytest -q --tb=short --junitxml=test-reports/results.xml
+      - store_test_results:
+          path: cloud-alerts/test-reports
+      - store_artifacts:
+          path: cloud-alerts/test-reports
+          destination: phase43-offline-test-reports
+
+workflows:
+  phase43_draft_only:
+    jobs:
+      - phase43_linux_regression:
+          filters:
+            branches:
+              only:
+                - feature/phase43-paper-recovery-audit
