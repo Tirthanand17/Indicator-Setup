@@ -8,10 +8,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-import asyncio,os,json,logging,signal
+import asyncio,os,json,logging,signal,hmac
 from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse
 from .engine import Engine
+from .paper_book import PaperBook
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -33,6 +34,8 @@ class AppSettings:
         self.enabled=os.environ.get('ALERTS_ENABLED','false').strip().lower()=='true'
         self.shadow_enabled=os.environ.get('KITE_SHADOW_ENABLED','false').strip().lower()=='true'
         self.paper_premium_tracking=os.environ.get('PAPER_PREMIUM_TRACKING_ENABLED','false').strip().lower()=='true'
+        self.paper_dashboard_enabled=os.environ.get('PAPER_DASHBOARD_ENABLED','false').strip().lower()=='true'
+        self.paper_dashboard_key=os.environ.get('PAPER_DASHBOARD_KEY','')
     def validate(self):
         # Mirror deployment preflight: a direct Uvicorn invocation must not
         # bypass secret placeholders/format checks when preflight is skipped.
@@ -41,7 +44,9 @@ class AppSettings:
                 'TOKEN_VAULT_KEY':self.vault_key,
                 'ALERTS_ENABLED': 'true' if self.enabled else 'false',
                 'KITE_SHADOW_ENABLED':'true' if self.shadow_enabled else 'false',
-                'PAPER_PREMIUM_TRACKING_ENABLED':'true' if self.paper_premium_tracking else 'false'}
+                'PAPER_PREMIUM_TRACKING_ENABLED':'true' if self.paper_premium_tracking else 'false',
+                'PAPER_DASHBOARD_ENABLED':'true' if self.paper_dashboard_enabled else 'false',
+                'PAPER_DASHBOARD_KEY':self.paper_dashboard_key}
         if configuration_blockers(config):
             raise RuntimeError('Invalid cloud configuration; use offline preflight for safe blocker codes')
 
@@ -54,6 +59,13 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     vault.load(datetime.now(IST))
     # Shadow subscriptions are opt-in diagnostics only. Kite REST is authoritative.
     shadow=ShadowSupervisor(cfg.api_key) if getattr(cfg,'shadow_enabled',False) else None
+    # Optional private paper-account data. Disabled by default; no public
+    # paper portfolio endpoint is exposed without a strong operator-provided key.
+    paper_enabled=bool(getattr(cfg,'paper_dashboard_enabled',False))
+    paper_key=str(getattr(cfg,'paper_dashboard_key',''))
+    if paper_enabled and (len(paper_key)<32 or len(set(paper_key))<8):
+        raise RuntimeError('Paper dashboard requires a separate strong access key')
+    paper_book=PaperBook(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
                   enabled=cfg.enabled,shadow=shadow,
                   paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False))
@@ -123,6 +135,25 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     app.state.worker_task=None
     app.state.startup_recovery=None
     app.state.last_worker_recovery=None
+    def _authorize_paper(request:Request):
+        # Never accept dashboard keys in URLs/cookies (easy to leak). Do not
+        # expose the presence of accounts to an unauthenticated visitor.
+        if paper_book is None or not hmac.compare_digest(
+                request.headers.get('x-paper-dashboard-key',''), paper_key):
+            raise HTTPException(404,'Not found')
+
+    @app.get('/paper/api/summary')
+    async def paper_summary(request:Request):
+        _authorize_paper(request)
+        return JSONResponse(paper_book.dashboard(),headers={'Cache-Control':'no-store'})
+
+    @app.get('/paper/api/trades')
+    async def paper_trades(request:Request):
+        _authorize_paper(request)
+        return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
+                             'trades':paper_book.trade_history(limit=100)},
+                            headers={'Cache-Control':'no-store'})
+
     @app.get('/healthz')
     async def healthz():
         data=engine.health()
