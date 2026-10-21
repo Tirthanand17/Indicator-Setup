@@ -108,3 +108,17 @@ def test_quote_mismatch_and_noncausal_exit(tmp_path):
 def test_money_rejects_nan_negative_and_infinite():
     for x in ('NaN','Infinity',-0.01):
         with pytest.raises(ValueError):money(x)
+
+def test_history_presents_paper_only_and_no_private_credentials(tmp_path):
+    b=book(tmp_path)
+    a=b.enter('signal-1',quote(),NOW,account_id='PAPER_50K')
+    history=b.trade_history()
+    assert len(history)==1
+    row=history[0]
+    assert row['status']=='OPEN' and row['actual_fill_verified'] is False
+    assert row['entry_ask_rs']==100.0 and row['option_token']==777
+    assert 'access_token' not in repr(history) and 'apikey' not in repr(history).lower()
+    t=NOW+timedelta(minutes=21)
+    b.exit(a['trade_id'],quote(bid=141,ask=142,at=t),t)
+    assert b.trade_history()[0]['net_pnl_rs']>0
+    with pytest.raises(ValueError):b.trade_history(limit=10000)
