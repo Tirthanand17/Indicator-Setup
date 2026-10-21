@@ -15,7 +15,7 @@
 
 ## Verified tests vs remaining verification
 
-- Ran **17 of 17 local synthetic PaperBook unit tests**, passing. Covered independent sizing and capitalization, cash persistence on restart, duplicate buys/sells, stop/target/time modeled fills, slippage and fees, unverified quote blocking, displayed depth, private history, risk rejections, atomic outbox records and day-end reconciliation.
+- Ran **18 of 18 local synthetic PaperBook unit tests**, passing. Covered independent sizing and capitalization, cash persistence on restart, duplicate buys/sells, stop/target/time modeled fills, slippage and fees, unverified quote blocking, displayed depth, private history, risk rejections, atomic outbox records and day-end reconciliation.
 - Added **9 integration cases** for FastAPI dashboard authentication/configuration, actual market decision -> simulated positions, quote-based simulated exits, and daily reporting. Those integration cases have NOT been executed against the complete repository, so the new paper runtime must remain OFF.
 - The historical latest full-suite pass is Phase 34's 451/451, before subsequent changes. The combined regression count is not verified.
 - Actual live host, signed real Kite handoff, real option quote capture, confirmed Telegram phone receipt with Nirala OFF, and five real market sessions remain **0/5 proven**.
@@ -32,3 +32,8 @@
 The new user specification substantially expands the original alerts-only scope. Preserve the historical **80% original core engineering estimate** separately. The NEW simulated paper trading subsystem is **35%** (core tested in isolation, integration unverified). Live cloud market acceptance is **0%**. The revised expanded-goal implementation index is **51%**, calculated as 50% * 80% + 30% * 35% + 20% * 0%, rounded. This is a rough transparent milestone index, not a performance, uptime, or profitability claim.
 
 **Next phases:** full suite and broker-free end-to-end synthetic tests; daily/recovery reconciliation; accurate charge modeling; complete missed-opportunity evidence; final dashboard analytics; approved always-on host, signed token relay, real Telegram receipt and five forward-market sessions.
+
+
+## Additional safety regression
+
+An 18th local test proves that a position marked EXIT_UNVERIFIABLE after the session closes **cannot** be retroactively closed using a future trading day's quote. Open-position polling now excludes such unresolved records while the account's cash remains reserved. A malformed non-ASCII dashboard access header is rejected before constant-time credential comparison.
