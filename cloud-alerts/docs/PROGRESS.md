@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-21 (Phase 42). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-21 (Phase 43 — draft, unmerged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 43 — crash-consistent paper account outcomes (DRAFT PR, 53% retained)
+
+1. Found a real two-portfolio write-gap: the source five-indicator REVIEW and virtual candidate are committed before the independent ₹50k and ₹100k paper account results. A worker crash can leave a partial pair; retry may be suppressed by the persisted review candidate. Never backfill a simulated option purchase using stale quotes.
+2. On `feature/phase43-paper-recovery-audit`, added an immutable UTC paper-automation activation watermark, append-only REVIEW-to-account coverage checks, and automatic **180-second grace then CRASH_GAP_NO_SIMULATED_FILL** reconciliation in one SQLite exclusive transaction. Missing account outcomes become explicit rejections, not invented trades; existing account cash/positions remain unchanged. A single durable PAPER_RECOVERY operational alert is queued.
+3. Production FastAPI enables this integrity gate only for explicitly opted-in PAPER_AUTOTRADE, before subsequent REST-driven decisions. The private paper summary and dashboard expose sanitized coverage/blocked-state counts. Original alert-only mode remains unchanged and live broker order methods remain absent.
+4. **Executed 14/14 focused isolated recovery unit tests — PASS**. Added **two full-schema/worker integration tests** but they and the combined suite remain **UNRUN** because the tool container cannot clone GitHub and there is no existing GitHub CI workflow. The branch is for review and is not deployed; a draft PR must not be merged without validation.
+5. Original alerts-only engineering **80%**; expanded engineering **53% unchanged** (Phase 43 unmerged/integrated verification pending); new paper research engineering **43%**, cloud/phone/five-session acceptance **0/5**. No user Nirala protected-file reads/writes, cloud charges, real Kite access token transfers, Telegram phone sends or real trades.
+6. Detailed phase ledger: [Phase 43 crash recovery and exact continuation](PAPER_RECOVERY_PHASE43.md). Next: full pytest on an approved runner; fix test/integration findings; then merge, complete data quality/fee validation, and activate approved host and real five-session paper tests.
 
 ## Phase 42 — dated NSE option fee model, daily-loss risk, causal missed signals and advanced research analytics
 
