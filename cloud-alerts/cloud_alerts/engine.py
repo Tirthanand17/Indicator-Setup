@@ -169,22 +169,9 @@ class Engine:
             # Reconcile interrupted 50k/100k paper basket entries BEFORE
             # any next opportunity. Delayed missing entries are rejections,
             # never backdated hypothetical fills or cash movements.
-            if self.paper_integrity_enforced:
-                try:
-                    repaired=recover_missing_outcomes(self.db.path,now)
-                    coverage=audit_entry_coverage(self.db.path)
-                    if not (repaired['new_entries_permitted']
-                            and coverage['new_entries_permitted']):
-                        self.paper_status='WAIT_PAPER_RECONCILIATION'
-                        self.set_status('WAIT_DATA','Paper account recovery grace in progress')
-                        await self._deliver_outbox(now)
-                        return
-                    if repaired['recovered']:
-                        self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
-                except (ValueError,RuntimeError,sqlite3.DatabaseError):
-                    self.paper_status='WAIT_PAPER_RECONCILIATION'
-                    self.set_status('WAIT_DATA','Paper account recovery requires review')
-                    return
+            if not self.reconcile_paper_journal(now,market_poll=True):
+                await self._deliver_outbox(now)
+                return
             token=self.vault.get(now)
             if not token:
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
@@ -222,6 +209,36 @@ class Engine:
                 outcome='REST_VALID'
             if boundary_for(now) is not None:
                 self.db.record_rest_attempt(now,outcome)
+
+    def reconcile_paper_journal(self,now:datetime,*,market_poll:bool=False)->bool:
+        """Pure-local durable recovery independent of market hours and Kite login.
+
+        Called before live candle polls and during the minute housekeeping
+        cycle. Never backfill paper fills or release capital from old quotes.
+        """
+        if not self.paper_integrity_enforced:
+            return True
+        if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
+            self.paper_status='WAIT_PAPER_RECONCILIATION'
+            if market_poll:
+                self.set_status('WAIT_DATA','Paper recovery clock is invalid')
+            return False
+        try:
+            result=recover_missing_outcomes(self.db.path,now)
+            coverage=audit_entry_coverage(self.db.path)
+            if not (result['new_entries_permitted'] and coverage['new_entries_permitted']):
+                self.paper_status='WAIT_PAPER_RECONCILIATION'
+                if market_poll:
+                    self.set_status('WAIT_DATA','Paper account recovery grace in progress')
+                return False
+            if result['recovered']:
+                self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
+            return True
+        except (ValueError,RuntimeError,sqlite3.DatabaseError):
+            self.paper_status='WAIT_PAPER_RECONCILIATION'
+            if market_poll:
+                self.set_status('WAIT_DATA','Paper account recovery requires review')
+            return False
 
     async def _collect_once(self,now:datetime,token:str)->None:
         # Own and release the metadata/quote SDK as well as the two transient
@@ -713,7 +730,12 @@ class Engine:
             # responsive to upcoming market-data boundaries.
             if minute!=last_outbox_minute:
                 last_outbox_minute=minute
-                if self.paper_book is not None and now.time()>=time(15,30):
+                # Local crash recovery is also essential AFTER the 15:26
+                # trading cutoff, on holidays and during token outages.
+                # Recover before any end-of-day paper summary is finalized.
+                paper_integrity_ok=self.reconcile_paper_journal(now)
+                if (paper_integrity_ok and self.paper_book is not None
+                        and now.time()>=time(15,30)):
                     await self.report_paper_session()
                 if self.shadow is not None:
                     try:
