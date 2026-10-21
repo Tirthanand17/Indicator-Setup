@@ -57,6 +57,15 @@ The authenticated paper dashboard previously showed available cash, net realized
 - **Added 4 additional full application tests (10 Phase 43 application integration tests total), NOT EXECUTED:** actual PaperBook entry/exit conservation; worker refuses cash corruption before Kite reads; private authenticated API flags changed cash; authenticated API safely handles a corrupt REVIEW timestamp. The complete preexisting repository suite remains unexecuted; the isolated local tests are not a substitute.
 - Main remains unchanged. No current paid runner, OCI host, public service, live Kite relay, handset receipt or real orders.
 
+## Phase 43 — actual Nirala checkout and full Windows suite (RED; 53% retained)
+
+1. Connected to **Nirala online** through the linked Desktop Commander Personal account. Cloned real Phase 43 branch into `%TEMP%\indicator-phase43-qa-20261021`, with isolated Python venv. No Desktop or protected Kite trading-folder mutations, no production services.
+2. Ran `python -m compileall -q cloud_alerts tests` — PASS. Windows Python **3.11** (production Docker targets **Linux Python 3.12**). Added conditional `tzdata` to project requirements so Windows can load `Asia/Kolkata`.
+3. **Full GitHub checkout pytest executed: 458 PASSED, 120 FAILED, 4 SKIPPED; red.** Failure signatures are dominated by Linux-only `os.fchmod`, `os.geteuid`, deliberate Linux/POSIX lock requirement, Windows symlink/file-lock constraints and local loopback smoke; do NOT fake POSIX security to force Windows green. No verified all-green Linux suite.
+4. Independently ran the paper research subset against actual source: **68/68 PASSED**, including new journal, fees, quote audit and realized-only analytics. **Two real State/PaperBook recovery integration tests PASSED** (5 in same integration file deselected); these overlap the full-suite pass total and are not additive.
+5. No merge, GitHub CI, paid host, real Kite key, phone send or real order. See [Full Windows QA results, failure classification and next Linux runner command](PHASE43_NIRALA_WINDOWS_QA_20261021.md).
+6. Expanded engineering estimate **53%**, original alert preparation **80%**, paper subsystem historical estimate **43%**; **live acceptance remains 0/5**. Next: authorized isolated Linux Python 3.12 full pytest, patch legitimate failures, merge then cloud acceptance.
+
 ## Test ledger
 
 **Executed locally:** `PYTHONPATH=. python -m pytest -q tests/test_paper_integrity.py tests/test_paper_integrity_hardening.py tests/test_paper_integrity_cash.py` on the isolated recovery module and fixtures -> **29 passed (0 failures)**. Three adversarial cases assert rejection of conflicting account evidence, refusal of unexpected paper account IDs, and full atomic rollback after an injected failure on the second account. Covers activation durability, old REVIEW history, full vs partial account outcomes, grace, recovery idempotence, exact UTC offset comparisons, corrupt and future timestamps, bounded status reports, explicit missed entries and no invented positions.
