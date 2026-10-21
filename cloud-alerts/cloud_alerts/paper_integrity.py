@@ -34,6 +34,46 @@ def _validate_signal_outcomes(db:sqlite3.Connection,signal_id:str)->set[str]:
         raise RuntimeError('Contradictory paper position and rejection evidence')
     return set(positions+rejected)
 
+def audit_cash_reconciliation(db_path:str)->dict:
+    """Check exact paise conservation without changing either paper account.
+
+    Initial capital minus every durable entry debit plus verified simulated
+    closing credit must equal account cash. An unresolved position cannot
+    contribute a fictitious exit credit. Fail closed on corrupt trade rows.
+    """
+    with sqlite3.connect(db_path,timeout=10) as db:
+        db.execute('BEGIN')
+        accounts=db.execute(
+            'SELECT account_id,initial_paise,cash_paise FROM paper_accounts').fetchall()
+        if {r[0] for r in accounts}!=set(ACCOUNTS):
+            raise RuntimeError('Paper account set changed unexpectedly')
+        rows=db.execute(
+            'SELECT account_id,status,entry_debit_paise,exit_credit_paise,'
+            'net_pnl_paise FROM paper_positions').fetchall()
+    balance={a:int(initial) for a,initial,_ in accounts}
+    expected={a:int(cash) for a,_,cash in accounts}
+    open_count=0
+    for account,status,debit,credit,pnl in rows:
+        if account not in balance or type(debit) is not int or debit<=0:
+            raise RuntimeError('Paper entry journal is malformed')
+        balance[account]-=debit
+        if status=='CLOSED':
+            if (type(credit) is not int or credit<0 or type(pnl) is not int
+                    or pnl!=credit-debit):
+                raise RuntimeError('Paper realized P&L journal mismatch')
+            balance[account]+=credit
+        elif status in ('OPEN','EXIT_UNVERIFIABLE'):
+            if credit is not None or pnl is not None:
+                raise RuntimeError('Paper unresolved position has fictional credit')
+            open_count+=1
+        else:
+            raise RuntimeError('Invalid paper position state')
+    if any(expected[a]<0 or balance[a]!=expected[a] for a in ACCOUNTS):
+        raise RuntimeError('Paper cash does not reconcile to journal')
+    return {'status':'BALANCED','accounts_verified':len(ACCOUNTS),
+            'positions_checked':len(rows),'unresolved_positions':open_count,
+            'cash_entries_permitted':True}
+
 def initialize_activation(db_path:str,now:datetime)->str:
     """Save immutable first-activation watermark; ignore earlier alert-only reviews."""
     if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
