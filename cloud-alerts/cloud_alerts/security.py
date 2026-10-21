@@ -91,8 +91,13 @@ class TokenVault:
         self.file_path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         fd,name=tempfile.mkstemp(dir=self.file_path.parent,prefix='.token-',suffix='.tmp')
         try:
+            # The POSIX permission restriction is mandatory. On failure
+            # retain ownership of the raw descriptor so cleanup can close it
+            # before removing the temporary encrypted token file.
             os.fchmod(fd,0o600)
-            with os.fdopen(fd,'wb') as f:
+            wrapped=os.fdopen(fd,'wb')
+            fd=-1  # ownership transferred to wrapped; it closes in all paths
+            with wrapped as f:
                 f.write(encrypted);f.flush();os.fsync(f.fileno())
             os.replace(name,self.file_path)
             # fsync the containing directory to make the replace durable on
@@ -102,7 +107,10 @@ class TokenVault:
                 try:os.fsync(directory_fd)
                 finally:os.close(directory_fd)
         finally:
-            if os.path.exists(name):os.unlink(name)
+            if fd>=0:
+                os.close(fd)  # includes failed os.fchmod/os.fdopen
+            if os.path.exists(name):
+                os.unlink(name)
         self._token=token;self._expires=expiry;self._relay_at=relay_at
 
     def load(self,now:datetime)->bool:
