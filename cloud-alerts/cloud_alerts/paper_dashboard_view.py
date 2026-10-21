@@ -44,6 +44,10 @@ footer{color:#90a8c4;font-size:.78rem;padding-bottom:28px}
 <section class="grid"><div class="card"><h2>Closed trade equity change</h2><div id="equity" class="chart muted">No verified paper quote pairs yet</div></div>
 <div class="card"><h2>Performance summary</h2><div id="stats" class="muted">Waiting for simulated trades</div></div></section>
 <section class="card"><h2>Recent simulated trades</h2><div class="tablewrap" id="trades">No paper history loaded.</div></section>
+<section class="card"><h2>Five-indicator decisions and missed opportunities</h2>
+<p>Recorded from completed NIFTY futures candles. A move in hindsight is not a validated missed CE/PE trade.</p>
+<div id="auditSummary" class="muted">No strategy observations loaded.</div>
+<div class="tablewrap" id="audits">No decision evidence loaded.</div></section>
 </main><footer>Research software only. Timezone: Asia/Kolkata. Estimates use observed option BID/ASK, configured fees and adverse slippage; no real broker execution.</footer>
 <script nonce="__NONCE__">
 "use strict";
@@ -113,12 +117,36 @@ function tradesView(trades){
  }
  t.appendChild(body);root.appendChild(t);
 }
+function auditView(data){
+ const summary=el("auditSummary"),root=el("audits");
+ summary.replaceChildren();root.replaceChildren();
+ const stats=data.audit;
+ add(summary,"p","Qualifying signals: "+stats.strategy_qualified+
+     " · Liquidity rejections: "+stats.liquidity_rejected+
+     " · Account risk rejections: "+stats.risk_rejected);
+ add(summary,"p","Missed trade P&L: unverified unless matching historical option quotes were captured.");
+ if(!data.evaluations.length){root.textContent="No completed-candle decisions recorded.";return}
+ const t=document.createElement("table"),h=document.createElement("thead"),r=document.createElement("tr");
+ for(const title of ["Observed (UTC)","Future","Stage","Outcome","Reason","Option"])add(r,"th",title);
+ h.appendChild(r);t.appendChild(h);
+ const body=document.createElement("tbody");
+ for(const record of data.evaluations){
+  const tr=document.createElement("tr");
+  for(const val of [record.observed_at_utc,record.future_symbol,record.stage,
+                    record.outcome,record.reason_code,record.option_symbol||"—"])
+   add(tr,"td",String(val));
+  body.appendChild(tr)
+ }
+ t.appendChild(body);root.appendChild(t);
+}
 async function refresh(){
  if(!secret)return;
  try{
-  const [summary,history]=await Promise.all([read("/paper/api/summary"),read("/paper/api/trades")]);
+  const [summary,history,opportunities]=await Promise.all([
+    read("/paper/api/summary"),read("/paper/api/trades"),read("/paper/api/opportunities")]);
   currentAccounts=summary.accounts;latestTrades=history.trades;
   accountsView(summary);statsView(latestTrades);drawChart(latestTrades);tradesView(latestTrades);
+  auditView(opportunities);
   el("status").textContent="Updated "+new Date().toLocaleTimeString("en-IN")+
    " · "+(summary.mode||"PAPER ONLY")+" · simulated fills only";
  }catch(e){el("status").textContent=e.message;}
