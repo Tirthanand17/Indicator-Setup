@@ -66,7 +66,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     # paper portfolio endpoint is exposed without a strong operator-provided key.
     paper_enabled=bool(getattr(cfg,'paper_dashboard_enabled',False))
     paper_key=str(getattr(cfg,'paper_dashboard_key',''))
-    if paper_enabled and (len(paper_key)<32 or len(set(paper_key))<8):
+    if paper_enabled and (not paper_key.isascii() or len(paper_key)<32 or len(set(paper_key))<8):
         raise RuntimeError('Paper dashboard requires a separate strong access key')
     paper_book=PaperBook(str(cfg.root/'alerts.sqlite3')) if paper_enabled else None
     if getattr(cfg,'paper_autotrade_enabled',False) and (
@@ -145,8 +145,9 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     def _authorize_paper(request:Request):
         # Never accept dashboard keys in URLs/cookies (easy to leak). Do not
         # expose the presence of accounts to an unauthenticated visitor.
-        if paper_book is None or not hmac.compare_digest(
-                request.headers.get('x-paper-dashboard-key',''), paper_key):
+        candidate=request.headers.get('x-paper-dashboard-key','')
+        if (paper_book is None or not candidate.isascii()
+                or not hmac.compare_digest(candidate, paper_key)):
             raise HTTPException(404,'Not found')
 
     @app.get('/paper/dashboard')
