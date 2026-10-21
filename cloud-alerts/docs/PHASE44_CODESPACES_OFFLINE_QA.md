@@ -17,6 +17,16 @@ The user confirmed CircleCI minutes are exhausted, and GitHub Actions minutes we
 - `.devcontainer/run-linux-qa.sh`: asserts native Linux and **Python 3.12** (rejects Windows emulation), creates an isolated virtual environment under `$HOME/.cache`, installs only repository dependencies plus pytest/httpx tooling, and runs the **entire** `cloud-alerts` pytest suite for up to 10 minutes using an `env -i` allowlist. All Kite/Telegram/cloud/account credentials are absent from the test process. Stores JUnit, log and exit-status locally inside the Codespace, **no broker orders or deployments**.
 - On Nirala the GitHub branch was pulled into the existing disposable `%TEMP%` QA clone. `python -m json.tool .devcontainer/devcontainer.json`: PASS; `bash -n .devcontainer/run-linux-qa.sh`: PASS. GitHub API reports the **2-core basicLinux32gb** machine is allowed for this repository. `gh codespace list` returned `[]` (no current active/listed Codespaces). The automated Codespace test job itself has NOT run.
 
+## Single-command launch, read-back and cleanup (optional, budget confirmation required)
+
+To minimize manual work, `.devcontainer/Run-Linux-QA.ps1` now wraps the GitHub CLI to create the **2-core** temporary Codespace on the exact branch, poll the auto-run test result, save the final 160 test-output lines under Nirala's existing `%TEMP%\indicator-phase43-qa-20261021\codespaces-linux-qa-result.txt`, and **stop/delete only the Codespace that it created**, even when pytest reports failures. Launch only once the $0 spending guard and remaining free allowance are confirmed:
+
+```powershell
+& "C:\Users\Dell\AppData\Local\Temp\indicator-phase43-qa-20261021\.devcontainer\Run-Linux-QA.ps1" -BudgetConfirmed
+```
+
+The PowerShell script was pulled to Nirala; PowerShell parser reported **0 syntax errors**. A trial invocation **without** `-BudgetConfirmed` correctly refused to create a Codespace; `gh codespace list` still returned `[]`. Its actual **create/SSH/poll/cleanup path is UNTESTED** until an approved Codespace exists. The user can use the manual CLI steps below if the wrapper fails. Do not pass `-BudgetConfirmed` without actually checking the account's free quota/spending settings.
+
 ## Minimal operator steps (only once, after checking $0 usage budget)
 
 1. Verify the personal Codespaces **remaining included allowance** and an effective $0 spend limit in https://github.com/settings/billing. Do not launch if the account could incur charges.
