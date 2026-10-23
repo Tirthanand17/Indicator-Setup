@@ -20,7 +20,7 @@
     "monitoring": null,
     "other": null
   },
-  "owner_accepted_temporary_host": false,
+  "owner_accepted_temporary_host": true,
   "free_plan_verified_in_account": false,
   "ec2_eligibility_verified_for_region_and_instance": false,
   "price_components_verified_from_provider": false,
@@ -33,5 +33,14 @@
   "no_real_broker_orders": true,
   "payment_card_requested": null,
   "payment_method_added": null,
-  "paid_plan_or_upgrade_enabled": null
+  "paid_plan_or_upgrade_enabled": null,
+  "signup_experience": null,
+  "contact_country_code": null,
+  "cpu_credit_mode": null,
+  "owner_approved_automatic_first_project_creation": false,
+  "owner_accepted_sydney_region_tradeoff": false,
+  "new_signup_available_for_actual_account": false,
+  "no_prior_aws_free_tier_ineligibility": false,
+  "card_verification_hold_requested": null,
+  "advanced_aws_features_activated": null
 }

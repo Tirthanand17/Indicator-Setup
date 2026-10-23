@@ -17,7 +17,10 @@ def proposed(**updates):
     item = {
         "provider": "AWS",
         "account_plan": "Free",
-        "region": "ap-south-1",
+        "signup_experience": "new",
+        "contact_country_code": "IN",
+        "cpu_credit_mode": "standard",
+        "region": "ap-southeast-2",
         "instance_type": "t3.micro",
         "account_opened_at_utc": "2026-10-01T00:00:00Z",
         "free_plan_expires_at_utc": "2027-04-01T00:00:00Z",
@@ -208,3 +211,41 @@ def test_cli_complete_fake_plan_never_provisions(tmp_path, capsys):
     assert outcome["result"] == "DECLARATIONS_COMPLETE_ONLY"
     assert outcome["approved_to_provision_or_deploy"] is False
     assert outcome["hosting_resource_created"] is False
+
+
+@pytest.mark.parametrize("signup", ["advanced", "legacy", None, [], "New"])
+def test_legacy_or_advanced_signup_cannot_be_mistaken_for_card_free(signup):
+    outcome = review_aws_free(proposed(signup_experience=signup), now=NOW)
+    assert "AWS_NEW_SIGNUP_NOT_CONFIRMED" in outcome["blockers"]
+    assert outcome["approved_to_provision_or_deploy"] is False
+
+
+@pytest.mark.parametrize("country", ["US", None, "UK", [], "in"])
+def test_wrong_or_unverified_contact_country_is_blocked(country):
+    outcome = review_aws_free(proposed(contact_country_code=country), now=NOW)
+    assert "INDIA_CONTACT_ADDRESS_NOT_CONFIRMED" in outcome["blockers"]
+
+
+@pytest.mark.parametrize("region", ["ap-south-1", "ap-south-2", "us-east-1"])
+def test_new_indian_signup_sydney_region_not_mumbai(region):
+    outcome = review_aws_free(proposed(region=region), now=NOW)
+    assert "AWS_NEW_INDIA_REGION_MUST_BE_SYDNEY" in outcome["blockers"]
+
+
+@pytest.mark.parametrize("cpu_mode", ["unlimited", None, "not_applicable", "STANDARD"])
+def test_t3_must_not_leave_unlimited_cpu_surcharge_enabled(cpu_mode):
+    outcome = review_aws_free(proposed(cpu_credit_mode=cpu_mode), now=NOW)
+    assert "T_INSTANCE_UNLIMITED_CPU_SURCHARGE_RISK" in outcome["blockers"]
+
+
+def test_non_burstable_instance_uses_not_applicable_cpu_mode():
+    outcome = review_aws_free(proposed(instance_type="c7i-flex.large",
+                                       cpu_credit_mode="not_applicable"), now=NOW)
+    assert "CPU_CREDIT_MODE_UNVERIFIED" not in outcome["blockers"]
+    assert "T_INSTANCE_UNLIMITED_CPU_SURCHARGE_RISK" not in outcome["blockers"]
+
+
+def test_invalid_non_burstable_cpu_mode_is_blocked():
+    outcome = review_aws_free(proposed(instance_type="m7i-flex.large",
+                                       cpu_credit_mode="standard"), now=NOW)
+    assert "CPU_CREDIT_MODE_UNVERIFIED" in outcome["blockers"]

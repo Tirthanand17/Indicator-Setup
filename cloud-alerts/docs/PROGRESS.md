@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 51 — offline AWS Free expiry/credit/migration preflight added; still NO approved host). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 52 — AWS new Free eligibility, India/Sydney region and no-card signup safety verified from official docs; no cloud account accessed or resources created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 52 — AWS new Free signup is conditionally no-card, India fixed to Sydney (2026-10-23; NO ACCOUNT OR DEPLOYMENT)
+
+- User approved **AWS Free as a temporary ₹0/no-card hosting candidate only**, explicitly requiring consent **before creation of any account/project/cloud resource**. Existing PR #8 Phase 51 safety changes are merged.
+- AWS current primary docs distinguish `Sign up for AWS (new)` (Google/GitHub sign-in, no payment method for most eligible new users, account-dependent USD $1 hold) from `Sign up for AWS (advanced)` (Indian account demands a payment method and ₹2 verification). Strictly **STOP on any payment/card hold or paid upgrade**. New signup is in limited rollout and automatically provisions its first project. No signup attempt made.
+- For genuine Indian contact addresses AWS currently assigns new projects to **Sydney `ap-southeast-2`**, not Mumbai; requires owner's informed acceptance of latency/performance implications and account screenshot verification after authorized signup. Officially listed eligible Free features include EC2/EBS/VPC/S3/Route53/Secrets Manager but no credit spending proof. T3/T4g's default unlimited CPU mode can incur surplus credits; require `standard` mode for a candidate.
+- Added strict India/signup/region/first-project-consent/payment-hold/T-instance CPU gates and synthetic tests, keeping shipping example BLOCKED and every result `approved_to_provision_or_deploy=false`. See [Phase 52 AWS India eligibility research](PHASE52_AWS_INDIA_NEW_SIGNUP_ELIGIBILITY.md).
+- **Full isolated Ubuntu Python 3.12 suite: 744 passed, 0 failed, 1 skipped, one third-party Starlette deprecation warning; exit 0.** No cloud project, charges, DNS, real credentials, Kite subscription or phone alerts. **53% engineering estimate unchanged; cloud acceptance 0/5.** Next: get separate owner authorization for new AWS signup's automatic project, stop if card/hold, then inspect actual Free entitlement/credit and estimate a one-worker service before asking again about resources.
 
 ## Phase 51 — AWS Free time-limit + cost + data-retention fail-closed preflight (2026-10-23; NOT DEPLOYED)
 

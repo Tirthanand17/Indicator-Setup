@@ -17,6 +17,10 @@ import re
 
 TRUE_FLAGS = (
     "owner_accepted_temporary_host",
+    "owner_approved_automatic_first_project_creation",
+    "owner_accepted_sydney_region_tradeoff",
+    "new_signup_available_for_actual_account",
+    "no_prior_aws_free_tier_ineligibility",
     "free_plan_verified_in_account",
     "ec2_eligibility_verified_for_region_and_instance",
     "price_components_verified_from_provider",
@@ -32,13 +36,16 @@ FALSE_FLAGS = (
     "payment_card_requested",
     "payment_method_added",
     "paid_plan_or_upgrade_enabled",
+    "card_verification_hold_requested",
+    "advanced_aws_features_activated",
 )
 PRICE_COMPONENTS = frozenset((
     "ec2_compute", "ebs_storage", "public_ipv4", "data_transfer",
     "snapshots", "dns", "monitoring", "other",
 ))
 FIELDS = frozenset((
-    "provider", "account_plan", "region", "instance_type",
+    "provider", "account_plan", "signup_experience",
+    "contact_country_code", "region", "instance_type", "cpu_credit_mode",
     "account_opened_at_utc", "free_plan_expires_at_utc",
     "migration_cutover_at_utc", "reviewed_at_utc",
     "pricing_reviewed_at_utc", "planned_run_days",
@@ -108,10 +115,27 @@ def review_aws_free(plan: object, *, now: datetime | None = None) -> dict:
 
     if plan.get("provider") != "AWS" or plan.get("account_plan") != "Free":
         blockers.append("NOT_AWS_NEW_FREE_PLAN")
+    if plan.get("signup_experience") != "new":
+        blockers.append("AWS_NEW_SIGNUP_NOT_CONFIRMED")
+    if plan.get("contact_country_code") != "IN":
+        blockers.append("INDIA_CONTACT_ADDRESS_NOT_CONFIRMED")
+    # As published by AWS in October 2026, new-signup projects for genuine
+    # Indian contact addresses are provisioned in Sydney, not Mumbai. Do not
+    # substitute a false billing address to get another Region. Reassess this
+    # explicit rule if AWS officially expands the eligible project Regions.
+    if plan.get("signup_experience") == "new" and plan.get("contact_country_code") == "IN" and plan.get("region") != "ap-southeast-2":
+        blockers.append("AWS_NEW_INDIA_REGION_MUST_BE_SYDNEY")
     if not isinstance(plan.get("region"), str) or not REGION_PATTERN.fullmatch(plan["region"]):
         blockers.append("REGION_NOT_VERIFIED")
     if not isinstance(plan.get("instance_type"), str) or plan["instance_type"] not in SUPPORTED_INSTANCES:
         blockers.append("INSTANCE_NOT_LISTED_ELIGIBLE")
+    instance = plan.get("instance_type")
+    cpu_mode = plan.get("cpu_credit_mode")
+    if isinstance(instance, str) and (instance.startswith("t3.") or instance.startswith("t4g.")):
+        if cpu_mode != "standard":
+            blockers.append("T_INSTANCE_UNLIMITED_CPU_SURCHARGE_RISK")
+    elif cpu_mode != "not_applicable":
+        blockers.append("CPU_CREDIT_MODE_UNVERIFIED")
     for flag in TRUE_FLAGS:
         if plan.get(flag) is not True:
             blockers.append("NOT_VERIFIED_" + flag.upper())
