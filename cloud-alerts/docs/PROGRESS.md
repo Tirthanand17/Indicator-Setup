@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 48 — free-host branch prepared and 622-test Linux suite green; host signup unverified). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 49 — official Caddy syntax validated and 647-test Linux suite green; Northflank still unqualified and undeployed). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,12 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 49 — Caddy validation and safe public-gateway probe (2026-10-23; NOT DEPLOYED)
+
+- A checksum-verified official Caddy v2.11.7 CLI **validated** the exact Northflank gateway Caddyfile on Ubuntu WSL (`Valid configuration`, exit 0). A harmless formatting warning remains. This was **not** a live reverse-proxy request, Docker build, HTTPS check or deployment.
+- Added `cloud_alerts.gateway_acceptance`, a deliberately opt-in synthetic HTTPS probe designed for a **future approved** public host. It enforces real TLS/443, no redirects, no secret headers/tokens, denied diagnostic/private routes, GET-only dashboard rules, separate dashboard-enabled shell behavior, 401 for unsigned handoff, and 413 for bodies above 2 KiB. Strictly no network calls before explicit confirmation. Recorded in [Phase 49 runbook](PHASE49_GATEWAY_EDGE_ACCEPTANCE.md).
+- Twenty-five new offline tests pass. The **entire isolated Linux Python 3.12 test suite: 647 passed, 0 failed, 1 skipped**, exit 0 (one third-party Starlette deprecation warning). No actual cloud account, persistent volume, private network, TLS gateway, Android/Telegram phone receipt, or daily Kite login tested. **Engineering estimate stays 53%; live acceptance stays 0/5.** User has already signed into Northflank in a *local Chrome tab*, which is not a remotely connected session; don't open cloud browser or create resources absent proven ₹0 entitlements and user approval.
 
 ## Phase 48 — no-card free cloud edge preparation (2026-10-23; NOT DEPLOYED)
 
