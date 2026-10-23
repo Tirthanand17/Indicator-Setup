@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 49 — official Caddy syntax validated and 647-test Linux suite green; Northflank still unqualified and undeployed). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 50 — Northflank free no-card 60-minute cutoff confirmed from signup; alternate host review underway). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 50 — mandatory Northflank card-block and safer no-card replan (2026-10-23)
+
+- The user's actual **Northflank Developer Sandbox Free** signup screenshots state that the first build/deployment starts a **60-minute window**, and a payment card must then verify the account to keep workloads running. The user has no card. **Northflank is conclusively unsuitable for laptop-off 24/7 use under this account**, despite its general Free/Sandbox marketing. No Northflank resources, payment, secrets, DNS or deployments were created.
+- Added an unconditional host qualification blocker `NORTHFLANK_SANDBOX_NO_CARD_60_MINUTE_WINDOW` even when a Northflank plan's operator declaration fields are all green; added three direct regression cases. Marked Phase 48 as **superseded/do not deploy** and documented alternatives in [Phase 50 no-card host re-assessment](PHASE50_CARD_FREE_HOST_REASSESSMENT.md).
+- Research from primary sources: AWS's **new** Free plan advertises $100 credit and no card for *most* eligible new sign-ups, EC2 support, a hard no-charge cutoff, and a strict **six-month or credit-depletion expiration**; best fit with current Python code if user qualifies, NOT a forever-free server. Deno Deploy Free + KV/cron is a potential **minute-scheduled JS migration**, subject to unverified no-card quota; Cloudflare Workers Free + D1 has a **10 ms CPU cap per Cron** and cannot run this Python worker unchanged. No card-only forever-free general VPS is verified.
+- **Pending:** safely qualify a different card-free account before proposing resource creation; never use an old signed-in Chrome session through cloud browser. Keep Kite unrenewed until the synthetic cloud system is qualified. Engineering estimate **53%** and cloud acceptance **0/5** remain unchanged. Full Phase 49 Python suite **647 passed, 1 skipped** before these Phase 50 changes.
 
 ## Phase 49 — Caddy validation and safe public-gateway probe (2026-10-23; NOT DEPLOYED)
 
