@@ -6,6 +6,18 @@
 
 From `cloud-alerts/`, run `python -m cloud_alerts.loopback_smoke --json`. This creates two **localhost-only** Uvicorn processes, validates a synthetic signed token handoff, encrypted disk state, replay rejection after restart, and private file permissions. It never uses your `.env`, real Kite/Telegram tokens or network hosts. **This is not a Docker/Caddy/TLS or cloud deployment test** and does not relax the production HTTPS sender and persistent-storage requirements. See [rehearsal details](LOOPBACK_LIFECYCLE_REHEARSAL.md).
 
+## Phase 46 host suitability gate — mandatory before any new service
+
+Run the **no-network, fail-closed** [host qualification CLI](../cloud_alerts/host_qualification.py) against a nonsecret operator-reviewed host plan. The supplied [example](../deploy/host-plan.example.json) intentionally rejects Render Free, and the provider's own docs confirm that its sleeping services and ephemeral local files are unsuitable for the unattended SQLite/token-vault worker:
+
+```bash
+cd cloud-alerts
+python -m cloud_alerts.host_qualification --plan deploy/host-plan.example.json --json
+# EXPECTED BLOCKED / exit 2; never put actual tokens in the plan.
+```
+
+Even `DECLARATIONS_COMPLETE_ONLY` means **self-attested form consistency, not verified cloud credentials, no-charge quota, uptime, mount durability, TLS, approval or permission to deploy**. See [Phase 46 host audit](PHASE46_HOST_QUALIFICATION.md). The connected Render services were inspected READ-ONLY and none was deployed or modified; a specific suitable host/credit guarantee remains unverified.
+
 ## 1 — Choose the cloud host first
 
 See [HOSTING_EVALUATION.md](HOSTING_EVALUATION.md) for verified current provider policy, OCI/Google Always Free candidates, specific account eligibility dependencies and zero-additional-charge rules. No cloud host has been approved and provisioned.
