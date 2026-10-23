@@ -112,3 +112,16 @@ async def test_repeated_candle_poll_does_not_reuse_old_thread_sdk_sessions(tmp_p
     assert len(first_ids) == 2 and len(second_ids) == 2
     assert first_ids.isdisjoint(second_ids)
     assert not instance.telegram.sent
+
+
+@pytest.mark.asyncio
+async def test_review_missing_confirmed_candle_cannot_request_option_quote(tmp_path, monkeypatch):
+    instance = fake_engine(tmp_path, monkeypatch)
+    monkeypatch.setattr(engine_module, 'KiteReadOnly', TrackedKite)
+    monkeypatch.setattr(engine_module, 'decide', lambda candles, now, confirm_15m:
+        Decision('REVIEW_CE', 'SYNTHETIC REVIEW WITHOUT CANDLE'))
+    await instance.run_once(NOW)
+    assert instance.status == 'WAIT_DATA'
+    assert not instance.telegram.sent
+    assert instance.db.get_runtime('virtual_candidate') is None
+    assert len(TrackedKite.instances) == 3  # No separate option quote client.
