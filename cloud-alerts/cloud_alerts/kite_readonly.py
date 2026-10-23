@@ -22,7 +22,7 @@ class _MarketDataAdapter(requests.adapters.HTTPAdapter):
     Python is not a security sandbox: deliberate code replacement is out of scope.
     """
     _lock = threading.Lock()
-    _last = {}
+    _last: dict[str, float] = {}
 
     def send(self, request, **kwargs):
         url = urlsplit(request.url)

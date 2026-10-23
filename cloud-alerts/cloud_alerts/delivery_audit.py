@@ -68,6 +68,8 @@ def delivery_report(rows: list[tuple], session_dates: list[date]) -> dict:
                 isinstance(status, str) and status.startswith('VIRTUAL_OPTION_EXIT_')):
             continue
         issued = _when(issued_raw, required=True)
+        if issued is None:
+            raise ValueError("missing issue timestamp")
         if issued.astimezone(IST).date() not in chosen:
             continue
         if type(state) is not int or state not in (0, 1, 2):
@@ -83,7 +85,7 @@ def delivery_report(rows: list[tuple], session_dates: list[date]) -> dict:
             raise ValueError('unexpected attempt timestamp')
         if attempts and (first is None or last is None):
             raise ValueError('missing attempt timestamps')
-        if first is not None and (first < issued or last < first):
+        if first is not None and (last is None or first < issued or last < first):
             raise ValueError('invalid attempt order')
         if accepted_at is not None and (state != 1 or accepted_at < issued
                                         or (last is not None and accepted_at < last)):

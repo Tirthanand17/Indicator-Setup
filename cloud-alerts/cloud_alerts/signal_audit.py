@@ -44,7 +44,7 @@ class SignalAudit:
             raise ValueError('invalid observed option identity')
         if indicators is None:
             levels={}
-        elif is_dataclass(indicators):
+        elif is_dataclass(indicators) and not isinstance(indicators, type):
             levels=asdict(indicators)
         elif isinstance(indicators,dict):
             levels=indicators

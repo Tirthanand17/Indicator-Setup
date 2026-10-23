@@ -55,17 +55,21 @@ def compute(candles: list[Candle], length: int = 14) -> Indicators:
         trs.append(max(b.high-b.low,abs(b.high-a.close),abs(b.low-a.close)))
     atr=rma(trs,length)
     pd=rma(plus,length);md=rma(minus,length)
-    di_plus=[];di_minus=[];dx=[]
-    for a,p,m in zip(atr,pd,md):
-        if a is None or p is None or m is None or a<=0:
+    di_plus: list[float | None] = []
+    di_minus: list[float | None] = []
+    dx: list[float | None] = []
+    for smoothed_atr,p,m in zip(atr,pd,md):
+        if smoothed_atr is None or p is None or m is None or smoothed_atr<=0:
             di_plus.append(None);di_minus.append(None);dx.append(None);continue
-        pdi=100*p/a;mdi=100*m/a
+        pdi=100*p/smoothed_atr;mdi=100*m/smoothed_atr
         di_plus.append(pdi);di_minus.append(mdi)
         total=pdi+mdi
         dx.append(100*abs(pdi-mdi)/total if total>0 else 0.)
     adx=rma(dx,length)
     if adx[-1] is None or adx[-2] is None or atr[-1] is None:
         raise ValueError('ADX or ATR not ready')
+    if di_plus[-1] is None or di_minus[-1] is None:
+        raise ValueError('DMI not ready')
     last_day=candles[-1].start.date()
     daily=[x for x in candles if x.start.date()==last_day]
     if not daily or any(x.volume<=0 for x in daily):

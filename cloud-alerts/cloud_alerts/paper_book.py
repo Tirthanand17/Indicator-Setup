@@ -210,6 +210,8 @@ class PaperBook:
                 db.execute('INSERT OR IGNORE INTO paper_rejections VALUES(?,?,?,?)',
                            (account_id,signal_id,now.astimezone(IST).isoformat(),reason))
                 return {'status':'REJECTED','reason':reason,'account_id':account_id}
+            if selection is None:
+                raise ValueError("missing validated paper allocation")
             lots,entry_fee,exit_fee,debit=selection
             trade_id=account_id+':'+signal_id
             db.execute('UPDATE paper_accounts SET cash_paise=cash_paise-? WHERE account_id=? AND cash_paise>=?',

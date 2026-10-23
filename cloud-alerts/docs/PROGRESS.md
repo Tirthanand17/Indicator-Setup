@@ -1,5 +1,8 @@
 # Canonical engineering progress — 23 October 2026
 
+**Typing/lock follow-up:**29 artifact hashes verified by clean offline installation; eight core modules pass mypy; whole-app errors reduced56 to36;51 regressions passed. [Evidence](../../audit/TYPE_AND_LOCK_PROGRESS.md). Item21 remains open; progress15/25 (60%).
+
+
 **Dependency follow-up:** default REST SDK dependency chain removed; fresh Linux suite774 passed/1 skipped, REST contract suite15 passed, pip check clean and advisory scan reports no known vulnerabilities. Live WebSocket shadow is explicitly disabled pending review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md). Engineering remains15/25 (60%) because type-checking/reproducibility work remains. Earlier round counts below are historical snapshots.
 
 
