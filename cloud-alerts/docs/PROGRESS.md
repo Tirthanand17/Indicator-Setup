@@ -42,7 +42,7 @@ Live acceptance     [-----]                      0/5
 |24|Telegram ambiguous delivery/retry_after/retention handling|No|A15 open|
 |25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
 
-Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;63 Node passed; full configured mypy49 files passed; pip check clean**. The **1 native local workerd test** and previous advisory scan are historical results, not rerun this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include history review, cloud service integration, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
+Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;63 Node passed; full configured mypy49 files passed; pip check clean**. The **1 native local workerd test also passed** in the temporary checkout. The previous advisory scan is historical and was not rerun this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include history review, cloud service integration, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
 Five live gates are individually unverified: cloud Kite data, phone Telegram receipt, real session scheduling, dashboard/ledger recovery, laptop-off continuation. No broker orders, live credentials, phone messages, cloud resources or billing changes in this round.
 
