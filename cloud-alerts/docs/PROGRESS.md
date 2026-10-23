@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 47 — Azure Student connection prepared; account verification pending). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 47 — subscription audit merged; student activation pending). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,12 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 47 source merge checkpoint (no cloud deployment)
+
+- GitHub [PR #3](https://github.com/Tirthanand17/Indicator-Setup/pull/3) merged into `main` with merge commit `ff22dabd234acd36f15497658c7ec4a88d23b18e`, after full offline Ubuntu Python 3.12 **616 passed, 0 failed, 1 skipped**, exit 0. The new code is read-only Azure subscription inspection.
+- Azure CLI software installed; student offer registration and valid CLI account authorization remain unverified. **No Azure VM, disk, IP, resource group, cloud secret or deployment created**, and no real Kite/Telegram integration activated. Users must complete their own academic verification; no passwords or one-time codes belong in repository or chat.
+- Actual live acceptance `0/5`; weighted engineering estimate **53% unchanged** until a verified covered host and live phone/data/session evidence exist.
 
 ## Phase 47 — Azure Student subscription discovery (connection awaits user academic verification)
 
