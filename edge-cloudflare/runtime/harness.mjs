@@ -44,6 +44,27 @@ export class TestSession extends MarketSession {
       const after = await this.storage.get('paper-ledger-v1');
       return Response.json({ unchanged: JSON.stringify(before) === JSON.stringify(after) });
     }
+    if (path === '/test/pipeline/turn' && request.method === 'POST') {
+      return Response.json(await this.processSyntheticMarketTurn(await request.json()));
+    }
+    if (path === '/test/pipeline/state') {
+      return Response.json({ session: await this.storage.get('synthetic-session-v1') ?? null,
+        ledger: await this.storage.get('paper-ledger-v1') ?? null });
+    }
+    if (path === '/test/pipeline/rollback') {
+      const before = await this.storage.get('synthetic-session-v1');
+      const ledgerBefore = await this.storage.get('paper-ledger-v1');
+      try {
+        await this.storage.transaction(async txn => {
+          await txn.put('synthetic-session-v1', { schema: 999 });
+          await txn.put('paper-ledger-v1', { schema: 999 });
+          throw new Error('abort synthetic pipeline transaction');
+        });
+      } catch { /* expected */ }
+      return Response.json({ unchanged:
+        JSON.stringify(before) === JSON.stringify(await this.storage.get('synthetic-session-v1')) &&
+        JSON.stringify(ledgerBefore) === JSON.stringify(await this.storage.get('paper-ledger-v1')) });
+    }
     if (path === '/test/tick') {
       if (!ticked) {
         clock = (await this.storage.get('scheduler-v1')).scheduledAtMs;
