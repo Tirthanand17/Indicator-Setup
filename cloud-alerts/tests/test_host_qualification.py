@@ -1,6 +1,7 @@
 """Host suitability declarations are NEVER approval or real uptime evidence."""
 from datetime import datetime, timedelta, timezone
 import json
+from pathlib import Path
 
 import pytest
 
@@ -103,3 +104,14 @@ def test_cli_does_not_authenticate_or_provision_when_declarations_pass(tmp_path,
     assert result['result'] == 'DECLARATIONS_COMPLETE_ONLY'
     assert result['hosting_resource_created'] is False
     assert result['approved_to_provision_or_deploy'] is False
+
+def test_shipped_host_template_is_explicitly_blocked_and_contains_no_secrets():
+    template = (Path(__file__).resolve().parents[1] / 'deploy' /
+                'host-plan.example.json')
+    plan_values = json.loads(template.read_text(encoding='utf-8'))
+    result = review_host(plan_values, now=NOW)
+    assert result['result'] == 'BLOCKED'
+    assert 'RENDER_FREE_SLEEP_AND_EPHEMERAL_STATE' in result['blockers']
+    assert 'NOT_CONFIRMED_ZERO_INCREMENTAL_CHARGE_VERIFIED' in result['blockers']
+    assert not any('token' in key.lower() or 'secret' in key.lower()
+                   for key in plan_values)
