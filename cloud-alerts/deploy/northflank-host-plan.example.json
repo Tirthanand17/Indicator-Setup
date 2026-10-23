@@ -1,0 +1,14 @@
+{
+  "provider": "Northflank",
+  "service_class": "dedicated_container_worker",
+  "plan_tier": "sandbox_free",
+  "reviewed_at_utc": "1970-01-01T00:00:00Z",
+  "owner_approved_host": false,
+  "zero_incremental_charge_verified": false,
+  "zero_overspend_guard_confirmed": false,
+  "always_on_without_inbound_requests": false,
+  "supports_private_durable_volume": false,
+  "one_worker_only": false,
+  "supports_restricted_https_ingress": false,
+  "no_real_broker_orders": true
+}
