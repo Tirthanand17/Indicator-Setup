@@ -1,5 +1,7 @@
 # Phase 52 — AWS new Free signup eligibility for an Indian owner (READ-ONLY / NOT DEPLOYED)
 
+> **Post-Phase-52 outcome (2026-10-23; supersedes its eligibility checklist):** The owner subsequently authorized the *new AWS Free signup and its automatically created Sydney project only if no payment method/hold was required*. In the actual Indian AWS flow the user encountered a **₹2 verification and a ₹15,000 UPI AutoPay/e-mandate request**. This fails the owner's absolute no-card/no-hold/no-mandate restriction. AWS is now **BLOCKED**, not a temporary eligible host. Do **not** approve the mandate on the theory it can be revoked immediately; cancelling a payment mandate does not establish that the service stays usable at ₹0. No AWS project or resource creation has been confirmed. See [Phase 53 provider reassessment](PHASE53_CLOUDFLARE_DURABLE_OBJECTS_FREE_FEASIBILITY.md).
+
 **Research:** 2026-10-23. **Owner decision:** AWS is approved as a **temporary candidate at ₹0 without any payment method**; the owner explicitly requires approval **before any AWS account/project/EC2 creation**. All cloud resource and credential operations remain forbidden until that distinct approval.
 
 ## Decisive updates from AWS first-party documentation
@@ -27,9 +29,9 @@ Official sources:
 | Requirement | Verified? | Next proof |
 |---|---|---|
 | Existing AWS eligibility; no previous AWS Free account | **Unknown** | User's own signup path, no identity leakage |
-| New signup offered with Google and no card/hold | **Unknown** | Actual initial signup screen; do not proceed if payment asked |
+| New signup offered with Google and no card/hold | **NO on user's actual Indian flow** | ₹2 verification plus ₹15,000 UPI AutoPay demand; hard STOP |
 | Temporary hosting approved in principle | **YES** | This conversation, no resources permitted yet |
-| First project creation explicitly authorized | **NO** | Ask the user BEFORE pressing the signup/create action |
+| First project creation explicitly authorized | **Conditional approval was given later; conditions failed** | No created project confirmed; no further AWS signup attempts |
 | Region is Sydney and risk accepted | **Research supports Sydney; user acceptance pending** | User acceptance and AWS Settings nonsecret Region after signup |
 | Free plan and $100-or-current account credit verified | **NO** | AWS Settings/Billing Free plan and credit balance |
 | EC2 / EBS / IPv4 / bandwidth / DNS exact credit quote | **NO** | Region-specific cost estimate with all running services, no invented prices |
@@ -54,6 +56,6 @@ Every result, including hypothetical complete declarations, says `approved_to_pr
 
 ## Safe next human checkpoint
 
-The owner must decide whether they authorize **the AWS new-signup flow that automatically creates a Free project in Sydney**, subject to stopping before any card/hold or Paid upgrade. If authorized, the user can open AWS on their **own local Chrome** and show a redacted nonsecret signup/Free plan screen. The assistant must ask again for the exact EC2/EBS/public-ingress resources after verifying ₹0 cash and running credit cost.
+**CLOSED: user authorized the conditional signup, but the real AWS screen required UPI AutoPay.** Do not ask the user to approve or revoke a mandate, retry identity variants, continue the signup, create the automatic project, or provision EC2/EBS. Shift to Phase 53 no-card research and seek fresh consent only for a genuinely eligible different provider.
 
 **Do not** renew Kite, update domain DNS, create IAM access keys, deploy resources, pay ₹2/$1, enable auto-billing, or call the service live before the separate gates.
