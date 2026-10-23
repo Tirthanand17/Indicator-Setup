@@ -204,3 +204,64 @@ test('native synthetic pipeline commits 5m/15m signal, two accounts, exits and j
     assert.equal(after.ledger.accounts.PAPER_100K.initialPaise,10000000);
   } finally {await mf.dispose();}
 });
+
+test('native private mobile dashboard login, read-only API, fail closed and SQLite restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-private-view-native-'));
+  const viewKey='private-view-synthetic-0123456789-AbCdEfGh';
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PAPER_LEDGER_ENABLED:'true',OFFLINE_PRIVATE_DASHBOARD_ENABLED:'true',
+      PAPER_DASHBOARD_VIEW_KEY:viewKey},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('External requests forbidden by local test');}};
+  let mf=new Miniflare(options);
+  const request=(route,init)=>mf.dispatchFetch(`https://unit.invalid${route}`,init);
+  try {
+    assert.equal((await request('/paper/api/summary')).status,404);
+    const loginPage=await request('/paper/dashboard');
+    assert.equal(loginPage.status,200);
+    assert.match(await loginPage.text(),/Private paper dashboard/);
+    assert.equal((await request('/paper/login',{method:'POST',
+      headers:{'content-type':'application/x-www-form-urlencoded'},body:'key=wrong'})).status,401);
+    const login=await request('/paper/login',{method:'POST',
+      redirect:'manual',
+      headers:{'content-type':'application/x-www-form-urlencoded',origin:'https://unit.invalid'},
+      body:new URLSearchParams({key:viewKey}).toString()});
+    assert.equal(login.status,303);
+    const rawCookie=login.headers.get('set-cookie');
+    assert.match(rawCookie,/HttpOnly; SameSite=Strict/);
+    assert.equal(rawCookie.includes(viewKey),false);
+    const cookie=rawCookie.split(';')[0];
+    assert.equal((await request('/paper/api/summary',{headers:{cookie}})).status,503);
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    const stub=ns.get(ns.idFromName('nifty-paper-session-v1'));
+    const entryAt=Date.parse('2026-10-23T04:30:00Z');
+    const q={contract:{symbol:'NIFTY26OCT23000CE',kind:'CE',expiry:'2026-10-29',
+      token:12345,lotSize:65},bid:100,ask:100.5,bidQuantity:650,
+      askQuantity:650,updatedAtMs:entryAt-1000};
+    const entered=await stub.fetch('https://unit.invalid/test/paper/enter',{
+      method:'POST',body:JSON.stringify({signalId:'native-private-dashboard-001',
+        nowMs:entryAt,quote:q})});
+    assert.equal((await entered.json()).results.PAPER_50K.status,'OPEN');
+    const summary=await (await request('/paper/api/summary',{headers:{cookie}})).json();
+    assert.equal(summary.status,'READY');
+    assert.equal(summary.accounts[0].openCount,1);
+    assert.equal(summary.accounts[0].valuationNote,'CASH_ONLY_NOT_EQUITY_NO_VERIFIED_MTM');
+    assert.equal(summary.realOrdersEnabled,false);
+    const trades=await (await request('/paper/api/trades?limit=2',{headers:{cookie}})).json();
+    assert.equal(trades.trades.length,2);
+    assert.equal(trades.trades[0].netPnlRupees,null);
+    const daily=await (await request('/paper/api/daily?date=2026-10-23',{headers:{cookie}})).json();
+    assert.equal(daily.accounts[0].entries,1);
+    assert.equal(daily.accounts[0].winRate,null);
+    assert.equal((await request('/paper/api/trades',{method:'POST',headers:{cookie},body:'x'})).status,404);
+    assert.equal((await request('/orders',{method:'POST',headers:{cookie},body:'x'})).status,404);
+    await mf.dispose();mf=new Miniflare(options);
+    const after=await (await request('/paper/api/summary',{headers:{cookie}})).json();
+    assert.equal(after.status,'READY');
+    assert.equal(after.accounts[0].openCount,1);
+    assert.equal(after.accounts[1].openCount,1);
+  } finally {await mf.dispose();}
+});
