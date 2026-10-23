@@ -53,8 +53,8 @@ function signedBody(e, opts={}) {
   return {req,body,nonce};
 }
 async function send(e,opts={}){return worker.fetch(signedBody(e,opts).req,e);}
-test("health never claims real trades or Kite connectivity",async()=>{
-  const r=await worker.fetch(new Request("https://test/healthz"),{});
+test("public status never claims real trades or Kite connectivity",async()=>{
+  const r=await worker.fetch(new Request("https://test/status"),{});
   assert.equal(r.status,200);
   const b=await r.json();assert.equal(b.status,"UP");
   assert.equal(b.paper_trading_enabled,false);assert.equal(b.live_data,false);
@@ -62,7 +62,7 @@ test("health never claims real trades or Kite connectivity",async()=>{
 });
 test("disabled relay fails closed even with other credentials",async()=>{
   const e=env();e.TOKEN_RELAY_ENABLED="false";
-  assert.equal((await send(e)).status,503);assert.equal(e.DB.token,null);
+  assert.equal((await send(e)).status,401);assert.equal(e.DB.token,null);
 });
 test("missing AES secret cannot accept signed token",async()=>{
   const e=env();delete e.EDGE_AES_KEY;
@@ -139,4 +139,11 @@ test("POST oversized content-length blocked before crypto",async()=>{
   req.headers.set("content-length","8000");
   assert.equal((await worker.fetch(req,e)).status,413);
   assert.equal(e.DB.nonces.size,0);
+});
+
+test("private health and readiness routes remain inaccessible",async()=>{
+  for(const path of ["/healthz","/readyz","/operationalz","/docs","/openapi.json","/"]){
+    const r=await worker.fetch(new Request("https://test"+path),env());
+    assert.equal(r.status,404,path);
+  }
 });
