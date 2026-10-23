@@ -106,3 +106,19 @@ def test_readonly_transport_subscribes_full_mode_only_and_clears_on_disconnect()
     w.stop()
     assert w._ticker.closed
     assert w.aggregator.diagnostic()['status']=='DISCONNECTED_REQUIRES_RECONCILIATION'
+
+
+def test_missing_values_and_corrupt_tick_baseline_fail_closed():
+    a = FiveMinuteTickAggregator(TOK)
+    missing = tick(D)
+    missing['last_price'] = None
+    assert a.ingest(missing, D) == []
+    assert a.rejected_count == 1
+    assert a.diagnostic()['status'] == 'INVALID_TICK'
+
+    assert a.ingest(tick(D, 23000, 100), D) == []
+    a._last_volume = None  # Simulate a corrupted in-process tick baseline.
+    next_tick = D + timedelta(seconds=1)
+    assert a.ingest(tick(next_tick, 23000, 101), next_tick) == []
+    assert a.diagnostic()['status'] == 'INCOMPLETE_TICK_BASELINE'
+    assert a.emitted_count == 0
