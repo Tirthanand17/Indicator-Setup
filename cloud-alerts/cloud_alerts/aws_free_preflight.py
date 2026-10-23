@@ -110,7 +110,7 @@ def review_aws_free(plan: object, *, now: datetime | None = None) -> dict:
         blockers.append("NOT_AWS_NEW_FREE_PLAN")
     if not isinstance(plan.get("region"), str) or not REGION_PATTERN.fullmatch(plan["region"]):
         blockers.append("REGION_NOT_VERIFIED")
-    if plan.get("instance_type") not in SUPPORTED_INSTANCES:
+    if not isinstance(plan.get("instance_type"), str) or plan["instance_type"] not in SUPPORTED_INSTANCES:
         blockers.append("INSTANCE_NOT_LISTED_ELIGIBLE")
     for flag in TRUE_FLAGS:
         if plan.get(flag) is not True:
