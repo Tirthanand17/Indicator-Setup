@@ -178,7 +178,7 @@ def review_aws_free(plan: object, *, now: datetime | None = None) -> dict:
         if any(price is None for price in prices):
             blockers.append("COST_COMPONENTS_INVALID")
         else:
-            monthly = sum(prices, Decimal(0))
+            monthly = sum((price for price in prices if price is not None), Decimal(0))
             if monthly == 0:
                 blockers.append("ZERO_RUNNING_COST_ESTIMATE_NOT_CREDIBLE")
 
