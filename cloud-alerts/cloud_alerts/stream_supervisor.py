@@ -107,7 +107,7 @@ class ShadowSupervisor:
         self._instrument: int | None = None
         self._socket = None
         self._generation = 0
-        self._loop = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self.connections = 0
         self.restart_count = 0
         self.last_diagnostic: str | None = None
@@ -155,19 +155,20 @@ class ShadowSupervisor:
         if self._socket is not None:
             self.restart_count += 1
             await self._close()
-        self._loop = asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
+        self._loop = loop
         generation = self._generation + 1
         self._generation = generation
 
         def on_bar(bar: StreamBar) -> None:
             try:
-                self._loop.call_soon_threadsafe(self._accept_bar, generation, bar)
+                loop.call_soon_threadsafe(self._accept_bar, generation, bar)
             except RuntimeError:
                 pass  # event loop is shutting down, never keep stale data
 
         def on_diagnostic(event: dict) -> None:
             try:
-                self._loop.call_soon_threadsafe(self._accept_diagnostic, generation, event)
+                loop.call_soon_threadsafe(self._accept_diagnostic, generation, event)
             except RuntimeError:
                 pass
 
