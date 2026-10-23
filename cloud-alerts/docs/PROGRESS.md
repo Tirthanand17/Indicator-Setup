@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 52 — AWS new Free eligibility, India/Sydney region and no-card signup safety verified from official docs; no cloud account accessed or resources created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 53 — AWS India Free signup blocked by the user's actual ₹2 verification / ₹15,000 UPI AutoPay mandate; Cloudflare Workers Free + SQLite Durable Objects alarms researched as a conditional no-card serverless alternative; no cloud account or resources created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 53 — next no-card candidate: Cloudflare Workers Free + Durable Objects alarms (2026-10-23; RESEARCH ONLY)
+
+- New user evidence overrides AWS's earlier theoretical eligibility: the actual AWS India signup demanded a **₹2 verification and ₹15,000 UPI AutoPay mandate**. This breaches the no-mandate/no-hold restriction. **AWS Free is BLOCKED** on this attempt; no authorization for an AWS paid/mandated flow, EC2, project or other cloud service.
+- Reviewed authoritative Cloudflare Workers and Durable Objects docs: **no-card Workers Free signup advertised**, 100k requests/day and 128-MB/10-ms Free Worker limits. SQLite Durable Objects on Free add persistent SQL storage and **programmatic alarms fine-grained enough to request ~20-second wakeups** (not guaranteed punctual delivery). Free quota includes 100k DO request/alarm invocations/day, 13k GB-s/day, and 5 GB total SQLite storage; exhaustion fails closed.
+- Inference: a single market-session orchestrator would schedule about **1,125 premium-check alarms in a full 375-minute NSE session**, not counting retries/bootstraps/storage. The Python 3.12 FastAPI/Kite SDK/cryptography/native SQLite monolith cannot be deployed unchanged; Cloudflare does support Python FastAPI via ASGI, Python DOs and alarms, but exact packages, memory, CPU, auth and read-only REST performance require **offline and field validation**.
+- Also checked Deno Deploy: official changelog confirms card verification to unlock regular Free organization limits; Back4app's own 2026 Free container test lasted only about one hour. No truly free no-card **drop-in always-on Linux VPS** has been qualified. See [Phase 53 comparison and fail-closed feasibility](PHASE53_CLOUDFLARE_DURABLE_OBJECTS_FREE_FEASIBILITY.md).
+- **No Cloudflare account, Worker, DO, database, domain/DNS, secret, Kite renewal or resource created.** Ask before all host creation. Existing project code, sample safety flags, **53% engineering estimate**, and **0/5 real cloud-market acceptance gates** are unchanged. Most recent verified full isolated Linux test suite remains the Phase 52 result of **744 passed, 1 skipped**; Phase 53 is documentation-only.
 
 ## Phase 52 — AWS new Free signup is conditionally no-card, India fixed to Sydney (2026-10-23; NO ACCOUNT OR DEPLOYMENT)
 
