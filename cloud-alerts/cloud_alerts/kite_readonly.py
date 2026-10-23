@@ -1,8 +1,6 @@
-"""Strict read-only Kite SDK wrapper with credential-bearing transport isolation.
+"""Official read-only REST market data without the trading-capable SDK.
 
-Never offers any order or account methods. The official Kite SDK uses Requests
-with an inherited environment by default. Production REST must fail closed if
-that SDK no longer exposes the reviewed Requests session configuration.
+Transport permits only approved market-data GET endpoints. No order methods.
 """
 from __future__ import annotations
 from datetime import datetime
@@ -44,54 +42,87 @@ class _MarketDataAdapter(requests.adapters.HTTPAdapter):
         return super().send(request, **kwargs)
 
 
-def _enforce_direct_kite_tls(sdk:object)->None:
-    """Enforce the reviewed SDK HTTP transport BEFORE supplying a bearer token.
-
-    For pykiteconnect v5, reqsession is requests.Session, proxies is a mapping,
-    and disable_ssl disables request verification. Fail closed if changed.
-    """
-    if (getattr(sdk,'root',None) != OFFICIAL_KITE_ROOT
-            or getattr(sdk,'disable_ssl',None) is not False
-            or getattr(sdk,'debug',None) is not False
-            or getattr(sdk,'proxies',None) != {}):
-        raise RuntimeError('Unapproved Kite SDK endpoint or transport configuration')
-    session=getattr(sdk,'reqsession',None)
-    if session is None or not isinstance(session,requests.Session):
-        raise RuntimeError('Unsupported Kite SDK HTTP session; fail closed')
-    session.trust_env=False
-    # The SDK passes allow_redirects=True. A zero-redirect Requests limit
-    # prevents following 3xx responses carrying a bearer Authorization header.
-    session.max_redirects=0
-    # Even accidental access to the underlying SDK cannot send order, account,
-    # GTT, token-revocation or arbitrary host requests through this session.
-    session.mount('https://', _MarketDataAdapter())
-    session.mount('http://', _MarketDataAdapter())
-    if session.trust_env is not False or session.max_redirects != 0:
-        raise RuntimeError('Kite SDK HTTPS policy not enforced')
-
-
 class KiteReadOnly:
-    def __init__(self,api_key:str,access_token:str):
-        from kiteconnect import KiteConnect
-        if not api_key or not access_token:raise ValueError('Kite daily credentials missing')
-        self._sdk=KiteConnect(api_key=api_key,timeout=8,proxies={},disable_ssl=False,debug=False)
-        _enforce_direct_kite_tls(self._sdk)
-        self._sdk.set_access_token(access_token)
-    def close(self)->None:
-        """Release SDK HTTP connections; no broker/API network request."""
-        self._sdk.reqsession.close()
+    """Official REST market data only; no SDK or transaction methods loaded."""
+    def __init__(self, api_key: str, access_token: str):
+        if (not api_key or not access_token or
+                any(c in api_key + access_token for c in '\r\n')):
+            raise ValueError('Kite daily credentials missing or invalid')
+        self._session = requests.Session()
+        self._session.trust_env = False
+        self._session.max_redirects = 0
+        self._session.mount('https://', _MarketDataAdapter())
+        self._session.mount('http://', _MarketDataAdapter())
+        self._session.headers.update({'X-Kite-Version': '3',
+            'Authorization': 'token ' + api_key + ':' + access_token})
 
-    def instruments_nfo(self)->list[dict]:return self._sdk.instruments('NFO')
-    def historical(self,token:int,interval:str,start:datetime,end:datetime)->list[Candle]:
-        if interval not in ('5minute','15minute'):raise ValueError('unsupported interval')
-        raw=self._sdk.historical_data(token,start,end,interval,continuous=False,oi=False)
-        out=[]
-        for r in raw:
-            t=r['date']
-            if isinstance(t,str):t=datetime.fromisoformat(t)
-            if t.tzinfo is None:t=t.replace(tzinfo=IST)
-            out.append(Candle(t.astimezone(IST),float(r['open']),float(r['high']),float(r['low']),float(r['close']),int(r['volume'])))
+    def close(self) -> None:
+        self._session.close()
+
+    def _get(self, path: str, params=None, *, csv_response=False):
+        # Do not expose remote error bodies or Requests exceptions containing
+        # prepared credential-bearing requests to callers/logging.
+        try:
+            with self._session.get(OFFICIAL_KITE_ROOT + path, params=params,
+                    timeout=8, allow_redirects=False, verify=True, proxies={}) as response:
+                if response.status_code != 200:
+                    raise RuntimeError('Kite market-data HTTP failure')
+                if csv_response:
+                    import csv
+                    import io
+                    if 'text/csv' not in response.headers.get('Content-Type', ''):
+                        raise ValueError('Unexpected instrument content type')
+                    rows = list(csv.DictReader(io.StringIO(response.text)))
+                    for row in rows:
+                        for field in ('instrument_token', 'exchange_token', 'lot_size'):
+                            row[field] = int(row[field])
+                        for field in ('last_price', 'strike', 'tick_size'):
+                            row[field] = float(row[field])
+                        if row.get('expiry'):
+                            row['expiry'] = datetime.fromisoformat(row['expiry']).date()
+                    return rows
+                payload = response.json()
+                if not isinstance(payload, dict) or payload.get('status') != 'success':
+                    raise ValueError('Invalid API envelope')
+                data = payload.get('data')
+                if not isinstance(data, dict):
+                    raise ValueError('Invalid API data')
+                return data
+        except Exception:
+            raise RuntimeError('Kite market-data request or response invalid') from None
+
+    def instruments_nfo(self) -> list[dict]:
+        return self._get('/instruments/NFO', csv_response=True)
+
+    def historical(self, token: int, interval: str, start: datetime, end: datetime) -> list[Candle]:
+        if (type(token) is not int or token <= 0 or
+                interval not in ('5minute', '15minute') or
+                start.tzinfo is None or end.tzinfo is None or start > end):
+            raise ValueError('Invalid historical request')
+        data = self._get(f'/instruments/historical/{token}/{interval}', {
+            'from': start.astimezone(IST).strftime('%Y-%m-%d %H:%M:%S'),
+            'to': end.astimezone(IST).strftime('%Y-%m-%d %H:%M:%S'),
+            'continuous': 0, 'oi': 0})
+        rows = data.get('candles')
+        if not isinstance(rows, list):
+            raise ValueError('Missing candle sequence')
+        out = []
+        for row in rows:
+            if not isinstance(row, list) or len(row) != 6:
+                raise ValueError('Invalid candle row')
+            timestamp = datetime.fromisoformat(row[0])
+            if timestamp.tzinfo is None or type(row[5]) is not int:
+                raise ValueError('Invalid candle timestamp or volume')
+            candle = Candle(timestamp.astimezone(IST), *row[1:])
+            candle.validate()
+            out.append(candle)
         return out
-    def full_quote(self,symbol:str)->dict:
-        key='NFO:'+symbol
-        return self._sdk.quote([key]).get(key) or {}
+
+    def full_quote(self, symbol: str) -> dict:
+        if not isinstance(symbol, str) or not re.fullmatch(r'NIFTY[A-Z0-9]+', symbol):
+            raise ValueError('Invalid NIFTY symbol')
+        key = 'NFO:' + symbol
+        quote = self._get('/quote', {'i': key}).get(key, {})
+        if not isinstance(quote, dict):
+            raise ValueError('Invalid quote')
+        return quote

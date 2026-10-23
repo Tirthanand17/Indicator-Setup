@@ -1,5 +1,8 @@
 # Canonical engineering progress — 23 October 2026
 
+**Dependency follow-up:** default REST SDK dependency chain removed; fresh Linux suite774 passed/1 skipped, REST contract suite15 passed, pip check clean and advisory scan reports no known vulnerabilities. Live WebSocket shadow is explicitly disabled pending review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md). Engineering remains15/25 (60%) because type-checking/reproducibility work remains. Earlier round counts below are historical snapshots.
+
+
 **IN DEVELOPMENT / PAPER ONLY. Not deployed. Live acceptance 0/5.**
 
 Engineering checklist v1: **15/25 completed = 60%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.

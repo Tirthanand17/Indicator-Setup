@@ -24,3 +24,7 @@ Statuses describe repository evidence, not live acceptance. No critical defect c
 | A18 High design limitation | Cloud export/recovery and quota | Scheduler ring128 is not a paper audit ledger; cloud restore and quota-wide controls absent | Transactional ledger/outbox, export checksums, restore rehearsals, owner-approved retention and total-account quota accounting | Open |
 
 Twisted advisory CVE-2026-106454 concerns an IMAP server path not used by this application; scanner matching and actual reachability need separate adjudication. It is not represented as fixed. Build-tool pip findings differ from application runtime exposure. No exploit testing performed.
+
+## A11 follow-up
+
+Default REST dependency exposure remediated by removing the SDK chain and upgrading cryptography; fresh advisory scan reports no known vulnerabilities. Live WebSocket shadow disabled pending review. See [dependency evidence](DEPENDENCY_REMEDIATION_2026-10-23.md). A17 static typing and artifact hashes remain open; the earlier23-record scan describes the previous environment.

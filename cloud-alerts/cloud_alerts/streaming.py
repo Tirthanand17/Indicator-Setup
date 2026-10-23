@@ -254,8 +254,7 @@ class KiteTickerShadow:
         self.on_bar = on_bar
         self.on_diagnostic = on_diagnostic or (lambda event: None)
         if ticker_factory is None:
-            from kiteconnect import KiteTicker
-            ticker_factory = KiteTicker
+            raise RuntimeError("Live WebSocket shadow disabled pending dependency review")
         self._ticker = ticker_factory(api_key,token)
         self._ticker.on_ticks = self._on_ticks
         self._ticker.on_connect = self._on_connect
