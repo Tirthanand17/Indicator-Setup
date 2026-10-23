@@ -43,7 +43,7 @@ The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINA
 
 - Added `cloud_alerts.aws_free_preflight`, a **network-free, no-credentials** qualification worksheet/gate for the new AWS Free plan. It checks no-card/no-paid-plan declarations, six-calendar-month expiration, conservative monthly EC2/EBS/IPv4/egress estimates, ≥20% credit reserve, an independently recoverable off-AWS backup, and a migration cutover ≥14 days ahead of AWS closure. **Even if all declarations pass, it never authorizes deployment.** Shipping JSON sample is intentionally BLOCKED.
 - AWS first-party billing says an expired Free plan account **automatically closes, with resource/data access lost**: this is a temporary six-month-or-credit-limited candidate, NOT permanent free hosting. The user has not yet selected it or supplied actual account/billing/backup evidence. No AWS signup, card, EC2, keys, DNS, billing changes, Kite renewal, telegram send or broker orders.
-- Added regression tests and [Phase 51 safeguard runbook](PHASE51_AWS_FREE_NO_CARD_EXPIRY_PREFLIGHT.md). **Engineering index stays 53%; verified cloud delivery remains 0/5.**
+- Added regression tests and [Phase 51 safeguard runbook](PHASE51_AWS_FREE_NO_CARD_EXPIRY_PREFLIGHT.md); the generic host gate also forces AWS Free into this dedicated review. **Final full Linux Python 3.12 suite: 715 passed, 0 failed, 1 skipped, 1 third-party Starlette deprecation warning (exit 0). Engineering index stays 53%; verified cloud delivery remains 0/5.**
 
 ## Phase 50 — mandatory Northflank card-block and safer no-card replan (2026-10-23)
 
