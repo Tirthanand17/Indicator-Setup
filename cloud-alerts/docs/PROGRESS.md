@@ -39,6 +39,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 
+## Phase 47 — verified Student Pack, Microsoft academic-domain blocker (2026-10-23)
+
+- On the authorized Nirala Chrome browser, inspected the actual Microsoft Azure for Students academic verification form with the user's permission. The form displayed an **unrecognized institution academic email domain** error and provided no functional alternative verification selector. Do not store the student's DOB, email address, name or device verification codes in this repository. The account **is NOT Azure for Students activated**.
+- Confirmed the existing **GitHub Student Developer Pack status is verified**, and its Microsoft Azure partner offer is shown under claimed offers. Following the partner activation link simply returns to Azure for Students signup; GitHub verification alone did **not** bypass Microsoft's academic-domain recognition.
+- Attempted the official Azure Support portal: the account's support extension fails with **AADSTS16000** and cannot retrieve access tokens, so no support ticket was filed. No paid offer selected and no payment card entered.
+- **Unblocking dependency:** Microsoft Education / Azure subscription support or the institution's IT administration must enable recognition of the legitimate academic email domain, or provide another official academic verification route. Only the student can approve identity proof or account verification if requested. Do not retry by inventing a different school, school email, verification code or paid account.
+- Full Linux tests remain **616 passed, 0 failed, 1 skipped** on the previously merged source; no source implementation changed. Engineering estimate **53%**, actual live host/token/phone/five-session acceptance **0/5** unchanged.
+
 ## Phase 47 source merge checkpoint (no cloud deployment)
 
 - GitHub [PR #3](https://github.com/Tirthanand17/Indicator-Setup/pull/3) merged into `main` with merge commit `ff22dabd234acd36f15497658c7ec4a88d23b18e`, after full offline Ubuntu Python 3.12 **616 passed, 0 failed, 1 skipped**, exit 0. The new code is read-only Azure subscription inspection.
