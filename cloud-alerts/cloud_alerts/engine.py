@@ -6,7 +6,7 @@ For millisecond/second tick updates, see the *planned* KiteTicker WebSocket stag
 from __future__ import annotations
 import asyncio,json,os,logging,sqlite3
 from contextvars import ContextVar
-from datetime import datetime,timedelta,time
+from datetime import datetime,timedelta,time,date
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from .contracts import select_future,select_option,validate_quote
@@ -42,15 +42,15 @@ class Engine:
         self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
         self.premium_hypothesis=premium_hypothesis or PremiumHypothesis()
         self.premium_status="DISABLED" if not self.paper_premium_tracking else "IDLE"
-        self.last_premium_quote_at=None
+        self.last_premium_quote_at: datetime | None = None
         self.status='NOT_STARTED' if enabled else 'DISABLED'
         self.status_at=datetime.now(IST)
-        self.instrument_rows=None
-        self.instrument_date=None
-        self.last_data_at=None
-        self._rest_verified_at=None
-        self.last_alert_at=None
-        self.last_error=None
+        self.instrument_rows: list[dict] | None = None
+        self.instrument_date: date | None = None
+        self.last_data_at: datetime | None = None
+        self._rest_verified_at: datetime | None = None
+        self.last_alert_at: datetime | None = None
+        self.last_error: str | None = None
         # Task-local flag: live polling must sample the wall clock when Telegram
         # is actually contacted, not the earlier REST candle poll timestamp.
         # Explicit run_once(now=...) preserves deterministic historical tests.
@@ -304,7 +304,7 @@ class Engine:
             # Don't suppress delayed Telegram retry.
             await self._deliver_outbox(now)
             return
-        if shadow_ready:
+        if shadow_ready and self.shadow is not None:
             try:
                 shadow_verdict=self.shadow.reconcile(completed5[-1])
                 status=('MISSING' if shadow_verdict is None else
@@ -366,9 +366,15 @@ class Engine:
                 # Fail closed: unparseable tracked candidate must not be overwritten.
                 self.set_status('WAIT_DATA','Virtual candidate state malformed; no new alert')
                 return
+        # A REVIEW is not evidence of a usable candle. Fail closed before
+        # quoting or constructing any virtual position if the strategy omitted it.
+        review_candle=decision.candle
+        if review_candle is None:
+            self.set_status('WAIT_DATA','Review signal missing confirmed candle')
+            return
         side=decision.status[-2:]
         try:
-            opt=select_option(self.instrument_rows,now.date(),side,decision.candle.close,avoid_expiry_day=True)
+            opt=select_option(self.instrument_rows,now.date(),side,review_candle.close,avoid_expiry_day=True)
             raw=await asyncio.to_thread(kite.full_quote,opt.symbol)
             # Historical indicator evaluation belongs to the candle boundary,
             # but executable option depth must be fresh at the *response* time.
@@ -403,21 +409,21 @@ class Engine:
         body=format_review(decision,oq)
         event_id=stamp+':'+decision.status
         candidate={
-            'direction':side,'symbol':fut.symbol,'signal_candle':decision.candle.start.isoformat(),
-            'entry':decision.candle.close,'stop':decision.stop_underlying,
+            'direction':side,'symbol':fut.symbol,'signal_candle':review_candle.start.isoformat(),
+            'entry':review_candle.close,'stop':decision.stop_underlying,
             'target':decision.target_underlying,'expiry_date':now.date().isoformat(),
             # Link virtual position to delivery of the actual entry notification.
             # Queued/expired entry reviews must never generate misleading exits.
             'entry_event_id':event_id}
         if self.paper_premium_tracking:
             candidate['premium']=reference_from_quote(
-                oq,futures_symbol=fut.symbol,signal_candle=decision.candle.start,
+                oq,futures_symbol=fut.symbol,signal_candle=review_candle.start,
                 created_at=observed_at,hypothesis=self.premium_hypothesis)
         # Record the actual observed ASK/BID alongside the paper candidate.
         # The quotation is not a fill, and its source is explicitly unverified.
         try:
             quote_snapshot=make_snapshot(event_id,'ENTRY',
-                decision.candle.start+timedelta(minutes=5),observed_at,oq)
+                review_candle.start+timedelta(minutes=5),observed_at,oq)
         except ValueError:
             self.set_status('WAIT_DATA','Quote evidence validation failed; no paper entry')
             return
