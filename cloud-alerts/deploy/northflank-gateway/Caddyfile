@@ -1,0 +1,31 @@
+# Northflank edge terminates HTTPS. Do not expose the private Python worker.
+# Project-internal upstream must be the *actual* service name configured in Northflank.
+:8081 {
+    header {
+        Cache-Control "no-store"
+        X-Content-Type-Options "nosniff"
+    }
+
+    @gateway_health {
+        method GET
+        path /gateway-healthz
+    }
+    handle @gateway_health {
+        respond "ok" 200
+    }
+
+    @signed_token_handoff {
+        method POST
+        path /internal/token
+    }
+    handle @signed_token_handoff {
+        request_body {
+            max_size 2KB
+        }
+        reverse_proxy indicator-worker:8080
+    }
+
+    handle {
+        respond "Not found" 404
+    }
+}
