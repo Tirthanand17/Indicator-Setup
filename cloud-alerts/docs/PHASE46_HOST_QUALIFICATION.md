@@ -10,7 +10,7 @@
 4. Implemented `cloud_alerts.host_qualification` with strict typed and fresh operator declarations and **blocker codes only**. It rejects sleeping/ephemeral Render Free even when every other declaration is marked true; it also refuses missing fields, extra secret-like fields, out-of-date or future evidence, nonliteral-boolean confirmations, static/sleeping service classes, and nonverified free cost/overspend controls.
 5. The result `DECLARATIONS_COMPLETE_ONLY` **never** authorizes provisioning/deploying and never claims billing, TLS, restart durability, or phone reception were independently verified. That host acceptance remains separate from both developer code tests and contract/signal tests.
 6. Added `deploy/host-plan.example.json` which **intentionally fails** with Render Free and unconfirmed free-spend and always-on declarations. Do not change it to pass without reviewing the actual host and receiving operator approval.
-7. Initial Phase 46 full WSL Python 3.12 suite after adding the gate: **607 passed, 0 failed, 1 skipped**, 1 upstream TestClient deprecation warning, exit 0. A later example fixture adds one more test; run the exact branch's final full suite again before merge.
+7. Final Phase 46 complete WSL Python 3.12 suite on branch commit **\`d30fecf\`**: **608 passed, 0 failed, 1 skipped**, 1 upstream TestClient deprecation warning, exit **0**, in 27.64 seconds. The default-blocked plan file and its regression test are included.
 
 ## Running the plan gate locally, never with broker secrets
 
