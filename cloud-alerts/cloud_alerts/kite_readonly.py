@@ -3,6 +3,7 @@
 Transport permits only approved market-data GET endpoints. No order methods.
 """
 from __future__ import annotations
+from collections.abc import Mapping
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
@@ -24,13 +25,17 @@ class _MarketDataAdapter(requests.adapters.HTTPAdapter):
     _lock = threading.Lock()
     _last: dict[str, float] = {}
 
-    def send(self, request, **kwargs):
-        url = urlsplit(request.url)
+    def send(self, request: requests.PreparedRequest, stream: bool = False,
+             timeout: float | tuple[float, float] | tuple[float, None] | None = None,
+             verify: bool | str = True,
+             cert: bytes | str | tuple[bytes | str, bytes | str] | None = None,
+             proxies: Mapping[str, str] | None = None) -> requests.Response:
+        url = urlsplit(request.url or '')
         historical = re.fullmatch(r'/instruments/historical/[1-9][0-9]*/(5minute|15minute)', url.path)
         if (request.method != 'GET' or url.scheme != 'https' or
                 url.netloc != 'api.kite.trade' or url.fragment or
                 not (url.path in ('/instruments/NFO', '/quote') or historical) or
-                kwargs.get('verify', True) is not True or kwargs.get('proxies')):
+                verify is not True or proxies):
             raise RuntimeError('Kite transport permits approved read-only market data only')
         group = 'history' if historical else 'quote' if url.path == '/quote' else 'instruments'
         spacing = {'history': 0.35, 'quote': 1.05, 'instruments': 0.11}[group]
@@ -39,7 +44,8 @@ class _MarketDataAdapter(requests.adapters.HTTPAdapter):
             if delay > 0:
                 time.sleep(delay)
             self._last[group] = time.monotonic()
-        return super().send(request, **kwargs)
+        return super().send(request, stream=stream, timeout=timeout,
+                            verify=verify, cert=cert, proxies=proxies)
 
 
 class KiteReadOnly:
