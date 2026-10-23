@@ -39,6 +39,11 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
 
+## Phase 46 final — post-merge Python 3.12 verification
+
+- Synced post-merge GitHub `main` commit `f0c17a055eb56ab888b4213a7d51a4de5f777f77` to Nirala's disposable Windows TEMP clone and WSL Ubuntu ext4 checkout (non-root `indicatorqa`). Ran the checked-in full Linux regression again, with empty inherited credentials and paper/live activation disabled: **608 passed, 0 failed, 1 skipped, exit 0**, 29.03 seconds. Local JUnit/logs remain under `/home/indicatorqa/work/reports/`.
+- Existing Render workspace contains only sleeping Free web services or other unrelated services, and its Free Postgres is suspended; **no approved eligible durable always-on ₹0 host exists in this connection**. Azure/OCI infrastructure management account is not connected. Hosting, daily real Kite token relay, actual phone receipt, and five separate market sessions remain open. The new local host-plan review is NOT deployment authorization. No real orders.
+
 ## Phase 46 merge checkpoint — verified local gate, NOT live activation
 
 - [PR #2](https://github.com/Tirthanand17/Indicator-Setup/pull/2) **merged into main** at `118a5b5c37018a50a6da1c86e1838c308292c436`. The diff is limited to the host qualification CLI, blocked host example, strict regression tests, and documentation. The Ubuntu Linux Python 3.12 full suite passed **608/608 runnable tests (plus 1 skipped)**, exit 0, before merge.
