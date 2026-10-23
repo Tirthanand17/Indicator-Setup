@@ -36,4 +36,4 @@ Add `--dashboard-enabled` **only if** `PAPER_DASHBOARD_ENABLED=true` was deliber
 4. Run this external probe with synthetic/disabled services and run more complete private-volume, HMAC replay, network, restart tests before adding real Kite/Telegram secrets.
 5. Renew the Kite subscription **only after** the platform passes synthetic cloud qualification. Five actual NSE session reports and independent phone receipts are still required for live monitoring acceptance. Never enable real broker order placement.
 
-**Engineering estimate:** still 53%. **Actual cloud acceptance:** still 0/5. Linux targeted policy suite: **31 passed** including 25 newly added synthetic probe tests and the six static Phase 48 tests; full suite pending this phase checkpoint.
+**Engineering estimate:** still 53%. **Actual cloud acceptance:** still 0/5. Linux targeted policy suite: **31 passed** including 25 newly added synthetic probe tests and the six static Phase 48 tests; full Python 3.12 Linux suite: **647 passed, 0 failed, 1 skipped, 1 third-party deprecation warning, exit 0** (2026-10-23) in an isolated clean QA checkout.
