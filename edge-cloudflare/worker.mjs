@@ -5,6 +5,9 @@
 import { assessAlarm, validClaimedTickId, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
 import { verifyDailyRelay, sealDailyToken, openDailyToken, expiryForSignedSecond } from './daily-token.mjs';
 import { createReadOnlyKite } from './market-readonly.mjs';
+import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
+  enterPaperBasket, exitPaperPosition, markPaperUnverifiable,
+  paperLedgerSummary } from './paper-ledger.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -53,7 +56,8 @@ export default {
     const path = new URL(request.url).pathname;
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
     if (!tokenRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
-          (path === '/internal/scheduler' && request.method === 'GET')) ||
+          (path === '/internal/scheduler' && request.method === 'GET') ||
+          (path === '/internal/paper-ledger' && request.method === 'GET')) ||
         !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
     if (env.OFFLINE_SCHEDULER_ENABLED !== 'true' || !env.MARKET_SESSION) {
       return reply({ status: 'DISABLED', paperOnly: true }, 503);
@@ -87,6 +91,14 @@ export class MarketSession {
         return reply({ ...saved, paperOnly: true, marketRuntimeImplemented: true,
           marketRuntimeEnabled: this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true',
           market: market && validMarketObservation(market) ? market : null, realOrdersEnabled: false });
+      }
+      if (path === '/internal/paper-ledger' && request.method === 'GET') {
+        if (this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true')
+          return reply({ status: 'DISABLED', paperOnly: true }, 503);
+        const stored = await this.storage.get(PAPER_LEDGER_KEY);
+        if (stored === undefined) return reply({ status: 'NOT_INITIALIZED', paperOnly: true });
+        try { return reply({ status: 'READY', ...paperLedgerSummary(stored) }); }
+        catch { return reply({ status: 'BLOCKED_CORRUPT_PAPER_LEDGER', paperOnly: true }, 503); }
       }
       if (path !== '/internal/bootstrap' || request.method !== 'POST') return reply({ error: 'Not found' }, 404);
       // No input or token upload is accepted by this scheduler-only endpoint.
@@ -158,6 +170,38 @@ export class MarketSession {
       return result === 'OK' ? reply({ status: 'TOKEN_ACCEPTED' }) :
         reply({ error: 'Token handoff rejected' }, 409);
     } catch { return reply({ error: 'Token handoff unavailable' }, 503); }
+  }
+
+  /** Internal methods, not remotely exposed POST endpoints. The future signal
+   * engine must separately validate a real market quote before calling them.
+   * Ledger/cash/outbox writes are all-or-nothing under native DO transaction.
+   */
+  async withPaperLedger(operation, nowMs) {
+    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true' ||
+        this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true')
+      throw new Error('PAPER_LEDGER_DISABLED');
+    return this.storage.transaction(async txn => {
+      const existing = await txn.get(PAPER_LEDGER_KEY);
+      const current = existing === undefined ? newPaperLedger(nowMs) : existing;
+      auditPaperLedger(current);
+      const outcome = operation(current);
+      // Even rejected trades have durable idempotent rejection journal records.
+      // A HOLD or duplicate returns identical state; no new alerts are sent.
+      if (outcome.ledger !== existing) await txn.put(PAPER_LEDGER_KEY, outcome.ledger);
+      return { ...outcome, ledger: undefined };
+    });
+  }
+
+  enterPaperBasket(input) {
+    return this.withPaperLedger(state => enterPaperBasket(state, input), input?.nowMs);
+  }
+
+  exitPaperPosition(input) {
+    return this.withPaperLedger(state => exitPaperPosition(state, input), input?.nowMs);
+  }
+
+  markPaperUnverifiable(nowMs) {
+    return this.withPaperLedger(state => markPaperUnverifiable(state, nowMs), nowMs);
   }
 
   async alarm() {
