@@ -19,6 +19,25 @@ const result = (status, nextAlarmAtMs = null, tickId = null, latenessMs = null) 
   });
 const validMillis = (v) => Number.isSafeInteger(v) && Number.isFinite(v);
 
+// Re-arm across nights, weekends and known 2026 F&O holidays.
+// Return null when the pinned calendar ends rather than assuming a 2027 session.
+function nextMarketOpenAfter(observedAtMs) {
+  const local = new Date(observedAtMs + IST_OFFSET_MS);
+  for (let daysAhead = 0; daysAhead <= 8; daysAhead += 1) {
+    const localDay = new Date(Date.UTC(
+      local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + daysAhead,
+    ));
+    if (localDay.getUTCFullYear() !== 2026) return null;
+    const day = localDay.getUTCDay();
+    if (day === 0 || day === 6 ||
+        CLOSED_2026.has(localDay.toISOString().slice(0, 10))) continue;
+    const openingAt = localDay.getTime() + 9 * 60 * 60_000 +
+      15 * 60_000 - IST_OFFSET_MS;
+    if (openingAt > observedAtMs) return openingAt;
+  }
+  return null;
+}
+
 /**
  * Assess an at-least-once alarm from the *real observed* timestamp.
  * lastClaimedTickId must eventually be loaded/updated atomically in
@@ -44,18 +63,18 @@ export function assessAlarm({
   const date = local.toISOString().slice(0, 10);
   const weekday = local.getUTCDay();
   if (weekday === 0 || weekday === 6 || CLOSED_2026.has(date)) {
-    return result('CLOSED_NSE_SESSION');
+    return result('CLOSED_NSE_SESSION', nextMarketOpenAfter(observedAtMs));
   }
   const y = local.getUTCFullYear(), m = local.getUTCMonth(), d = local.getUTCDate();
   const open = Date.UTC(y, m, d, 9, 15) - IST_OFFSET_MS;
   const close = Date.UTC(y, m, d, 15, 30) - IST_OFFSET_MS;
   if (observedAtMs < open) return result('WAIT_MARKET_OPEN', open);
-  if (observedAtMs >= close) return result('CLOSED_NSE_SESSION');
+  if (observedAtMs >= close) return result('CLOSED_NSE_SESSION', nextMarketOpenAfter(observedAtMs));
 
   // Always re-arm to the next anchored slot; NEVER replay skipped ticks.
   const nextSlot = Math.floor((observedAtMs - open) / ALARM_INTERVAL_MS) + 1;
   const proposedNext = open + nextSlot * ALARM_INTERVAL_MS;
-  const next = proposedNext < close ? proposedNext : null;
+  const next = proposedNext < close ? proposedNext : nextMarketOpenAfter(observedAtMs);
   const dueSlot = (scheduledAtMs - open) / ALARM_INTERVAL_MS;
   if (scheduledAtMs < open || scheduledAtMs >= close ||
       !Number.isInteger(dueSlot)) {
