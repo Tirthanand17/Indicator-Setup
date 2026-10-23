@@ -1,0 +1,51 @@
+# Northflank terminates public TLS. The Python worker must remain INTERNAL only.
+# Reverse-proxy allowlist: signed daily token POST and read-only paper dashboard GET.
+# The backend itself requires a separate high-entropy X-Paper-Dashboard-Key
+# for EVERY JSON API call. The HTML page contains no account data or secrets.
+:8081 {
+    header {
+        Cache-Control "no-store"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+
+    @gateway_health {
+        method GET
+        path /gateway-healthz
+    }
+    handle @gateway_health {
+        respond "ok" 200
+    }
+
+    @signed_token_handoff {
+        method POST
+        path /internal/token
+    }
+    handle @signed_token_handoff {
+        request_body {
+            max_size 2KB
+        }
+        reverse_proxy indicator-worker:8080
+    }
+
+    @paper_dashboard_html {
+        method GET
+        path /paper/dashboard
+    }
+    handle @paper_dashboard_html {
+        reverse_proxy indicator-worker:8080
+    }
+
+    @paper_dashboard_api {
+        method GET
+        path /paper/api/summary /paper/api/analytics /paper/api/opportunities /paper/api/trades
+    }
+    handle @paper_dashboard_api {
+        reverse_proxy indicator-worker:8080
+    }
+
+    # Never expose worker diagnostics, management, other methods, or future APIs.
+    handle {
+        respond "Not found" 404
+    }
+}

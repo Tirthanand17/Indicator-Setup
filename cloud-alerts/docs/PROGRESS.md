@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 47 — subscription audit merged; student activation pending). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 48 — free-host branch prepared and 622-test Linux suite green; host signup unverified). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 48 — no-card free cloud edge preparation (2026-10-23; NOT DEPLOYED)
+
+- Investigated Northflank Sandbox Free as a possible 24/7 alternative to an idle-sleeping host; its current pricing advertises **no card, 2 services, always-on compute and up to $20/mo in resources**. Older first-party billing documentation states a payment method is required. **Actual no-card account creation, explicit overage cutoff, persistence eligibility and ₹0 cost are UNVERIFIED**, therefore no account/resources were created and this is not hosting approval.
+- In the isolated `feature/phase48-northflank-sandbox-prep` branch, prepared a separate Caddy gateway with a strict allowlist: signed 2 KB daily Kite-token handoff; GET-only HTML paper dashboard; four GET-only paper-account JSON APIs that individually demand a high-entropy backend key; public gateway liveness (not worker health); and 404 for all unrelated paths. Worker port 8080 must remain private. No order routes.
+- Added six static policy tests and reran the **entire Python 3.12 Linux suite in a fresh separate WSL checkout: 622 passed, 0 failed, 1 skipped, exit 0**. The pre-existing WSL QA worktree showed local modifications and was deliberately left untouched. **No live Caddy binary validation, Docker build, TLS, mounted volume, laptop-off test or phone receipt has run**.
+- Kite subscription renewal is postponed until after the strictly free host is qualified and synthetic integration checks pass. Never activate real market data credentials, Telegram delivery or autonomous paper entries before the operator approves an exact no-charge host. Expanded engineering estimate **53%**, actual live acceptance **0/5** remain unchanged.
 
 ## Phase 47 — verified Student Pack, Microsoft academic-domain blocker (2026-10-23)
 
