@@ -9,6 +9,12 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if (path === '/test/now') return Response.json({ now: Date.now() });
+    if (path === '/test/token-sealed') {
+      const stored = await this.storage.get('daily-token-v1');
+      return Response.json({ present: !!stored, encrypted: !!stored?.ciphertext,
+        containsPlainToken: JSON.stringify(stored).includes('SYNTHETIC-ACCESS-TOKEN') });
+    }
     if (path === '/test/tick') {
       if (!ticked) {
         clock = (await this.storage.get('scheduler-v1')).scheduledAtMs;

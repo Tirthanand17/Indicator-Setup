@@ -1,12 +1,17 @@
-/** Undeployed scheduler implementation. No market data, secrets relay or trading.
- * SQLite-backed DO storage uses its transactional KV interface. No filesystem,
- * timers, external fetch, broker SDK, or constructor alarm scheduling.
+/** Undeployed paper-only scheduler and optional read-only Kite market sampler.
+ * SQLite-backed DO storage uses transactional KV. No order endpoint, Telegram,
+ * broker SDK, filesystem or constructor alarm scheduling. Runtime is opt-in.
  */
 import { assessAlarm, validClaimedTickId, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
+import { verifyDailyRelay, sealDailyToken, openDailyToken, expiryForSignedSecond } from './daily-token.mjs';
+import { createReadOnlyKite } from './market-readonly.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
 const RETAINED_EVENTS = 128;
+const TOKEN_KEY = 'daily-token-v1';
+const MARKET_KEY = 'market-observation-v1';
+const RETAINED_NONCES = 96;
 const reply = (data, status = 200) => Response.json(data, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
 });
@@ -46,12 +51,15 @@ function validState(s) {
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (!((path === '/internal/bootstrap' && request.method === 'POST') ||
+    const tokenRoute = path === '/internal/token' && request.method === 'POST';
+    if (!tokenRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET')) ||
-        !await authorized(request, env)) return reply({ error: 'Not found' }, 404);
+        !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
     if (env.OFFLINE_SCHEDULER_ENABLED !== 'true' || !env.MARKET_SESSION) {
       return reply({ status: 'DISABLED', paperOnly: true }, 503);
     }
+    if (tokenRoute && (env.READONLY_MARKET_RUNTIME_ENABLED !== 'true' ||
+        new URL(request.url).protocol !== 'https:')) return reply({ error: 'Not found' }, 404);
     const id = env.MARKET_SESSION.idFromName('nifty-paper-session-v1');
     return env.MARKET_SESSION.get(id).fetch(request);
   },
@@ -64,15 +72,21 @@ export class MarketSession {
   }
 
   async fetch(request) {
-    if (!await authorized(request, this.env)) return reply({ error: 'Not found' }, 404);
-    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true') return reply({ status: 'DISABLED' }, 503);
     const path = new URL(request.url).pathname;
+    const tokenRoute = path === '/internal/token' && request.method === 'POST' &&
+      new URL(request.url).protocol === 'https:' && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true';
+    if (!tokenRoute && !await authorized(request, this.env)) return reply({ error: 'Not found' }, 404);
+    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true') return reply({ status: 'DISABLED' }, 503);
     try {
+      if (tokenRoute) return await this.acceptSignedToken(request);
       if (path === '/internal/scheduler' && request.method === 'GET') {
         const saved = await this.storage.get(STATE_KEY);
         if (saved === undefined) return reply({ status: 'NOT_INITIALIZED', paperOnly: true });
         if (!validState(saved)) return reply({ status: 'BLOCKED_CORRUPT_STATE' }, 503);
-        return reply({ ...saved, paperOnly: true, marketRuntimeImplemented: false, realOrdersEnabled: false });
+        const market = await this.storage.get(MARKET_KEY);
+        return reply({ ...saved, paperOnly: true, marketRuntimeImplemented: true,
+          marketRuntimeEnabled: this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true',
+          market: market && validMarketObservation(market) ? market : null, realOrdersEnabled: false });
       }
       if (path !== '/internal/bootstrap' || request.method !== 'POST') return reply({ error: 'Not found' }, 404);
       // No input or token upload is accepted by this scheduler-only endpoint.
@@ -108,17 +122,49 @@ export class MarketSession {
         return state;
       });
       return reply({ status: saved.status, scheduledAtMs: saved.scheduledAtMs,
-        paperOnly: true, marketRuntimeImplemented: false, realOrdersEnabled: false });
+        paperOnly: true, marketRuntimeImplemented: true, realOrdersEnabled: false });
     } catch {
       return reply({ status: 'BLOCKED_STORAGE_OR_STATE', paperOnly: true }, 503);
     }
+  }
+
+  async acceptSignedToken(request) {
+    let relay, encrypted;
+    try {
+      relay = await verifyDailyRelay(request, this.env);
+      encrypted = await sealDailyToken(relay.token, this.env, relay);
+    } catch { return reply({ error: 'Token handoff rejected' }, 401); }
+    try {
+      const result = await this.storage.transaction(async txn => {
+        const previous = await txn.get(TOKEN_KEY);
+        if (previous !== undefined && !validTokenRecord(previous)) return 'CORRUPT';
+        const validPrevious = validTokenRecord(previous) && Date.now() < previous.expiresAtMs;
+        if (validPrevious && previous.nonces.includes(relay.nonceHash)) return 'REPLAY';
+        if (validPrevious && (relay.signedAt < previous.signedAt ||
+            (relay.signedAt === previous.signedAt && relay.fingerprint !== previous.fingerprint)))
+          return 'ROLLBACK';
+        if (validPrevious && relay.signedAt === previous.signedAt) {
+          // A different nonce but identical signed second and token is idempotent.
+          previous.nonces.push(relay.nonceHash);
+          previous.nonces = previous.nonces.slice(-RETAINED_NONCES);
+          await txn.put(TOKEN_KEY, previous);
+          return 'OK';
+        }
+        await txn.put(TOKEN_KEY, { schema: 1, signedAt: relay.signedAt,
+          expiresAtMs: relay.expiresAtMs, fingerprint: relay.fingerprint,
+          nonces: [relay.nonceHash], ...encrypted });
+        return 'OK';
+      });
+      return result === 'OK' ? reply({ status: 'TOKEN_ACCEPTED' }) :
+        reply({ error: 'Token handoff rejected' }, 409);
+    } catch { return reply({ error: 'Token handoff unavailable' }, 503); }
   }
 
   async alarm() {
     // An exception before commit is retried by Cloudflare. No external effects
     // happen inside the transaction or after it, so replay cannot create fills.
     const now = Date.now();
-    return this.storage.transaction(async txn => {
+    const decision = await this.storage.transaction(async txn => {
       const state = await txn.get(STATE_KEY);
       if (!validState(state)) {
         await txn.deleteAlarm();
@@ -157,5 +203,78 @@ export class MarketSession {
       await txn.put(STATE_KEY, state);
       return decision;
     });
+    if (decision.shouldPoll && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true') {
+      const market = await this.pollReadOnlyMarket(decision.tickId, now);
+      return { ...decision, marketStatus: market.status };
+    }
+    return decision;
   }
+
+  async pollReadOnlyMarket(tickId, nowMs) {
+    let report = { schema: 1, tickId, observedAtMs: nowMs, status: 'BLOCKED_MISSING_TOKEN' };
+    try {
+      const stored = await this.storage.get(TOKEN_KEY);
+      if (!validTokenRecord(stored)) throw new Error('invalid token state');
+      const token = await openDailyToken(stored, this.env, nowMs);
+      if (!token) throw new Error('expired or invalid token');
+      const symbol = this.env.KITE_FUTURE_SYMBOL;
+      const instrumentToken = Number(this.env.KITE_FUTURE_INSTRUMENT_TOKEN);
+      if (!/^NIFTY[A-Z0-9]+FUT$/.test(symbol ?? '') ||
+          !Number.isSafeInteger(instrumentToken) || instrumentToken <= 0)
+        throw new Error('invalid configured future');
+      const client = createReadOnlyKite({ apiKey: this.env.KITE_API_KEY, accessToken: token });
+      const quote = await client.quote(symbol);
+      // A plausible price without a recent exchange timestamp is NOT market evidence.
+      const quoteTimestamp = quote.timestamp;
+      const parsedTimestamp = typeof quoteTimestamp !== 'string' ? NaN :
+        /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(quoteTimestamp) ?
+          Date.parse(quoteTimestamp.replace(' ', 'T') + '+05:30') :
+          /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/.test(quoteTimestamp) ?
+            Date.parse(quoteTimestamp) : NaN;
+      if (!Number.isFinite(parsedTimestamp) || nowMs - parsedTimestamp > 60_000 ||
+          parsedTimestamp - nowMs > 5000 ||
+          (quote.instrument_token !== undefined &&
+            String(quote.instrument_token) !== String(instrumentToken)))
+        throw new Error('stale or mismatched market timestamp/instrument');
+      report = { schema: 1, tickId, observedAtMs: nowMs, status: 'QUOTE_OBSERVED',
+        exchangeAtMs: parsedTimestamp, lastPrice: quote.last_price };
+      // Only every five-minute boundary: about 75*2 historical GETs a session.
+      const slot = Number(tickId.split(':')[1]);
+      if (slot % 15 === 0) {
+        const local = ms => new Date(ms + 19_800_000).toISOString().slice(0, 19).replace('T', ' ');
+        const from = local(nowMs - 7 * 86_400_000);
+        const to = local(nowMs - 300_000);
+        const [m5, m15] = await Promise.all([
+          client.history(instrumentToken, '5minute', from, to),
+          client.history(instrumentToken, '15minute', from, to),
+        ]);
+        report = { ...report, status: 'HISTORY_OBSERVED', fiveMinuteCount: m5.length,
+          fifteenMinuteCount: m15.length };
+      }
+    } catch {
+      // Never log exception text/response bodies/request headers/credentials.
+      report = { schema: 1, tickId, observedAtMs: nowMs, status: 'BLOCKED_MARKET_DATA' };
+    }
+    try { await this.storage.put(MARKET_KEY, report); }
+    catch { return { status: 'BLOCKED_OBSERVATION_STORAGE' }; }
+    return report;
+  }
+}
+
+function validTokenRecord(record) {
+  return record && record.schema === 1 && Number.isSafeInteger(record.signedAt) &&
+    Number.isSafeInteger(record.expiresAtMs) &&
+    record.expiresAtMs === expiryForSignedSecond(record.signedAt) &&
+    typeof record.fingerprint === 'string' &&
+    /^[a-f0-9]{64}$/.test(record.fingerprint) && Array.isArray(record.nonces) &&
+    record.nonces.length <= RETAINED_NONCES &&
+    record.nonces.every(v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) &&
+    typeof record.iv === 'string' && typeof record.ciphertext === 'string';
+}
+
+function validMarketObservation(value) {
+  return value && value.schema === 1 && typeof value.tickId === 'string' &&
+    Number.isSafeInteger(value.observedAtMs) &&
+    ['BLOCKED_MARKET_DATA', 'BLOCKED_OBSERVATION_STORAGE',
+      'QUOTE_OBSERVED', 'HISTORY_OBSERVED'].includes(value.status);
 }

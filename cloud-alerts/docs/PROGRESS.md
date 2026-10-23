@@ -1,5 +1,7 @@
 # Canonical engineering progress — 23 October 2026
 
+**Phase17 offline bridge completion:** Cloudflare Worker now has disabled-by-default, signed daily-token intake with atomic replay/rollback controls and AES-GCM sealed Durable Object storage, plus a strictly allowlisted read-only NIFTY futures quote/5m/15m sampler on claimed slots. It passes fully synthetic HTTP/clock tests; no actual Kite or cloud connectivity has been verified. [Evidence](../../audit/PHASE17_EDGE_READONLY_TOKEN.md).
+
 **Phase 16 (offline-only) completion:** JavaScript CE/PE strategy decisions, hypothetical premium BID and virtual/portfolio exit rules now have Python-generated reference cases and fail-closed regressions. **113 combined Node tests passed**; full Python **777 passed, 1 skipped**; native workerd **1 passed**. This is pure rule parity, **not** a deployed cloud trading system. [Evidence](../../audit/PHASE16_DECISION_EXIT_PARITY.md).
 
 **Latest type/dependency verification:** Complete configured mypy check: zero issues across49 application files; full offline Python suite777 passed/1 skipped (one third-party warning); Node63 passed; Linux pip check clean. Earlier Linux3.12 hashed wheel verification covered29 artifacts. [Evidence](../../audit/TYPE_AND_LOCK_PROGRESS.md). Item21 is now complete **for the Linux offline baseline**, not a live deployment approval.
@@ -9,10 +11,10 @@
 
 **IN DEVELOPMENT / PAPER ONLY. Not deployed. Live acceptance 0/5.**
 
-Engineering checklist v1: **17/25 completed = 68%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
+Engineering checklist v1: **18/25 completed = 72%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
 
 ```text
-Offline engineering [#################--------] 68% (17/25)
+Offline engineering [##################-------] 72% (18/25)
 Live acceptance     [-----]                      0/5
 ```
 
@@ -34,7 +36,7 @@ Live acceptance     [-----]                      0/5
 |14|Repository safety regressions and script repair|Yes|771 passed/1 skipped; PowerShell parse clean|
 |15|Audit/register/verification and deployment gate docs|Yes|audit/ and this checklist|
 |16|Complete Python/JS decision/exit parity|Yes|30 Python decision fixtures, 5 premium references, 3 BID and 8 paper exits; risk-first virtual exit tests; pure offline logic only|
-|17|Cloud read-only market-data and daily-token integration|No|Scheduler has no external HTTP or token relay|
+|17|Cloud read-only market-data and daily-token integration|Yes|Opt-in signed relay, encrypted DO token, allowlisted quote/history sampler and synthetic native tests; not deployed|
 |18|Cloud transactional two-account ledger/outbox|No|Not implemented|
 |19|Full cloud synthetic market-session end-to-end|No|Scheduler-only simulation exists|
 |20|Private mobile cloud dashboard and daily reporting|No|Not implemented|
@@ -44,7 +46,7 @@ Live acceptance     [-----]                      0/5
 |24|Telegram ambiguous delivery/retry_after/retention handling|No|A15 open|
 |25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
 
-Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;113 Node passed; full configured mypy49 files passed in this round; pip check clean (prior round)**. The **1 native local workerd test also passed** in this round. The previous advisory scan is historical and was not rerun this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include history review, cloud service integration, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
+Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;127 combined Node tests passed (88 edge+39 extension); full configured mypy49 files previously passed; pip check clean (prior round)**. **2 native local workerd tests passed**. The previous advisory scan is historical and was not rerun in this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include full market-data-to-engine integration, cloud capacity, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
 Five live gates are individually unverified: cloud Kite data, phone Telegram receipt, real session scheduling, dashboard/ledger recovery, laptop-off continuation. No broker orders, live credentials, phone messages, cloud resources or billing changes in this round.
 

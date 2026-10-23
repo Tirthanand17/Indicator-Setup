@@ -1,0 +1,111 @@
+/** Allowlisted, credential-redacting Kite REST transport. No trading methods. */
+const ROOT = 'https://api.kite.trade';
+const MAX_JSON_BYTES = 512 * 1024;
+const decoder = new TextDecoder('utf-8', { fatal: true });
+
+export function permittedMarketUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.origin !== ROOT || url.username || url.password || url.hash) return false;
+  if (url.pathname === '/quote') {
+    return [...url.searchParams.keys()].join(',') === 'i' &&
+      /^NFO:NIFTY[A-Z0-9]+$/.test(url.searchParams.get('i') ?? '');
+  }
+  if (/^\/instruments\/historical\/[1-9]\d*\/(5minute|15minute)$/.test(url.pathname)) {
+    return [...url.searchParams.keys()].sort().join(',') === 'continuous,from,oi,to' &&
+      url.searchParams.get('continuous') === '0' && url.searchParams.get('oi') === '0' &&
+      /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(url.searchParams.get('from') ?? '') &&
+      /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(url.searchParams.get('to') ?? '');
+  }
+  return url.pathname === '/instruments/NFO' && !url.search;
+}
+
+function credential(value) {
+  return typeof value === 'string' && value.length >= 3 && value.length <= 1024 &&
+    /^[\x21-\x7e]+$/.test(value) && !value.includes(':');
+}
+
+function recentCandle(row) {
+  return Array.isArray(row) && row.length === 6 &&
+    typeof row[0] === 'string' &&
+    /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/.test(row[0]) &&
+    !Number.isNaN(Date.parse(row[0])) &&
+    row.slice(1, 5).every(v => typeof v === 'number' && Number.isFinite(v) && v > 0) &&
+    Number.isSafeInteger(row[5]) && row[5] >= 0 &&
+    row[2] >= Math.max(row[1], row[4], row[3]) && row[3] <= Math.min(row[1], row[4]);
+}
+
+async function readBounded(response, limit) {
+  if (!response.body) throw new Error('invalid response');
+  const reader = response.body.getReader();
+  const chunks = []; let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new Error('oversized response');
+      chunks.push(value);
+    }
+  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return decoder.decode(bytes);
+}
+
+export function createReadOnlyKite({ apiKey, accessToken, fetchImpl = globalThis.fetch, timeoutMs = 8000 }) {
+  if (!credential(apiKey) || !credential(accessToken) ||
+      !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 8000 ||
+      typeof fetchImpl !== 'function') throw new Error('Read-only market configuration invalid');
+
+  async function get(path, { asCsv = false } = {}) {
+    const url = ROOT + path;
+    if (!permittedMarketUrl(url)) throw new Error('Read-only market URL blocked');
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), timeoutMs);
+    try {
+      const result = await fetchImpl(url, { method: 'GET', redirect: 'error',
+        credentials: 'omit', cache: 'no-store', signal: abort.signal,
+        headers: { 'X-Kite-Version': '3', Authorization: `token ${apiKey}:${accessToken}` } });
+      if (result.status !== 200 || result.redirected || result.url && !permittedMarketUrl(result.url))
+        throw new Error('HTTP failure');
+      const contentType = result.headers.get('content-type')?.toLowerCase() ?? '';
+      if (asCsv) {
+        if (!contentType.includes('text/csv')) throw new Error('invalid CSV');
+        return await readBounded(result, 4 * 1024 * 1024);
+      }
+      if (!contentType.includes('application/json')) throw new Error('invalid JSON');
+      const parsed = JSON.parse(await readBounded(result, MAX_JSON_BYTES));
+      if (!parsed || parsed.status !== 'success' || !parsed.data ||
+          Array.isArray(parsed.data) || typeof parsed.data !== 'object') throw new Error('invalid envelope');
+      return parsed.data;
+    } catch { throw new Error('Kite read-only market-data unavailable'); }
+    finally { clearTimeout(timer); }
+  }
+  return Object.freeze({
+    async instrumentsNfoCsv() { return get('/instruments/NFO', { asCsv: true }); },
+    async quote(symbol) {
+      if (typeof symbol !== 'string' || !/^NIFTY[A-Z0-9]+$/.test(symbol))
+        throw new Error('Invalid NIFTY symbol');
+      const key = `NFO:${symbol}`;
+      const data = await get('/quote?i=' + encodeURIComponent(key));
+      const quote = data[key];
+      if (!quote || typeof quote !== 'object' || Array.isArray(quote) ||
+          typeof quote.last_price !== 'number' || !Number.isFinite(quote.last_price) || quote.last_price <= 0)
+        throw new Error('Invalid NIFTY quote');
+      return quote;
+    },
+    async history(token, interval, from, to) {
+      if (!Number.isSafeInteger(token) || token <= 0 ||
+          !['5minute', '15minute'].includes(interval) ||
+          !/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(from ?? '') ||
+          !/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(to ?? '') || from > to)
+        throw new Error('Invalid historical query');
+      const args = new URLSearchParams({ from, to, continuous: '0', oi: '0' });
+      const data = await get(`/instruments/historical/${token}/${interval}?${args}`);
+      if (!Array.isArray(data.candles) || data.candles.length > 400 ||
+          !data.candles.every(recentCandle)) throw new Error('Invalid historical candles');
+      return data.candles;
+    },
+  });
+}
