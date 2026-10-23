@@ -75,7 +75,8 @@ function parseRelay(raw, env) {
   return body;
 }
 async function relay(request, env) {
-  if (!configReady(env) || env.TOKEN_RELAY_ENABLED !== "true") return fail();
+  if (env.TOKEN_RELAY_ENABLED !== "true") return fail(401);
+  if (!configReady(env)) return fail();
   if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json")
     return fail(415);
   const length = Number(request.headers.get("content-length") || "0");
@@ -110,7 +111,7 @@ async function relay(request, env) {
 }
 async function handle(request, env) {
   const url = new URL(request.url);
-  if (url.pathname === "/healthz" && request.method === "GET")
+  if (url.pathname === "/status" && request.method === "GET")
     return reply(200, { status: "UP", mode: "INERT_RESEARCH_ONLY", broker_orders: false,
       paper_trading_enabled: false, live_data: false });
   if (url.pathname === "/internal/token" && request.method === "POST") return relay(request, env);
