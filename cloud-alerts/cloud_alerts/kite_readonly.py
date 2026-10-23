@@ -8,9 +8,40 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
+import re
+import threading
+import time
+from urllib.parse import urlsplit
 from .models import Candle
 IST=ZoneInfo('Asia/Kolkata')
 OFFICIAL_KITE_ROOT = 'https://api.kite.trade'
+
+
+class _MarketDataAdapter(requests.adapters.HTTPAdapter):
+    """Deny transaction endpoints at the final HTTP boundary, including SDK calls.
+
+    A shared pacing lock covers all transient REST clients in this process.
+    Python is not a security sandbox: deliberate code replacement is out of scope.
+    """
+    _lock = threading.Lock()
+    _last = {}
+
+    def send(self, request, **kwargs):
+        url = urlsplit(request.url)
+        historical = re.fullmatch(r'/instruments/historical/[1-9][0-9]*/(5minute|15minute)', url.path)
+        if (request.method != 'GET' or url.scheme != 'https' or
+                url.netloc != 'api.kite.trade' or url.fragment or
+                not (url.path in ('/instruments/NFO', '/quote') or historical) or
+                kwargs.get('verify', True) is not True or kwargs.get('proxies')):
+            raise RuntimeError('Kite transport permits approved read-only market data only')
+        group = 'history' if historical else 'quote' if url.path == '/quote' else 'instruments'
+        spacing = {'history': 0.35, 'quote': 1.05, 'instruments': 0.11}[group]
+        with self._lock:
+            delay = self._last.get(group, float('-inf')) + spacing - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            self._last[group] = time.monotonic()
+        return super().send(request, **kwargs)
 
 
 def _enforce_direct_kite_tls(sdk:object)->None:
@@ -31,6 +62,10 @@ def _enforce_direct_kite_tls(sdk:object)->None:
     # The SDK passes allow_redirects=True. A zero-redirect Requests limit
     # prevents following 3xx responses carrying a bearer Authorization header.
     session.max_redirects=0
+    # Even accidental access to the underlying SDK cannot send order, account,
+    # GTT, token-revocation or arbitrary host requests through this session.
+    session.mount('https://', _MarketDataAdapter())
+    session.mount('http://', _MarketDataAdapter())
     if session.trust_env is not False or session.max_redirects != 0:
         raise RuntimeError('Kite SDK HTTPS policy not enforced')
 

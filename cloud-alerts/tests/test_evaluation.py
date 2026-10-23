@@ -72,7 +72,7 @@ def test_no_zero_fee_benchmark_mistaken_for_net():
 def test_full_paper_sample_never_implies_actual_fill():
     # Construct five different sessions and enough synthetic evidence.
     rows=[]
-    for d in range(5):
+    for d in (0,2,3,4,7):  # 19,21,22,23,26: skip holiday and weekend.
         for n in range(6):
             p=sample(n)
             when=p.signal_entry_at+timedelta(days=d)

@@ -12,6 +12,7 @@ import math
 import sqlite3
 from zoneinfo import ZoneInfo
 from .paper_charges import estimate_nse_option_leg, POLICY as COST_POLICY
+from .trading_calendar import regular_session
 
 IST = ZoneInfo('Asia/Kolkata')
 PAISE = Decimal('0.01')
@@ -107,7 +108,7 @@ class PaperBook:
         if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
             raise ValueError('aware IST clock required')
         local = now.astimezone(IST)
-        if local.weekday()>=5 or not (time(9,30) <= local.time() < (time(15,0) if entry else time(15,26))):
+        if not regular_session(local.date()) or not (time(9,30) <= local.time() < (time(15,0) if entry else time(15,26))):
             raise ValueError('outside permitted paper-trading time')
 
     @staticmethod
@@ -115,7 +116,8 @@ class PaperBook:
         if (quote.contract.kind not in ('CE','PE') or
             not quote.contract.symbol.startswith('NIFTY') or
             not quote.contract.symbol.endswith(quote.contract.kind) or
-            quote.contract.lot_size < 1 or quote.contract.token < 1 or not quote.contract.expiry):
+            type(quote.contract.lot_size) is not int or quote.contract.lot_size < 1 or
+            type(quote.contract.token) is not int or quote.contract.token < 1 or not quote.contract.expiry):
             raise ValueError('invalid listed NIFTY option contract')
         if quote.updated.tzinfo is None or quote.updated.utcoffset() is None:
             raise ValueError('option exchange time missing')

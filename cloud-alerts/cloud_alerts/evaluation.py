@@ -11,6 +11,7 @@ from datetime import datetime, date, time
 from zoneinfo import ZoneInfo
 import math
 import re
+from .trading_calendar import regular_session, CalendarUnavailable
 
 IST=ZoneInfo('Asia/Kolkata')
 
@@ -79,13 +80,17 @@ def score_pair(p: PaperQuotePair, costs: Costs, *, max_delay_seconds: int = 20,
         raise EvidenceError('signals and quote observations must be in causal time order')
     if (eq-es).total_seconds()>max_delay_seconds or (xq-xs).total_seconds()>max_delay_seconds:
         raise EvidenceError('quote observations too delayed for a time-sensitive paper evaluation')
-    if (es.weekday()>=5 or xs.weekday()>=5 or es.time()<time(9,15)
+    try:
+        valid_sessions = regular_session(es.date()) and regular_session(xs.date())
+    except CalendarUnavailable:
+        raise EvidenceError('NSE F&O calendar unavailable for evaluation') from None
+    if (not valid_sessions or es.time()<time(9,15)
             or xq.time()>time(15,30)):
         raise EvidenceError('quotes outside the regular weekday session')
     if (eq.date()>p.option_expiry or xq.date()>p.option_expiry
             or es.date()!=eq.date() or xs.date()!=xq.date() or es.date()!=xs.date()):
         raise EvidenceError('expired contract, overnight trade or crossed local trading day')
-    if not (isinstance(p.lot_size,int) and isinstance(p.lots,int)
+    if not (type(p.lot_size) is int and type(p.lots) is int
             and 0<p.lot_size<=10000 and 0<p.lots<=100):
         raise EvidenceError('invalid lots')
     if not isinstance(p.entry_ask_qty,int) or not isinstance(p.exit_bid_qty,int):

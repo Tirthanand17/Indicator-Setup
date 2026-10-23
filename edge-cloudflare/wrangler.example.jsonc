@@ -1,0 +1,14 @@
+// OFFLINE TEMPLATE ONLY. Do not deploy or create resources without owner approval.
+{
+  "name": "nifty-paper-scheduler",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "OFFLINE_SCHEDULER_ENABLED": "false" },
+  "durable_objects": {
+    "bindings": [{ "name": "MARKET_SESSION", "class_name": "MarketSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MarketSession"] }],
+  "observability": { "enabled": false }
+}

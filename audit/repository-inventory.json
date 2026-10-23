@@ -1,0 +1,1264 @@
+{
+  "tracked_files": 227,
+  "python_files": 122,
+  "local_import_cycles": [],
+  "inventory": [
+    {
+      "path": ".devcontainer/Run-Linux-QA.ps1",
+      "bytes": 2484,
+      "sha256": "eca278bc75bc2e6787e05ae52ff8d2b31c05b6d8709eb4eb8bf8451bbc6b6ecf"
+    },
+    {
+      "path": ".devcontainer/devcontainer.json",
+      "bytes": 682,
+      "sha256": "6d8464d8d0e50293f4a03fd1a928dae67eee0d69a07c335211cd0ae711ce41e6"
+    },
+    {
+      "path": ".devcontainer/run-linux-qa.sh",
+      "bytes": 1487,
+      "sha256": "2c6470deecc5cda5fbe79ef4c36de58aadbe81a23863383dfc52d11ece87398c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6890,
+      "sha256": "69a283786c7571bdf74d8d0961b96a2e565f81e5764ca1fbfd90dfd9336268ce"
+    },
+    {
+      "path": "cloud-alerts/.env.example",
+      "bytes": 1325,
+      "sha256": "5812e6e9c75a637d04389d88f67c9a16d13e19dd4231b235d130c98ad3b717b7"
+    },
+    {
+      "path": "cloud-alerts/.gitignore",
+      "bytes": 132,
+      "sha256": "e37fdf6586b51639a1c7dd0b37e801906d2a11426780000c8b372bdc8aebfd23"
+    },
+    {
+      "path": "cloud-alerts/Dockerfile",
+      "bytes": 1044,
+      "sha256": "3bdc47af4142f67d638edb74e60051136ddf97c0cadc852f55c190f64b90465d"
+    },
+    {
+      "path": "cloud-alerts/README.md",
+      "bytes": 27809,
+      "sha256": "1e4e9cad0ce8f3a00fb2ab90d6b2655d20b5dd26bf7cff925af241c601f55266"
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/__init__.py",
+      "bytes": 98,
+      "sha256": "9110b260647911df466fd63e4b6ed00a20c85c162617f02a7023072922747881",
+      "functions": 0
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/aws_free_preflight.py",
+      "bytes": 10538,
+      "sha256": "a633d731ae17db400d15ddd0bc150f8c3144bb6786fd8ea9e46427265978ce13",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/azure_student_audit.py",
+      "bytes": 5315,
+      "sha256": "e723413039f45936f23b1ecdc9e2f8526fe4b3e0e217271de71bf43cee7ae615",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/calendar_cli.py",
+      "bytes": 1687,
+      "sha256": "dde81cb402bf841da778d17c2c5d8689c81e9c97c38d6ece1f871c0f0b7a6c45",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/config_guard.py",
+      "bytes": 3512,
+      "sha256": "00efa35d332512110dd7c4180a10840cf221617a5e73b710ce3eb1d6c256f1b2",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/contracts.py",
+      "bytes": 4015,
+      "sha256": "595723496507e0c60df678b411b3a2a34fac75fe4d0a58a7e9b6ab5607499cdd",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/delivery_audit.py",
+      "bytes": 7399,
+      "sha256": "be1789f06c1abbfc64e08d12d7deb1cd0a723068c63d29610b3ef7efcc09e12d",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/delivery_audit_cli.py",
+      "bytes": 1160,
+      "sha256": "ad409ad08bc34b2ee2ff33daec6165f75b5ad6ff5a18b25e9cffabe725c60399",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/engine.py",
+      "bytes": 44207,
+      "sha256": "1b0e9abfe448bbe23b59fc531328e2061b0430a2959c3520bd36d9b47157ac3e",
+      "functions": 20
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/evaluation.py",
+      "bytes": 7444,
+      "sha256": "4ec2724663d28080a4a9dc8279e4c5ac70e8ac1f4a68a9674252786c3d492d7f",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/evidence_cli.py",
+      "bytes": 4602,
+      "sha256": "82ab1064e1c4c0dbc993ea863f8dad869cfcd380ddcac4d5f96fef784d7361d2",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/gateway_acceptance.py",
+      "bytes": 6576,
+      "sha256": "7d68868779c802de112835a5134b93deb7f89150ad465b83894654b666f833f9",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/host_qualification.py",
+      "bytes": 5969,
+      "sha256": "2d3d937b88e8fb699614971bba8f758ab415d6ef8a12230db72fbceea047682c",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/https_acceptance.py",
+      "bytes": 5635,
+      "sha256": "b1a852ab6cc19f40d76086ab51e2c9472a745842421d5ec46751edd920f9fc70",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/indicators.py",
+      "bytes": 3228,
+      "sha256": "8208d6dbe866c90857dd953edefb940d1379f5bb533279e7a7a2954e70fd2928",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/kite_readonly.py",
+      "bytes": 4799,
+      "sha256": "c31524cd1ccbafc3efb16580ead41459f535d6781071fbc0a720ee0d2cf723a6",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/loopback_smoke.py",
+      "bytes": 10150,
+      "sha256": "dbf3c793b720be67f2f6b31f483b9d013f685df01067025f64b8eaa723d87389",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/main.py",
+      "bytes": 130,
+      "sha256": "fc2606c3af6340e6096953e04642bd9d571760d54faea8fb5c6e0d8d16bd1176",
+      "functions": 0
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/models.py",
+      "bytes": 1711,
+      "sha256": "46295eb74d99b65adcce7b639a3e90d5a62f91a168cdd0c651cae1be9ace3df9",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/oci_plan_guard.py",
+      "bytes": 5415,
+      "sha256": "531084d244e7fb7302ad5ecd52a970badadda7d0ecf0de0416c8d5df677e8058",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/operational.py",
+      "bytes": 2963,
+      "sha256": "c82bb75f7a3bd3bafa6cf8a2abf0b4628ca2f6214566b1c659aacf5e14aa9c43",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/paper_analytics.py",
+      "bytes": 4867,
+      "sha256": "5ec0f7da26f48a5ceb4a051e6f20dc3545a070a995098ad0d81a6f628c8542e5",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/paper_book.py",
+      "bytes": 24394,
+      "sha256": "e789d7a1f805337dea0a5b66c05e667895520d3244f2fb371dd2ba7733ed7e8a",
+      "functions": 14
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/paper_charges.py",
+      "bytes": 2775,
+      "sha256": "667dc54802f64ee20cdaad15e5c6d8dbaa9625feb7b0af2c4cab2480cc4efcba",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/paper_dashboard_view.py",
+      "bytes": 13528,
+      "sha256": "3d0af59c8a01f45aebac9e3d2111459a742aaedfafbd7cfc71e79684e1002043",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/paper_integrity.py",
+      "bytes": 9523,
+      "sha256": "09ec39409e2314673d0ed0946982f42821774ffd8cf9391aa8dcdc36db6145bf",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/preflight.py",
+      "bytes": 7208,
+      "sha256": "6aa1d30a4e8dfb4928b04d1f0539a533c2991743ce63b94536fb2cb20e6f7ee6",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/premium.py",
+      "bytes": 5795,
+      "sha256": "4c54788e8c7f5b306eff5e6a779178b28d164b228c0a215cb9b3ed93a230a509",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/quote_evidence.py",
+      "bytes": 11661,
+      "sha256": "fa1f97887b8ade5ad626650b0161a303b03655e844b9e6bdf0f1c3c1ace70f87",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/replay.py",
+      "bytes": 6865,
+      "sha256": "65624cd8f532b179310aa32ee648560f3c4be4604afc28be7a17c24add97fe16",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/replay_cli.py",
+      "bytes": 4241,
+      "sha256": "d61a07f5cbd1f4a1d68689b4db9fc816688a2d99861b5daeda2143bf69ae3ac7",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/runtime_guard.py",
+      "bytes": 1800,
+      "sha256": "4892d41062e37b260351170e218402e56ca346715330e936fdc852e679a9833c",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/scheduler.py",
+      "bytes": 2245,
+      "sha256": "4d471db3f3267613f818706ef3e2efed54f02420687edafa3490a53a1c6312b5",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/security.py",
+      "bytes": 7287,
+      "sha256": "4ebed18e6c7d7be529aebeb8bd63ad06a213ea0cbacf880ef83c9f1c453be169",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/server.py",
+      "bytes": 18300,
+      "sha256": "c5d22185c710fc900e4f456d36dac652a04daa876a0b0835383ab0144c99602d",
+      "functions": 17
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/session_audit_cli.py",
+      "bytes": 1923,
+      "sha256": "5474e7dd351d232a98bcb25023e526bf5a459515b84a7b07cda0ad9f80b58a12",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/session_coverage.py",
+      "bytes": 5364,
+      "sha256": "00f6afc7c588fd452c18042eb96282b16863fc0530829ad78e183ce702b5664e",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/signal_audit.py",
+      "bytes": 6308,
+      "sha256": "e27a41ab57571539c5be6b40c3b6c0ca2394d75e5ce8412b5ff6ff1d3ded7fcd",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/signals.py",
+      "bytes": 5985,
+      "sha256": "7e224d6a7fb37433991a88ed636dd937cf8a49ace3261cf58f08f94a97d9a91f",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/snapshot.py",
+      "bytes": 7704,
+      "sha256": "5e4cab267214b04eaa9ac8164ef8c301bc3a72d2435c32bdc236927813efbab0",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/state.py",
+      "bytes": 26493,
+      "sha256": "3cfb90b5185061fc8a426aceb3a3d0f0e9446bd3dc311e12b027c4390256b59f",
+      "functions": 26
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/stream_supervisor.py",
+      "bytes": 9517,
+      "sha256": "7fd8c3f5602758dd77f8b835f1be324e4f4e410cf194c4f47b0ad2aad97d85c3",
+      "functions": 16
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/streaming.py",
+      "bytes": 12568,
+      "sha256": "80df6f6c3412621d5e0ec3313dcac4cc2f144e03609b6050f25726fcff91b7ce",
+      "functions": 16
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/telegram.py",
+      "bytes": 2763,
+      "sha256": "811b6572217f1181c329bb114ad9e309b1cc077cc461abac539aed6ecca75317",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/telegram_probe.py",
+      "bytes": 3263,
+      "sha256": "cb2694d673524c656eefad12dfd7c02db1b9b3e68912aeb33a77ef9f99ca16c0",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/token_sender.py",
+      "bytes": 5907,
+      "sha256": "0643e2510980c47c6630a0b38bb54360f893a63aeef75a45050f9fbe23b0d661",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/trading_calendar.py",
+      "bytes": 1827,
+      "sha256": "8cc0d62272615c5aa31fc3e9c3a643fb5d6793a850b087498eb01fa929c926d8",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/walkforward.py",
+      "bytes": 3754,
+      "sha256": "d60b5bf8da1b3854dd305cac73479d939202bfe7923d23ce0d8b1e78bdf98acb",
+      "functions": 1
+    },
+    {
+      "path": "cloud-alerts/cloud_alerts/worker_supervisor.py",
+      "bytes": 4333,
+      "sha256": "c8b0aaaa7478f746c775f1403af8f332b7cef2bac46e02f8ca7190c8cb1343ad",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/deploy/Caddyfile.example",
+      "bytes": 686,
+      "sha256": "61caf504da078dee03a219e55c9ce59d3eaf5ba33aae0cda5a7e92ecc0f63754"
+    },
+    {
+      "path": "cloud-alerts/deploy/aws-free-preflight.example.json",
+      "bytes": 1597,
+      "sha256": "9c87a9c5e8fa35161f89765f91ca9ae975cfa528d685804ad94b3ec3011675e0"
+    },
+    {
+      "path": "cloud-alerts/deploy/compose.yml",
+      "bytes": 1339,
+      "sha256": "2a9168072f98e778744093b393197d01aeb216f60da52ef0840631358dd3af1f"
+    },
+    {
+      "path": "cloud-alerts/deploy/host-plan.example.json",
+      "bytes": 476,
+      "sha256": "5372f34245318e8da241a496396e0bacb138d8dc34503cb69bf3932fe86f85ff"
+    },
+    {
+      "path": "cloud-alerts/deploy/northflank-gateway/Caddyfile",
+      "bytes": 1414,
+      "sha256": "0c138cef0d7c144bec91cb86b14b328b21154117c5bd28418b5f02ed8ef43679"
+    },
+    {
+      "path": "cloud-alerts/deploy/northflank-gateway/Dockerfile",
+      "bytes": 263,
+      "sha256": "cb5c4c18c96dbe46ed86b51aa285a20b88154c5ac5194085d13f0c8ff0895362"
+    },
+    {
+      "path": "cloud-alerts/deploy/northflank-host-plan.example.json",
+      "bytes": 488,
+      "sha256": "6176a9de3694e6834f032b49099edb1d76e7d7c3d98cb4f3e5715bd5110e8056"
+    },
+    {
+      "path": "cloud-alerts/deploy/windows/Install-DailyTokenRelay.ps1",
+      "bytes": 5523,
+      "sha256": "d1d2534b9c008e1edc9951133db2ff269267eec43e79f18ae1d26af4a5be82dd"
+    },
+    {
+      "path": "cloud-alerts/deploy/windows/Watch-DailyToken.ps1",
+      "bytes": 1971,
+      "sha256": "5a2895e5647d06bb9f435f5a519fec6a0d99bd93e75b0b2899f668fb437fc8f9"
+    },
+    {
+      "path": "cloud-alerts/docs/ARCHITECTURE.md",
+      "bytes": 11881,
+      "sha256": "ff9df7b79afd119d81df6e292b8b5c162d7807ef1d25b1805fdea947c3519949"
+    },
+    {
+      "path": "cloud-alerts/docs/AUTOMATED_PAPER_PORTFOLIO_PHASE41.md",
+      "bytes": 6256,
+      "sha256": "40c4f5ade6023b8b22044c59483cad38f3893795816e13c95d48b2391b3e0e4d"
+    },
+    {
+      "path": "cloud-alerts/docs/AUTOMATED_PAPER_PORTFOLIO_PHASE42.md",
+      "bytes": 6907,
+      "sha256": "b3fc8a8f0ce5f2e93403c3ab6e7815814cf440a5723249108458270a1d6c7a0b"
+    },
+    {
+      "path": "cloud-alerts/docs/BACKGROUND_WORKER_SUPERVISION.md",
+      "bytes": 4021,
+      "sha256": "c75c595e4a257a4bedcae13cd650be37312be6f869ea59f4911d91a15c41459f"
+    },
+    {
+      "path": "cloud-alerts/docs/BOUNDED_TELEGRAM_DISPATCH.md",
+      "bytes": 3056,
+      "sha256": "04fcc3f6b3201826e37b6128cf8bc0fda023c43867154ecefcbe7c07be7a9748"
+    },
+    {
+      "path": "cloud-alerts/docs/CLOUD_DEPLOYMENT_PREFLIGHT.md",
+      "bytes": 7538,
+      "sha256": "a35793e025bc6777ed0e8616ba230995d1d6a532dd2a5fb33a524eaffe177853"
+    },
+    {
+      "path": "cloud-alerts/docs/DAILY_TOKEN_HANDOFF_VALIDATION.md",
+      "bytes": 4746,
+      "sha256": "759692567518c51f56f1795d7fd8b85ef542a7521574a6373135d46673420513"
+    },
+    {
+      "path": "cloud-alerts/docs/DEPLOYMENT.md",
+      "bytes": 16146,
+      "sha256": "fd0d5c56062e594eeff50db220675c9cd51550e70c2b1c5944d740333ae72847"
+    },
+    {
+      "path": "cloud-alerts/docs/DISPATCH_FRESHNESS.md",
+      "bytes": 2373,
+      "sha256": "01bd5fb30fa862a6cf8a7be262e8337e305225ce81238639c9019c101c0172a8"
+    },
+    {
+      "path": "cloud-alerts/docs/ENTRY_NOTICE_EXIT_SAFETY.md",
+      "bytes": 2469,
+      "sha256": "ce0e66702e283ac8a82764aeefe1df1f870da352c8304d71b8beee23581353c5"
+    },
+    {
+      "path": "cloud-alerts/docs/FAIL_CLOSED_CONFIG.md",
+      "bytes": 2848,
+      "sha256": "c77db3994b39dce2eb04f43d31d6e2a3dbdc821880ba4db4cdade311dd1f9c5f"
+    },
+    {
+      "path": "cloud-alerts/docs/HISTORICAL_REPLAY.md",
+      "bytes": 2101,
+      "sha256": "23912c231b4c0e1f6521067b955dd7d69a760fd96077f1fd29814b4e9fabe477"
+    },
+    {
+      "path": "cloud-alerts/docs/HOSTING_EVALUATION.md",
+      "bytes": 3697,
+      "sha256": "b60721c5a5d0de6031736986da985a4ae6f077cd9722c0b702799adc9601bc21"
+    },
+    {
+      "path": "cloud-alerts/docs/HOST_ACTIVATION_DECISION.md",
+      "bytes": 4906,
+      "sha256": "6ece6e6750fbe8c6fdf3701f0a0234bc009d4d5b39fd9ba851d3d580b6bc7498"
+    },
+    {
+      "path": "cloud-alerts/docs/HTTPS_INGRESS_AND_PHONE_TEST.md",
+      "bytes": 5733,
+      "sha256": "2e907869be11d73522f1ba715e0086738c4261808b8018f8b355b4fd71b2a45d"
+    },
+    {
+      "path": "cloud-alerts/docs/INDEPENDENT_KITE_REST_SESSIONS.md",
+      "bytes": 4343,
+      "sha256": "facba2468d5a2265af3b3b9c8afb26f84405deea2b09c0f1462c26f455627601"
+    },
+    {
+      "path": "cloud-alerts/docs/IN_PROCESS_RESTART_RECONCILIATION.md",
+      "bytes": 3526,
+      "sha256": "f9d22f6915b9577646032ce979cb3d3121341517c046f22ff766e5e0ae199dfe"
+    },
+    {
+      "path": "cloud-alerts/docs/KITE_REST_SESSION_LIFECYCLE.md",
+      "bytes": 4196,
+      "sha256": "f556b5c482ef12e3310dd34ef259ae2099dde60a49fcf0159a3f1ff573101fca"
+    },
+    {
+      "path": "cloud-alerts/docs/KITE_SDK_DIRECT_TLS.md",
+      "bytes": 4108,
+      "sha256": "a68a2bc784a7fb3f3dfa0da36d135f5b7d81f505c874f197901cbe8ce55fbfdd"
+    },
+    {
+      "path": "cloud-alerts/docs/LIVE_API_SMOKE_2026-10-19.md",
+      "bytes": 3081,
+      "sha256": "275c34d1ef6f688998b8733e49d72e53931a717ce030359870d9b08738146bbd"
+    },
+    {
+      "path": "cloud-alerts/docs/LIVE_CLOCK_AND_QUOTE_FRESHNESS.md",
+      "bytes": 2946,
+      "sha256": "8bee86a914d52d2e1e5eac038002a7423d5ca35b09bbdd63ddccadb446700bbb"
+    },
+    {
+      "path": "cloud-alerts/docs/LOOPBACK_LIFECYCLE_REHEARSAL.md",
+      "bytes": 3467,
+      "sha256": "13e4f72ad5841b2a32904643627a34c414008d7252a3c4e770c837d604f7a682"
+    },
+    {
+      "path": "cloud-alerts/docs/MARKET_DATA_INTEGRITY.md",
+      "bytes": 2301,
+      "sha256": "f1c7d92bf8dcf78b856a77be93ac0ec9ce53546156433ffa14ca5b5b892f6a7c"
+    },
+    {
+      "path": "cloud-alerts/docs/NSE_FO_HOLIDAY_CALENDAR.md",
+      "bytes": 3631,
+      "sha256": "490ed9df85583ff5ca0c25a42ffd6534267af187ec1a1a0a667a0b85a4c24974"
+    },
+    {
+      "path": "cloud-alerts/docs/OCI_ALWAYS_FREE_OPERATOR_GATE.md",
+      "bytes": 5926,
+      "sha256": "8ce38256e3d0e9dfa36d0d91188a2d03f99500b8b913d528a26dbb87c3f187cd"
+    },
+    {
+      "path": "cloud-alerts/docs/OPERATIONAL_READINESS.md",
+      "bytes": 3171,
+      "sha256": "72825f293ac695406def7e9144a0ee562140c063ce7d5a83877f3a0a209ffb4e"
+    },
+    {
+      "path": "cloud-alerts/docs/OPTION_QUOTE_EVIDENCE_LEDGER.md",
+      "bytes": 5781,
+      "sha256": "1d795e58c6e3984f7cddeea68bba3f682447c23882557ad5576391fee9bc0990"
+    },
+    {
+      "path": "cloud-alerts/docs/OUTBOUND_TLS_ISOLATION.md",
+      "bytes": 3736,
+      "sha256": "ff9e325fe69cd0cba8b0ac32fb76bd2dda89b105d76cd14de82cb7bad3ac30c7"
+    },
+    {
+      "path": "cloud-alerts/docs/PAPER_EVIDENCE_EVALUATION.md",
+      "bytes": 3747,
+      "sha256": "143435fa1f22e6f45b623775737232f57673f592433f26906c8979cbf4afa937"
+    },
+    {
+      "path": "cloud-alerts/docs/PAPER_RECOVERY_PHASE43.md",
+      "bytes": 14012,
+      "sha256": "d1027bdef177ef8ca786cf40f40954bb6a03301e1ce8fcd88eb648bcd9832df4"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE40_HOST_ACTIVATION_TRUTH.md",
+      "bytes": 4551,
+      "sha256": "09beb6d80226ea3b2f1f4370fc533af8ca559e00f47e2623e6556d2f33cdcca1"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE43_NIRALA_WINDOWS_QA_20261021.md",
+      "bytes": 7349,
+      "sha256": "8c23ca899bbeb684383bc9db456fa1da8e419b5b9f37e1c4d54baad2885041b7"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE44_CODESPACES_OFFLINE_QA.md",
+      "bytes": 9645,
+      "sha256": "e2e400583df613c097a4b3049faed5a4a516054979c23374e3d960c58c1b0554"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE45_WSL_LINUX_REGRESSION.md",
+      "bytes": 6722,
+      "sha256": "1e3bb59945c3fe43206cf1add5f6a4e28634eed48f0266562d51ff01de625cc6"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE46_HOST_QUALIFICATION.md",
+      "bytes": 6072,
+      "sha256": "1658d6f034ca0f366451de047184268f1863c1d40d776032d34e707a3cd9be77"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE47_AZURE_STUDENT_CONNECTION.md",
+      "bytes": 6147,
+      "sha256": "2a2393e90a5ded76679ad2193e0322953f147161c14bf49e79c9387fbf370b9b"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE48_NORTHFLANK_SANDBOX.md",
+      "bytes": 10560,
+      "sha256": "6baf13a0974812a20aaf3c0d8fa994d2a459b73cb7c27074e8636ad4fbf79304"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE49_GATEWAY_EDGE_ACCEPTANCE.md",
+      "bytes": 4709,
+      "sha256": "c75c52c91ed3ae49f808ec92a428a6f74c45adcf15e2452023871b768ba6c40a"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE50_CARD_FREE_HOST_REASSESSMENT.md",
+      "bytes": 7627,
+      "sha256": "7ff91abf2c5a143b45dc397afe8534092a1ced83273f3296ca033395fd925305"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE51_AWS_FREE_NO_CARD_EXPIRY_PREFLIGHT.md",
+      "bytes": 7461,
+      "sha256": "2beba145bf5a89fda97cc2695079e738dc9f2876f63966d9f2ee9afe841f26a2"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE52_AWS_INDIA_NEW_SIGNUP_ELIGIBILITY.md",
+      "bytes": 7487,
+      "sha256": "64ed702f057799f88800d5cccd8648b069f66ebacbaa0a5ec9cc37c4b10ea016"
+    },
+    {
+      "path": "cloud-alerts/docs/PHASE53_CLOUDFLARE_DURABLE_OBJECTS_FREE_FEASIBILITY.md",
+      "bytes": 10517,
+      "sha256": "6977416ede1b6938a3a97c001f4e64be21012f42f9e1e13ba75444d570b5a066"
+    },
+    {
+      "path": "cloud-alerts/docs/PREMIUM_EXIT_MONITOR.md",
+      "bytes": 5928,
+      "sha256": "2e97cf5d2ca8534095cff0a73cf3220d9d5c9bdd41c86d2ff2fa861f6b6016e0"
+    },
+    {
+      "path": "cloud-alerts/docs/PREMIUM_RESPONSE_CLOCK.md",
+      "bytes": 3151,
+      "sha256": "33b835b38e777449fcf122b8ff709cfd23d70e9178fd1689a32956d2bd2ac224"
+    },
+    {
+      "path": "cloud-alerts/docs/PROGRESS.md",
+      "bytes": 104508,
+      "sha256": "1fd2eb5cb828e75bd402cf4dd8ac061d307e611064d7e725f1e422ef52e718e5"
+    },
+    {
+      "path": "cloud-alerts/docs/QUOTE_COVERAGE_AUDIT.md",
+      "bytes": 3863,
+      "sha256": "356199b0872b6de62983b564d2038a231c00332af0eefd1465a2de99ddf097f5"
+    },
+    {
+      "path": "cloud-alerts/docs/RECOVERY_AND_OUTBOX.md",
+      "bytes": 2501,
+      "sha256": "328bf18ef4ea4df42bae1c2f1571d62c708b5a288ca7844d65999b77318cf309"
+    },
+    {
+      "path": "cloud-alerts/docs/RELIABLE_CLOUD_STARTUP.md",
+      "bytes": 3553,
+      "sha256": "d984f26151c43ec6735a294355760ac98b50d288940b4f56a5f6c870bf8a3c48"
+    },
+    {
+      "path": "cloud-alerts/docs/REST_SESSION_COVERAGE.md",
+      "bytes": 4058,
+      "sha256": "ef28d6a5f4744ced5bdef76006d730aabdc2655d93faff245376666a7460f3be"
+    },
+    {
+      "path": "cloud-alerts/docs/ROADMAP.md",
+      "bytes": 26637,
+      "sha256": "dd2c140f3fd40279548df62a5d97547adefd7d91de33d7c4df14bc4a04eead55"
+    },
+    {
+      "path": "cloud-alerts/docs/SECURITY.md",
+      "bytes": 5479,
+      "sha256": "0701fd974285578eca3b2142111a5db67c5d704a9e1010a1761f2cfa2acc4c8f"
+    },
+    {
+      "path": "cloud-alerts/docs/SESSION_TOKEN_WARNING_AND_HTTPS_PROBE.md",
+      "bytes": 3942,
+      "sha256": "b1614c25cdf8e7d3a938d952c5ad582ce5ed53ae9652ff9b5d86d61487cb4f6c"
+    },
+    {
+      "path": "cloud-alerts/docs/SIGNED_TOKEN_ROLLBACK_GUARD.md",
+      "bytes": 3880,
+      "sha256": "13d49229b48068a1df0ff15cea5fa2c4f360dbf5c37d15dab4bc1dde247b5a73"
+    },
+    {
+      "path": "cloud-alerts/docs/STARTUP_RECONCILIATION.md",
+      "bytes": 3633,
+      "sha256": "fbff1831dc73e89e74251a380f9184388288278700b39767d454ed803016bf5e"
+    },
+    {
+      "path": "cloud-alerts/docs/STATE_SNAPSHOT_RECOVERY.md",
+      "bytes": 4608,
+      "sha256": "43d97a7d6588d1e2b84d74e3984c91fd9575b20b5fa42a48e0ba1593058371b1"
+    },
+    {
+      "path": "cloud-alerts/docs/STREAMING_DESIGN.md",
+      "bytes": 8162,
+      "sha256": "f824dbba50207084fa8883555f72c96c68200f5fd2f6b705a79451e3749a3ca2"
+    },
+    {
+      "path": "cloud-alerts/docs/TELEGRAM_DELIVERY_AUDIT.md",
+      "bytes": 4470,
+      "sha256": "9c3b6e479e04d843d5b0b12767a048d809b422fe2081e29df3dcdbbd6d55b5c5"
+    },
+    {
+      "path": "cloud-alerts/docs/TEST_PLAN.md",
+      "bytes": 5103,
+      "sha256": "19cb829f3049022d81262c694af006c114a4bd796177c7856513f23a95866830"
+    },
+    {
+      "path": "cloud-alerts/docs/VALIDATION_P6_2026-10-19.md",
+      "bytes": 4073,
+      "sha256": "4121fd8c176f17111b67f3000a4a9eaaf92c8274949146bc624cffde7862bc87"
+    },
+    {
+      "path": "cloud-alerts/docs/WALK_FORWARD_PAPER_VALIDATION.md",
+      "bytes": 2590,
+      "sha256": "bfdbd679761a35dc9e82b48af951336dd7b7b96006624ee7e2dd39e2b8aeb91c"
+    },
+    {
+      "path": "cloud-alerts/docs/WINDOWS_AUTOMATIC_DAILY_TOKEN_RELAY.md",
+      "bytes": 6320,
+      "sha256": "b0d9b850cdb70e2b8a6f3579b765e0ef5852125e7aa2085ff02d1fda4ee5a3c8"
+    },
+    {
+      "path": "cloud-alerts/pytest.ini",
+      "bytes": 47,
+      "sha256": "7b12dc1539dd3a9cc1c6799b3ce077b43f116193ccc98b032a87bcb470b9af3f"
+    },
+    {
+      "path": "cloud-alerts/requirements.txt",
+      "bytes": 374,
+      "sha256": "629ad1c5f61b20216fa013b8ace5fb75ed3bda0421de67450668fee9e8857881"
+    },
+    {
+      "path": "cloud-alerts/scripts/Invoke-WindowsPaperSmoke.ps1",
+      "bytes": 2241,
+      "sha256": "5e1abb06bdf7da4b71f27a044afbd35fd9c6189a4371afaeeb3af3b168f748ac"
+    },
+    {
+      "path": "cloud-alerts/scripts/Run-Local-WSL-Py312-Regression.sh",
+      "bytes": 1571,
+      "sha256": "ee4aef4042bf350297f2a7e99c7ea4c5c0565ad8fe1667b37798e6e9a2f761a7"
+    },
+    {
+      "path": "cloud-alerts/tests/test_atomic_entry.py",
+      "bytes": 4642,
+      "sha256": "c34d8ea30c43e4c06776e1f562bdf4fc0f044a3417ed1cfd8ae548d83de9cddb",
+      "functions": 11
+    },
+    {
+      "path": "cloud-alerts/tests/test_aws_free_preflight.py",
+      "bytes": 10926,
+      "sha256": "29715b9db265ed8aa5a74fbb466f4694dc54677e5a65ac087aa519126fd1f373",
+      "functions": 27
+    },
+    {
+      "path": "cloud-alerts/tests/test_azure_student_audit.py",
+      "bytes": 4030,
+      "sha256": "8202f63d4f90e2948a962df6d8711d031aa9d98558d7f691c58735b525399bc8",
+      "functions": 12
+    },
+    {
+      "path": "cloud-alerts/tests/test_bounded_outbox.py",
+      "bytes": 4921,
+      "sha256": "7ae03ac2a13c3a171f73130603f77898be6221ad2d53bb00a33bb3e156fc9c8c",
+      "functions": 13
+    },
+    {
+      "path": "cloud-alerts/tests/test_config_guard.py",
+      "bytes": 4137,
+      "sha256": "0f43e879b9a169221b4dca7e7323fe0b75b74c60b17ea10f7b1a6f273b101171",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/tests/test_container_security_policy.py",
+      "bytes": 1215,
+      "sha256": "9fd7df03c44250ecd5b71079b8b0b30633663b4f8a8d8a040a7ec09cca2cb7a0",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/tests/test_contracts.py",
+      "bytes": 2268,
+      "sha256": "80f5c7e0e796cb3a2e7aeea2675c05f71780691f2117c9ee58d976492d0c69e1",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_delivery_audit.py",
+      "bytes": 10568,
+      "sha256": "4a72feabb72c5449a69439235071e9d15ac4b20440e4a2c11804fd0df801ecc7",
+      "functions": 18
+    },
+    {
+      "path": "cloud-alerts/tests/test_deployment_readiness.py",
+      "bytes": 3722,
+      "sha256": "fd11bf6e4c9401190a01baa98aee4821ec93b7ddb74df61c880a25e78bee2407",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_engine.py",
+      "bytes": 1588,
+      "sha256": "91cbb24b16cede6aec8d9e4b57eb7805a8e27fa91eb5c4f166d1f8b8981c6205",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/tests/test_entry_notice_gate.py",
+      "bytes": 5779,
+      "sha256": "47e17252364aaf1e0167cf370c18dcff6c18e2ee797fbc1c221507be765e32c1",
+      "functions": 15
+    },
+    {
+      "path": "cloud-alerts/tests/test_evaluation.py",
+      "bytes": 4549,
+      "sha256": "b5f7da3e31436b8162e6dd694b4ecb03d3494755086fcba19d6e76c087e5a373",
+      "functions": 11
+    },
+    {
+      "path": "cloud-alerts/tests/test_evidence_coverage.py",
+      "bytes": 6187,
+      "sha256": "81984fe65acc0a212960b4b78f9623f9226d1000859b50dc695c82055046884e",
+      "functions": 12
+    },
+    {
+      "path": "cloud-alerts/tests/test_expiry_send_gate.py",
+      "bytes": 6077,
+      "sha256": "7c2c67da2b13cbf1e53e3f1840d166ed771e46f3911b6e9c4022b08e8d150f2d",
+      "functions": 14
+    },
+    {
+      "path": "cloud-alerts/tests/test_gateway_acceptance.py",
+      "bytes": 6624,
+      "sha256": "a72914f01ef5747a220263cab8809ee57296648bb05247e8d8eb5756690f7a48",
+      "functions": 13
+    },
+    {
+      "path": "cloud-alerts/tests/test_host_qualification.py",
+      "bytes": 6421,
+      "sha256": "adbc1c7b097ec2c7735621decd15c21c8ce84e715ca338a020e7cdb8de2b8d25",
+      "functions": 14
+    },
+    {
+      "path": "cloud-alerts/tests/test_https_acceptance.py",
+      "bytes": 4117,
+      "sha256": "8d6d25da4ddf23b281a04b333ecde1040cf4c5e96128060f0a3fb6bb2dc6fe55",
+      "functions": 10
+    },
+    {
+      "path": "cloud-alerts/tests/test_https_ingress_template.py",
+      "bytes": 1191,
+      "sha256": "c743d0c4b4bac0f538dd547ac0cea70585068cf9683704edb7064734f3031d07",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/tests/test_independent_kite_sessions.py",
+      "bytes": 4896,
+      "sha256": "a15846cbff4923ceec3530daca9e050b7116d6a61fcbe46b4bbd9b4da2d6e078",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_indicators.py",
+      "bytes": 1984,
+      "sha256": "ca428cefbf52cb3ff613ae3a6bd1f2204e13c7cbb9559f2dfd30e98b428ffd84",
+      "functions": 10
+    },
+    {
+      "path": "cloud-alerts/tests/test_inprocess_restart_recovery.py",
+      "bytes": 6683,
+      "sha256": "4541e038248f8902064fe0d94a4c962974b7db7d40dae2b2c056fe2be4fbd8ba",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_kite_sdk_transport.py",
+      "bytes": 3576,
+      "sha256": "bf6e49327046119790a196e72f701f925d00d42e05b61dbc8546777dbea5fa82",
+      "functions": 11
+    },
+    {
+      "path": "cloud-alerts/tests/test_kite_session_lifecycle.py",
+      "bytes": 3327,
+      "sha256": "e2b5f48ee910b1f784c683a9d36f0a744e39add555a33d97ac821b287a3618ea",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_live_delivery_clock.py",
+      "bytes": 7708,
+      "sha256": "a0a6957c8787c18fddcefaff8712b3f957a2339f6a097614072ec926b376e97a",
+      "functions": 21
+    },
+    {
+      "path": "cloud-alerts/tests/test_live_premium_response_clock.py",
+      "bytes": 5522,
+      "sha256": "8bd0811ed3f214adbdfea1982257ac5ad085e1f3bcf3b7650f1d80c98a0af30e",
+      "functions": 15
+    },
+    {
+      "path": "cloud-alerts/tests/test_loopback_smoke.py",
+      "bytes": 3534,
+      "sha256": "3a409c3239e464f7dd954a70961c9c2eccab2aef6e4ece2d7d04ddcb9cc23491",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_market_data_integrity.py",
+      "bytes": 4390,
+      "sha256": "836cc368c307480aeaad4d61b5433d13f8fb37f413a8a81ffa1ccd4cd21169df",
+      "functions": 15
+    },
+    {
+      "path": "cloud-alerts/tests/test_missing_daily_token_notice.py",
+      "bytes": 3260,
+      "sha256": "866ef88bef706a69d45201ec32f49bc964d63cbde01f5c90391c1cef9fa8cc91",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_no_broker_order_boundary.py",
+      "bytes": 1534,
+      "sha256": "6da150c10ec0657224369b214132360cbdf6150f8cd938f332dd27a0b0b61b56",
+      "functions": 2
+    },
+    {
+      "path": "cloud-alerts/tests/test_northflank_gateway_security.py",
+      "bytes": 4015,
+      "sha256": "eb4125a10b04509530d3080120e9cf6007271ca13f4c470ea67a95dc5278a5b5",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_oci_plan_guard.py",
+      "bytes": 4012,
+      "sha256": "b8bcd93f5332cdb5ee255eaae34cb2c47e1464310eddb5c5a6f6b2c92b60bfc7",
+      "functions": 11
+    },
+    {
+      "path": "cloud-alerts/tests/test_operational.py",
+      "bytes": 3116,
+      "sha256": "62ce8b6b407e33a7bbd4aa72f9d94009b53b88f57011357f6ce9d21c58b377ca",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_outbound_transport_isolation.py",
+      "bytes": 5873,
+      "sha256": "ec5cb291ab52f54c29ce6e54695e500c88ea4a389ce73d989899d2ba263a862b",
+      "functions": 12
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_analytics.py",
+      "bytes": 2750,
+      "sha256": "ef17903ff3d23edcfe14c6eb8eba5542e9dba8110675784c3f773a601bb9a986",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_autopilot_integration.py",
+      "bytes": 12408,
+      "sha256": "db76497e42a882ca5e3898e2be7def4150375ea5e015669ea1b30369bfa637d2",
+      "functions": 18
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_book.py",
+      "bytes": 8717,
+      "sha256": "5d4077950380acb1d7935d5773a64840d02c02fa19b3d12c8564e1393b530713",
+      "functions": 20
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_charges.py",
+      "bytes": 1661,
+      "sha256": "0a54594c8f789adad2a561956fc2836822b1150784d20231f430e6f8398d1ea3",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_fee_integration.py",
+      "bytes": 5227,
+      "sha256": "1e1110c9953f5d5db900b386126a33ff0871691fb447b5915893465aa423776a",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_integrity.py",
+      "bytes": 6718,
+      "sha256": "2d094d1b109bb040ea603c342b69d0a5e3cc51ff6ff39e168bc84a64e034117c",
+      "functions": 19
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_integrity_cash.py",
+      "bytes": 4450,
+      "sha256": "a928990d9064986ee297b195dd4fcf07256534e8560bb39e95456f19d31b2985",
+      "functions": 11
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_integrity_hardening.py",
+      "bytes": 2786,
+      "sha256": "51a6a102e6247e239fb719eaa4f05085e718fa9d94e98371a4bcc5adfb4224a0",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_integrity_integration.py",
+      "bytes": 8267,
+      "sha256": "41e001bf7b78d062b8880fb6102c569164c6722cabd82acd2fc27a1fb97245f7",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_paper_signal_audit_integration.py",
+      "bytes": 3085,
+      "sha256": "877e7c132773560b7e434525a6cc6f6278fb03e027a0d6aef1554a8ea484610e",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_preflight.py",
+      "bytes": 3567,
+      "sha256": "4e2965a603b42439da7464fd9fe9edf006c67b4e9d9b5bbf06269fac09c21871",
+      "functions": 10
+    },
+    {
+      "path": "cloud-alerts/tests/test_premium.py",
+      "bytes": 8459,
+      "sha256": "0976832b994ef2c21d3326f04e72eb1c3758faad7d60dd3bced1d23fdbadfd87",
+      "functions": 24
+    },
+    {
+      "path": "cloud-alerts/tests/test_premium_pipeline.py",
+      "bytes": 6081,
+      "sha256": "d756580693e83e60f5c8cf11cc256c1b83717054dd589b9ea1280f71123758df",
+      "functions": 12
+    },
+    {
+      "path": "cloud-alerts/tests/test_premium_session_lifecycle.py",
+      "bytes": 2362,
+      "sha256": "25792097c32c983affec279ef4acf367ab887be725af9d0f6384863abb561799",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_quote_evidence.py",
+      "bytes": 6990,
+      "sha256": "1ed32324897eafb9bfccbbccc95084ad734d7d21378a37838ef1654373f95b2d",
+      "functions": 16
+    },
+    {
+      "path": "cloud-alerts/tests/test_replay.py",
+      "bytes": 1818,
+      "sha256": "05d8dc758380cab6aa8b77a2bdfc35faf9e1d2fa48a8588a412f0a4e7b508814",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_replay_cli.py",
+      "bytes": 1821,
+      "sha256": "08a860ea9b1a0a29238bf0a1c6ab8236819c5965a942e012c14d96f9102d54b9",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_runtime_guard.py",
+      "bytes": 1528,
+      "sha256": "53ee0d4b41194b0e5e81a73c7e19b1d12dae35ace7a8e3139d561f50719c7955",
+      "functions": 4
+    },
+    {
+      "path": "cloud-alerts/tests/test_scheduler.py",
+      "bytes": 1421,
+      "sha256": "df1c2ec0a3e48ab4f3557132f4ac8277b257cf4cbd0164621637576b56e37ce5",
+      "functions": 3
+    },
+    {
+      "path": "cloud-alerts/tests/test_security.py",
+      "bytes": 3052,
+      "sha256": "410f752ed6bfea32e981bd48937572a5a99b938ff7ca029c56f5671d3d0cc5cb",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_server.py",
+      "bytes": 2407,
+      "sha256": "17ee7c6b1f9f1644ce107cf1057c8f29d76dee69dcec6b39589cb90a0eeeb424",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_session_coverage.py",
+      "bytes": 7702,
+      "sha256": "78f18f653376fbec4d15e807e8109382f53ee894a5825a592e94eafd71136736",
+      "functions": 19
+    },
+    {
+      "path": "cloud-alerts/tests/test_shadow_persistence.py",
+      "bytes": 2448,
+      "sha256": "c1bbe3bb76073a54bf5c73d92e1cfc33e0a335b650fa0152537d739fd9dfcc24",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_shadow_worker.py",
+      "bytes": 3813,
+      "sha256": "2db0839f7902bf0727ebcbbddf44148cd6633552b7f2b2551a1a9f7d5fd74e56",
+      "functions": 13
+    },
+    {
+      "path": "cloud-alerts/tests/test_signal_audit.py",
+      "bytes": 2586,
+      "sha256": "ff9d188da61efefe2fffd57704564f65b8103a3081bbd09df30b587de62a8327",
+      "functions": 6
+    },
+    {
+      "path": "cloud-alerts/tests/test_signals.py",
+      "bytes": 1845,
+      "sha256": "9bbefa6a3d6630f7b892195392739d43c76df98cd86ce8c7a885b280c1a5e35c",
+      "functions": 7
+    },
+    {
+      "path": "cloud-alerts/tests/test_simulated_broker_pipeline.py",
+      "bytes": 5661,
+      "sha256": "5e8af088ca52982d1abeceb69b55c73179cf6a8a3eec92272f55fc3845719ca1",
+      "functions": 13
+    },
+    {
+      "path": "cloud-alerts/tests/test_snapshot.py",
+      "bytes": 6466,
+      "sha256": "3c95ca73efb3124da2074004efacee980bb471f10ba5991fc7892c544faedb4f",
+      "functions": 14
+    },
+    {
+      "path": "cloud-alerts/tests/test_stale_delivery.py",
+      "bytes": 1359,
+      "sha256": "e798f33933cc8d0b0ba156c923a72d8313d382562cfa34a40ef0d597053e2841",
+      "functions": 5
+    },
+    {
+      "path": "cloud-alerts/tests/test_startup_recovery.py",
+      "bytes": 6168,
+      "sha256": "510a153b960e91b9adeb85356ee1a1f5202714dac5034bab63dd00512c0ad66a",
+      "functions": 10
+    },
+    {
+      "path": "cloud-alerts/tests/test_stream_supervisor.py",
+      "bytes": 5010,
+      "sha256": "0854c60d0aa299189583779e0f9bd72037752c03e95d8d62b34e281068f2adc6",
+      "functions": 16
+    },
+    {
+      "path": "cloud-alerts/tests/test_streaming.py",
+      "bytes": 5168,
+      "sha256": "76a84e04bfec016bc65f3c82f3f966eacde0133969e6b9122245524bf148f3d2",
+      "functions": 16
+    },
+    {
+      "path": "cloud-alerts/tests/test_telegram_probe.py",
+      "bytes": 3025,
+      "sha256": "df244a5b361a4a504258c3ec98e35049834bd329caeeeee4a2200e51ab312892",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_token_handoff_end_to_end.py",
+      "bytes": 6908,
+      "sha256": "95f8ac91153389f0a32dc7d9f2ae8e2259454f3a09aab56fbc338d9d7a35c9b5",
+      "functions": 18
+    },
+    {
+      "path": "cloud-alerts/tests/test_token_relay_monotonic.py",
+      "bytes": 5568,
+      "sha256": "87dcdb2d37c072227583974ce0a2c6bad2da887c50d4d97affac6d08d53e6bbe",
+      "functions": 9
+    },
+    {
+      "path": "cloud-alerts/tests/test_token_vault_atomic_cleanup.py",
+      "bytes": 2623,
+      "sha256": "f72998f4927583e645977bf3fb634ea945d088d546599995f072005694a036dd",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_trading_calendar.py",
+      "bytes": 7830,
+      "sha256": "cfee5b7ce622cecc11040d2579e7f84b4b4160391313b4ba8908a22846e607d8",
+      "functions": 19
+    },
+    {
+      "path": "cloud-alerts/tests/test_walkforward.py",
+      "bytes": 4020,
+      "sha256": "ab35c517cfc785cfec74ef9fc090b187278a7ef72d6eb038015d8a1ceab35688",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_windows_daily_token_installer.py",
+      "bytes": 4332,
+      "sha256": "d8063dc90c1c1984490b852148cd998efb322203b279e295a152900591150698",
+      "functions": 8
+    },
+    {
+      "path": "cloud-alerts/tests/test_worker_supervisor.py",
+      "bytes": 6397,
+      "sha256": "39622b1705561f35669ac1fb8d6d43969545a720e9bb9246525fc05f4e015b31",
+      "functions": 14
+    },
+    {
+      "path": "docs/BUY_SELL_DECISION_GUIDE.md",
+      "bytes": 10108,
+      "sha256": "46dc7599c90c3c80ef5f78c84d0755efa158c07e8625979329101962f7deff97"
+    },
+    {
+      "path": "docs/KITE_NIFTY_FIVE_INDICATOR_PLAYBOOK.md",
+      "bytes": 32132,
+      "sha256": "181fc7399c4e32d031e4bd7625634cbb8f817fbf554ae82de4f792c9b3c5a573"
+    },
+    {
+      "path": "docs/signal-practice-checker.html",
+      "bytes": 6486,
+      "sha256": "66ddc94f4b61f7df6d121018ceba9b270b68945607ceb518818debcc7839a050"
+    },
+    {
+      "path": "edge-cloudflare/README.md",
+      "bytes": 2733,
+      "sha256": "5e952bdf4f6387d11363e711b53d0856a5a4cdad19e8a35087cd3bd1112b92cf"
+    },
+    {
+      "path": "edge-cloudflare/alarm-core.mjs",
+      "bytes": 5086,
+      "sha256": "08b9553ad4d9f51e9568cb58a5bca76cd20a09e10bab1f16e8c1716bd0c6c359"
+    },
+    {
+      "path": "edge-cloudflare/alarm-core.test.mjs",
+      "bytes": 4294,
+      "sha256": "589c0e967e1dde32f1cea1d422659b5af5ad91b3e01c48028063e41ad4432921"
+    },
+    {
+      "path": "extension/README.md",
+      "bytes": 12246,
+      "sha256": "0ab6b96665fc4d25747f00c052b1722ccc047f95f8a63f652f51489d866efbb3"
+    },
+    {
+      "path": "extension/auto-engine.js",
+      "bytes": 5671,
+      "sha256": "ef4f81cf10242a4c4946010a8e8bb63fb1ea5ff4f2dfeb68a7175e24e76a3481"
+    },
+    {
+      "path": "extension/auto-runner.js",
+      "bytes": 2563,
+      "sha256": "1f614d964ddb2c2c05bc21d28e44976e92f69bf65a323df5f970bc16e31b7536"
+    },
+    {
+      "path": "extension/background.js",
+      "bytes": 13278,
+      "sha256": "d9b6203419a336b2e3a402b1568b591c88ceabd227789d367c2bb35462972f5a"
+    },
+    {
+      "path": "extension/content.js",
+      "bytes": 1770,
+      "sha256": "9cdfcb123741ebc27c955645d4ff98ad3bbc186771eb5197964aa9a44937538c"
+    },
+    {
+      "path": "extension/dashboard.html",
+      "bytes": 5945,
+      "sha256": "4d29c79e5f3e1fa966f2688906a0b4707ef5efb6e1dbe0e0ffcb286224cd0dd1"
+    },
+    {
+      "path": "extension/dashboard.js",
+      "bytes": 7502,
+      "sha256": "ec1b5ce84c505fe0c9d5ae2fe864938d26cddcd8b03bac73ebd37fc33cbf8293"
+    },
+    {
+      "path": "extension/engine.js",
+      "bytes": 4802,
+      "sha256": "0ee9b65af93e859293c2ea2633946be228c99dd996818144c3fa74371dae3009"
+    },
+    {
+      "path": "extension/manifest.json",
+      "bytes": 894,
+      "sha256": "c794f3abc56888ecbab8caef5efaa7efb8429a0b95033c85318bc41fffe6e3cf"
+    },
+    {
+      "path": "extension/popup.html",
+      "bytes": 604,
+      "sha256": "b6a1ca6e6ad8bce2749878338ffbc5fa7b72aece45530bb264d7b39a1c65ea90"
+    },
+    {
+      "path": "extension/popup.js",
+      "bytes": 971,
+      "sha256": "53a071905b099fca2e2e43bc01bddf10779b0387da66e7ae695b94fdb12188d6"
+    },
+    {
+      "path": "extension/reader.js",
+      "bytes": 3701,
+      "sha256": "34a2df4d9ac42e42647941862cbc679b76fe53e37681bfc2ef4fd36edf5446c7"
+    },
+    {
+      "path": "extension/style.css",
+      "bytes": 1650,
+      "sha256": "33751ce73de11a600b0b862a00c68ee547a51d85da298328b26795a0c0c6d3f2"
+    },
+    {
+      "path": "extension/telegram.js",
+      "bytes": 4242,
+      "sha256": "ff00ce6f184cb883cf697cdcfa026a3bcabfab6a9f69a676580b91e027479186"
+    },
+    {
+      "path": "extension/tests/automatic.test.cjs",
+      "bytes": 4758,
+      "sha256": "af74b2c03d01a6a593e328b06c05c5bae731f8264488457a3fe86692073a11b4"
+    },
+    {
+      "path": "extension/tests/engine.test.cjs",
+      "bytes": 2251,
+      "sha256": "ba650a31a9222447e5d08dcf0d45aea7187d5ada4eef162ec541261606f99e04"
+    },
+    {
+      "path": "extension/tests/telegram.test.cjs",
+      "bytes": 3846,
+      "sha256": "3c49d1c3e0931e516e095f00e7cb039cce2d6b31aaa8af4bc99b102c626604a8"
+    }
+  ]
+}

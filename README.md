@@ -8,7 +8,7 @@ A practical, step-by-step **educational / paper-trading** guide for using **five
 
 This new, separate `cloud-alerts/` project uses the **paid Kite Connect API** to calculate five indicators from actual *completed* 5-minute NIFTY futures candles, confirm the independent 15-minute chart and examine live listed CE/PE option bid/ask quotes. Its signed one-way daily token relay is designed to **READ** an access token from an existing protected trading project's `.env` without editing that folder. A properly configured *always-on* cloud host can continue to notify Telegram after the laptop is switched off **once the daily token has been delivered**.
 
-**Current status:** **44% estimated engineering implementation** (`███████████░░░░░░░░░░░░░░`) / **56% remaining**; **51 local tests passed**. A real read-only paid Kite REST test on Nirala confirmed NFO instruments, futures quote/depth and historical 5m/15m candles. **Cloud deployment, live cloud Telegram signals and strategy win rate are NOT verified.** No host deployed, no new charge approved, and no order-placement code included. [Detailed progress board](cloud-alerts/docs/PROGRESS.md) · [Live API evidence](cloud-alerts/docs/LIVE_API_SMOKE_2026-10-19.md).
+**Current status (23 October 2026): IN DEVELOPMENT / PAPER ONLY.** Engineering checklist v1 **60% (15/25)** (`###############----------`); live acceptance **0/5**. Latest independent Linux suite: **771 passed,1 skipped**; Node **63 passed** plus **1 local workerd runtime test**. The Cloudflare scheduler and numerical port are offline-tested; the complete cloud paper runtime is unfinished. Python dependency advisories remain open. No cloud deployment, phone delivery or profitability is established. [Canonical progress](cloud-alerts/docs/PROGRESS.md) · [Audit and open findings](audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
 ## Existing Chrome chart extension (v0.3 — separate legacy approach)
 
@@ -60,7 +60,7 @@ The [full playbook](docs/KITE_NIFTY_FIVE_INDICATOR_PLAYBOOK.md) explains:
 - **Chart observed and configured:** `NIFTY26OCTFUT` / NIFTY OCT FUT (NFO-FUT), **5-minute candles**, volume bars nonzero.
 - **Five studies visible:** VWAP HLC3 Session (yellow); EMA9 close (blue); EMA21 close (purple); DMI DI length 14 / ADX smoothing 14 (+DI green, −DI red, ADX pink; optional DX and ADXR hidden); ATR length 14 (orange).
 - **Kite layout renamed:** `NIFTY 5 Indicator Setup`. The layout menu showed **Save layout disabled** after renaming, consistent with no pending changes. Reopen/reload persistence was **not** independently verified.
-- **Repository privacy:** public, and contains no credentials, broker account data, API tokens or trade receipts.
+- **Repository privacy:** public. New artifacts contain synthetic fixtures; a full-history secret audit has not been completed.
 - **Order placement:** none; chart work and example orders are paper-only.
 - These confirmations establish chart setup, **not profitable signals, a win rate, or live-order readiness**.
 

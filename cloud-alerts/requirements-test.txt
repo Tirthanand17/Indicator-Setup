@@ -1,0 +1,5 @@
+# Tested with Python 3.12 on Linux. No live credentials are needed.
+-r requirements.txt
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
