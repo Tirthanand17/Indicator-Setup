@@ -1,0 +1,5 @@
+# Python 3.12 Linux QA type-check environment; never a production dependency.
+# App/test transitive versions are pinned in the Linux snapshot below.
+-r requirements-linux-test.lock
+mypy==1.18.2
+types-requests==2.33.0.20261006
