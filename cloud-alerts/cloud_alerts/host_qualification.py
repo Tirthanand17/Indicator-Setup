@@ -75,6 +75,13 @@ def review_host(plan: object, *, now: datetime | None = None) -> dict:
         # A payment card is required to keep workloads running afterward.
         # Marketing 'always-on' does not override this account restriction.
         blockers.append('NORTHFLANK_SANDBOX_NO_CARD_60_MINUTE_WINDOW')
+    if (isinstance(provider, str) and provider.strip().lower() == 'aws'
+            and isinstance(tier, str) and tier.strip().lower() in
+            {'free', 'new_free', 'aws_free'}):
+        # The new AWS Free plan shuts down within six months or when credits
+        # run out. A generic all-green host declaration cannot prove safe
+        # off-account recovery or authorize this temporary host.
+        blockers.append('AWS_FREE_REQUIRES_EXPIRY_AND_MIGRATION_PREFLIGHT')
     for key in REQUIRED_TRUE:
         if plan.get(key) is not True:
             blockers.append('NOT_CONFIRMED_' + key.upper())
