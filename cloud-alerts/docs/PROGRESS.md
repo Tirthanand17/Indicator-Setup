@@ -1,17 +1,16 @@
 # Canonical engineering progress — 23 October 2026
 
-**Typing/lock follow-up:**29 artifact hashes verified by clean offline installation; eight core modules pass mypy; whole-app errors reduced56 to36;51 regressions passed. [Evidence](../../audit/TYPE_AND_LOCK_PROGRESS.md). Item21 remains open; progress15/25 (60%).
+**Latest type/dependency verification:** Complete configured mypy check: zero issues across49 application files; full offline Python suite777 passed/1 skipped (one third-party warning); Node63 passed; Linux pip check clean. Earlier Linux3.12 hashed wheel verification covered29 artifacts. [Evidence](../../audit/TYPE_AND_LOCK_PROGRESS.md). Item21 is now complete **for the Linux offline baseline**, not a live deployment approval.
 
-
-**Dependency follow-up:** default REST SDK dependency chain removed; fresh Linux suite774 passed/1 skipped, REST contract suite15 passed, pip check clean and advisory scan reports no known vulnerabilities. Live WebSocket shadow is explicitly disabled pending review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md). Engineering remains15/25 (60%) because type-checking/reproducibility work remains. Earlier round counts below are historical snapshots.
+**Dependency status:** the trading-capable Kite SDK dependency chain was removed from the default runtime, and the diagnostic WebSocket shadow remains disabled pending separate review. The original23 pip-audit advisory records referred to the historical environment; a prior fresh REST dependency scan found no known advisories at that point. This does not replace a new live-host security review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md).
 
 
 **IN DEVELOPMENT / PAPER ONLY. Not deployed. Live acceptance 0/5.**
 
-Engineering checklist v1: **15/25 completed = 60%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
+Engineering checklist v1: **16/25 completed = 64%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
 
 ```text
-Offline engineering [###############----------] 60% (15/25)
+Offline engineering [################---------] 64% (16/25)
 Live acceptance     [-----]                      0/5
 ```
 
@@ -37,13 +36,13 @@ Live acceptance     [-----]                      0/5
 |18|Cloud transactional two-account ledger/outbox|No|Not implemented|
 |19|Full cloud synthetic market-session end-to-end|No|Scheduler-only simulation exists|
 |20|Private mobile cloud dashboard and daily reporting|No|Not implemented|
-|21|Dependency remediation, reproducible lock/type baseline|No|A11/A17 open|
+|21|Dependency remediation, reproducible lock/type baseline|Yes|Linux Python3.12 hashed wheel lock previously verified; full mypy49 files pass with pinned stubs; WebSocket intentionally disabled|
 |22|Complete portfolio MTM, capital and health views|No|A14 open|
 |23|Cloud retention, export/restore and capacity measurements|No|A13/A18 open|
 |24|Telegram ambiguous delivery/retry_after/retention handling|No|A15 open|
 |25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
 
-Latest local evidence: **771 Python passed,1 skipped,1 third-party warning;63 Node passed;1 native local workerd test passed**. No static type-check clearance. Python dependency advisories remain open; npm audit reported0 known vulnerabilities after overrides. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
+Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;63 Node passed; full configured mypy49 files passed; pip check clean**. The **1 native local workerd test** and previous advisory scan are historical results, not rerun this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include history review, cloud service integration, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
 Five live gates are individually unverified: cloud Kite data, phone Telegram receipt, real session scheduling, dashboard/ledger recovery, laptop-off continuation. No broker orders, live credentials, phone messages, cloud resources or billing changes in this round.
 
