@@ -8,6 +8,17 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+from typing import TypedDict
+
+class DailyCoverage(TypedDict):
+    date: str
+    expected_boundaries: int
+    rest_valid: int
+    attempted_not_valid: int
+    not_observed: int
+    rest_coverage_pct: float
+    complete_rest_coverage: bool
+
 
 IST = ZoneInfo('Asia/Kolkata')
 from .trading_calendar import regular_session, session_status, CalendarUnavailable, CALENDAR_VERSION
@@ -78,7 +89,7 @@ def coverage_report(records: list[tuple[str, int, str]], session_dates: list[dat
             raise ValueError('duplicate REST boundary observation')
         seen[canonical] = (attempts, result)
 
-    daily=[]
+    daily: list[DailyCoverage] = []
     for day in sorted(session_dates):
         ids = [dt.isoformat() for dt in expected_boundaries(day)]
         valid = sum(seen.get(i, (0, ''))[1] == 'REST_VALID' for i in ids)
