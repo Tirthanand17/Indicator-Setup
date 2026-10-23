@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -136,5 +137,70 @@ test('native local workerd commits two-account paper debits/outbox atomically an
     assert.deepEqual(recovered,before);
     assert.equal(recovered.outbox.filter(e=>e.kind==='PAPER_EXIT').length,1);
     assert.equal(recovered.accounts.PAPER_100K.initialPaise,10000000);
+  } finally {await mf.dispose();}
+});
+
+test('native synthetic pipeline commits 5m/15m signal, two accounts, exits and journal across restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-session-native-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PAPER_LEDGER_ENABLED:'true',OFFLINE_SYNTHETIC_SESSION_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw new Error('External requests forbidden by local test');}};
+  const fixtures=JSON.parse(readFileSync(path.join(root,'decision-parity-fixtures.json'),'utf8'));
+  const fixture=fixtures.cases.find(c=>c.expected.status==='REVIEW_PE');
+  const origin=Date.parse('2026-10-23T09:15:00+05:30');
+  const stamp=slot=>origin+slot*20000;
+  const q=(slot,bid=100,ask=100.5)=>({contract:{symbol:'NIFTY26OCT23000PE',kind:'PE',
+    expiry:'2026-10-29',token:23456,lotSize:65},bid,ask,bidQuantity:650,
+    askQuantity:650,updatedAtMs:stamp(slot)-1000});
+  const turn=(slot,signal=false)=>({source:'OFFLINE_SYNTHETIC_TEST_ONLY',
+    tickId:`2026-10-23:${slot}`,observedAtMs:stamp(slot),
+    futures:{symbol:'NFO:NIFTY26OCTFUT',instrumentToken:777,
+      exchangeAtMs:stamp(slot)-1000,lastPrice:22000},
+    candles5:signal?fixture.candles:null,
+    candles15:signal?fixture.confirm15m:null,
+    ...(signal?{strategyConfig:{adxMin:fixture.adxMin,atrBuffer:fixture.atrBuffer}}:{}),
+    optionQuotes:{PE:q(slot)},
+  });
+  let mf=new Miniflare(options);
+  const getStub=async()=>{
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));
+  };
+  try {
+    const stub=await getStub();
+    const send=body=>stub.fetch('https://unit.invalid/test/pipeline/turn',{
+      method:'POST',body:JSON.stringify(body)});
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/synthetic-session')).status,404);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/synthetic-session',
+      {method:'POST',headers})).status,404);
+    const one=turn(271,true);
+    one.futures.lastPrice=fixture.candles.at(-1).close;
+    const [a,b]=await Promise.all([send(one),send(one)]);
+    const [x,y]=await Promise.all([a.json(),b.json()]);
+    assert.deepEqual([x.status,y.status].sort(),['DUPLICATE_TICK','SYNTHETIC_TICK_PROCESSED']);
+    assert.equal((x.entered??0)+(y.entered??0),2);
+    const rolled=await (await stub.fetch('https://unit.invalid/test/pipeline/rollback')).json();
+    assert.equal(rolled.unchanged,true);
+    const exit=await (await send({...turn(273),optionQuotes:{PE:q(273,141,141.5)}})).json();
+    assert.equal(exit.exited,2);
+    assert.equal(exit.pendingOutboxCount,4);
+    const before=await (await stub.fetch('https://unit.invalid/test/pipeline/state')).json();
+    assert.equal(before.session.totalTicks,2);
+    assert.equal(before.ledger.positions.filter(p=>p.status==='CLOSED').length,2);
+    const aggregate=await (await mf.dispatchFetch('https://unit.invalid/internal/synthetic-session',
+      {headers})).json();
+    assert.equal(aggregate.status,'READY');
+    assert.equal(aggregate.syntheticOnly,true);
+    assert.equal(aggregate.liveMarketConnected,false);
+    assert.equal(aggregate.ledger.pendingOutboxCount,4);
+    await mf.dispose();mf=new Miniflare(options);
+    const after=await (await (await getStub()).fetch('https://unit.invalid/test/pipeline/state')).json();
+    assert.deepEqual(after,before);
+    assert.equal(after.ledger.accounts.PAPER_50K.initialPaise,5000000);
+    assert.equal(after.ledger.accounts.PAPER_100K.initialPaise,10000000);
   } finally {await mf.dispose();}
 });
