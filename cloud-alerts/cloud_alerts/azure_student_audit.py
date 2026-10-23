@@ -94,7 +94,7 @@ def inspect_student_access(*, runner: Runner | None = None) -> dict[str, Any]:
         except (TypeError, ValueError, AttributeError):
             failures += 1
             continue
-        if quota_id in _STUDENT_QUOTA_IDS:
+        if isinstance(quota_id, str) and quota_id in _STUDENT_QUOTA_IDS:
             result["student_offer_confirmed_count"] += 1
     if failures:
         result["blockers"].append("SUBSCRIPTION_OFFER_CHECK_INCOMPLETE")
