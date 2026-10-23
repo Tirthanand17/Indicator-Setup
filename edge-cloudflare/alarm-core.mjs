@@ -19,6 +19,16 @@ const result = (status, nextAlarmAtMs = null, tickId = null, latenessMs = null) 
   });
 const validMillis = (v) => Number.isSafeInteger(v) && Number.isFinite(v);
 
+/** Shared pinned NSE F&O calendar for both the scheduler and strategy port. */
+export function sessionStatus(istDate) {
+  if (typeof istDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(istDate)) return null;
+  const date = new Date(`${istDate}T00:00:00Z`);
+  if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== istDate ||
+      date.getUTCFullYear() !== 2026) return null;
+  if ([0, 6].includes(date.getUTCDay())) return 'WEEKEND';
+  return CLOSED_2026.has(istDate) ? 'HOLIDAY' : 'REGULAR';
+}
+
 export function validClaimedTickId(value) {
   if (typeof value !== 'string' || !/^2026-\d{2}-\d{2}:(0|[1-9]\d{0,3})$/.test(value)) return false;
   const [date, slot] = value.split(':');

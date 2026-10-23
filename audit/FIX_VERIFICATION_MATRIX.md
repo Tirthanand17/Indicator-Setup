@@ -7,9 +7,10 @@ Baseline: `05df18881160b52ecbbd1c118d439b0f9db5ea2e`, merged PR11. Original audi
 | Baseline complete Linux Python suite | 744 passed, 1 skipped, 1 third-party warning; 57.61s | Independently reproduced historical count |
 | Earlier complete Linux Python suite | **771 passed, 1 skipped, 1 third-party warning; 57.83s** | Historical calendar/data/ledger/transport regression result |
 | Latest fresh Python3.12 virtualenv suite | **777 passed, 1 skipped, 1 third-party warning; 13.97s** | Two extra fail-closed regressions included; synthetic only |
-| Combined edge and legacy extension Node tests | **63 passed, 0 failed**; 0.60s latest | 24 edge + 39 extension; offline rerun |
+| Combined edge and legacy extension Node tests | **113 passed, 0 failed**; current Phase16 | 74 edge + 39 extension; offline synthetic rerun |
 | Native local workerd SQLite DO runtime test | **1 passed, 0 failed**; rerun in temporary checkout | Actual storage/alarm transaction rollback, duplicate callback, restart persistence; outbound service rejects all traffic |
-| JS numerical parity | 3 indicator fixtures at tolerance1e-8; 36 fee cases exact paise | Covered by five of the edge tests; not full strategy parity |
+| JS numerical parity | 3 indicator fixtures at tolerance1e-8; 36 fee cases exact paise | Covered by five of the edge tests |
+| JS Python strategy and exit-rule parity | 30 synthetic decision cases (including CE/PE); 5 premium ASK references, 3 premium BID and 8 paper exit cases; plus risk-first fail-closed regressions | Pure rule port only; not a Worker or full-session integration. [Phase16](PHASE16_DECISION_EXIT_PARITY.md) |
 | Python compileall / AST | Passed; baseline122 Python files parsed | Not static type checking |
 | Baseline local relative import graph | No cycles detected | Limited graph, not dynamic-import or unused-code proof |
 | Four tracked PowerShell parsers | Zero errors after fix | No Codespace or external resource created |
