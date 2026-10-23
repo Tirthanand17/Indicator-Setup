@@ -1,9 +1,22 @@
-# Type and dependency-lock verification
+# Type and dependency-lock verification — 23 October 2026
 
-Whole-application mypy baseline:56 errors before fixes,36 remain. Diagnostics are recorded in mypy-initial.txt and mypy-current.txt; errors are not suppressed. Eight core modules now pass: models, indicators, signals, kite_readonly, paper_book, paper_analytics, signal_audit, delivery_audit. Configuration: cloud-alerts/mypy.ini; check_untyped_defs enabled, third-party missing stubs ignored, imports followed silently. This is not strict typing or whole-application clearance.
+The active Python application now passes the complete configured mypy check: **zero errors across 49 source files**. The original baseline had 56 errors and the prior interim snapshot had 36. `audit/mypy-initial.txt` preserves the initial diagnostics; the former 36-error snapshot is available in the PR commit history. `audit/mypy-current.txt` records the new checked result. No type errors were hidden using new `Any`, `cast`, `# type: ignore`, or a weakened mypy configuration.
 
-Changes add explicit optional checks and container annotations, and separate a reused Candle/numeric variable in indicator computation. Affected-module behavioral regressions:51 passed. Core mypy check:Success,8 source files. Engine/streaming/server and supporting-module diagnostics remain open.
+Verified in a fresh, isolated Linux Python 3.12.14 environment with mypy 1.18.2, types-requests 2.33.0.20261006 and the pinned application/test dependencies. Exact QA tooling inputs are in `cloud-alerts/requirements-typecheck.txt`.
 
-Dependency reproducibility:29 exact Python3.12 Linux x86_64 wheel artifacts downloaded and hashed. Clean offline install with --no-index --find-links and --require-hashes succeeded; pip check found no broken requirements. requirements-linux-test.hashed.lock is platform-specific, not a Windows or universal lock. audit/build_wheel_lock.py reproduces it from the pinned wheel directory and rejects missing/duplicate/unexpected packages. No wheels committed.
+From repository root, in an isolated Linux Python 3.12 virtual environment:
 
-Checklist item21 remains OPEN pending remaining type errors. Engineering15/25 (60%); live0/5. No cloud creation, broker calls, credential transmission or Telegram delivery.
+```sh
+python -m pip install -r cloud-alerts/requirements-typecheck.txt
+python -m mypy --no-incremental --cache-dir=/dev/null --config-file cloud-alerts/mypy.ini cloud-alerts/cloud_alerts
+cd cloud-alerts
+python -m pytest -q
+```
+
+Results after the two new regression tests: **mypy passed 49 files; Python 777 passed, 1 skipped, 1 third-party Starlette deprecation warning; Node 63 passed; `pip check` clean**. The two added tests cover a REVIEW signal with no candle and corrupted shadow tick state; both fail closed. The prior native workerd SQLite Durable Object test (1 passed) was not rerun in this environment.
+
+Typing scope: `check_untyped_defs = True` but this is **not strict typing**; `ignore_missing_imports = True` and `follow_imports = silent` remain as before. The installed Requests stubs exposed an additional HTTPAdapter override signature defect, now corrected without weakening its GET-only market-data guard. Passing mypy does not prove runtime security, performance, profitability, or cloud operation.
+
+Dependency reproducibility: the prior offline exercise verified **29 exact Python 3.12 Linux x86_64 wheel artifact hashes**, a clean install using `--no-index --find-links --require-hashes`, and `pip check`. `cloud-alerts/requirements-linux-test.hashed.lock` is platform-specific, **not** a Windows/universal lock. `audit/build_wheel_lock.py` checks pinned wheel inventory. The QA type-check tooling file pins versions but does **not** itself provide artifact hashes; no wheels are committed. Default trading-capable Kite SDK dependency was removed; the unsupported live WebSocket shadow stays disabled pending separate review.
+
+Checklist item **21 complete for its Linux 3.12 offline lock/type baseline**, bringing engineering to **16/25 (64%)**; live acceptance is **0/5**. Broader Git-history secret inspection, strict typing, universal package locks, cloud runtime integration and live data/Telegram verification remain outside this completed narrow deliverable. No cloud resource, broker order, live credentials, or Telegram messages were used.
