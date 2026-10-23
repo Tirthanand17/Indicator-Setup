@@ -24,7 +24,7 @@ def test_cloud_init_is_nonsecret_and_does_not_activate_worker():
     for needle in forbidden:
         assert needle not in blob, needle
     assert 'package_upgrade: false' in blob
-    assert 'BROKER' not in blob.upper().split('packages:')[1].split('write_files:')[0]
+    assert 'BROKER' not in blob.split('packages:', 1)[1].split('write_files:', 1)[0].upper()
 
 
 def test_host_verification_never_calls_oci_or_reads_secrets():
