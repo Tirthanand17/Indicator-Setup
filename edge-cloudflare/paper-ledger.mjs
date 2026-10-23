@@ -40,7 +40,7 @@ function permitted(nowMs, entry) {
 }
 
 /** Round positive exact decimal rupees times rational multiplier to paise. */
-function moneyScaled(price, numerator = 1, denominator = 1) {
+export function moneyScaled(price, numerator = 1, denominator = 1) {
   if (!positive(numerator) || !positive(denominator)) fail('INVALID_MONEY_SCALE');
   const raw = String(price);
   if (!/^\d+(?:\.\d{1,8})?$/.test(raw) || !(Number(raw) > 0 && Number(raw) <= 10_000_000)) {
@@ -55,7 +55,7 @@ function moneyScaled(price, numerator = 1, denominator = 1) {
   return Number(cents);
 }
 
-function checkQuote(quote, nowMs) {
+export function checkQuote(quote, nowMs) {
   const c = quote?.contract;
   const current = ist(nowMs);
   if (!c || !['CE', 'PE'].includes(c.kind) ||

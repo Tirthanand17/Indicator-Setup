@@ -1,6 +1,6 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
-**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist21/25 (84%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
+**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist22/25 (88%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
 `worker.mjs` exports a Worker and `MarketSession` Durable Object. Authenticated POST `/internal/bootstrap` with empty body and GET `/internal/scheduler` use `SCHEDULER_ADMIN_KEY` (32–256 chars, at least8 distinct), with authentication at both Worker and object. `OFFLINE_SCHEDULER_ENABLED` must explicitly be `true`. The example disables scheduling, market access, workers.dev and preview URLs.
 
@@ -38,6 +38,14 @@ No production HTTP POST route feeds this coordinator. The read-only live sampler
 
 Cookie-authenticated same-origin GET `/paper/api/summary`, `/paper/api/trades` (maximum 50 latest positions) and `/paper/api/daily?date=2026-10-23` report independently audited ₹50k/₹100k paper cash, realized net P&L, unresolved/open trades, IST-day closes and synthetic-worker health. An unpriced open position is **not** counted as account equity or profit. No Telegram deliveries or real Kite data are claimed. Reports fail closed for broken ledger integrity or unsupported dates. CSP and no-store headers protect page/APIs; the browser renders dynamic text safely. Backend tests include native SQLite restart with authenticated session. Future production steps require approved cloud resources, domain/TLS, secret bindings and user sign-off. [Phase20 audit](../audit/PHASE20_PRIVATE_CLOUD_DASHBOARD.md).
 
+## Phase22: indicative synthetic portfolio MTM, capital and health (NOT activated)
+
+`portfolio-valuation.mjs` snapshots **at most two validated synthetic option BID/ASK marks** with each new accepted test-only market tick. The marks, account ledger, strategy session and pending-only outbox are persisted in the **same Durable Object SQLite transaction**; a duplicate tick cannot change marks, and a missing/invalid quote in a newer tick clears an earlier mark. The code validates contract identity, exchange timestamp, bid depth, 2% spread limit, and the open position's size and quote causality. Stored marks are audited against the synthetic tick before display.
+
+Cookie-authenticated, read-only GET `/paper/api/portfolio` and an extra responsive dashboard section show available cash, capital committed to paper entries, remaining loss/trade budget, hypothetical open-position exit credit at **observed synthetic BID minus adverse slippage and modeled SELL fees**, and indicative equity. Fresh synthetic marks remain valid **at most15 seconds**: stale, missing or contract-mismatched quotes yield **null, not zero**, for open equity and unrealized P&L. Unverifiable exit positions remain blocked. Flat accounts show audited cash as known cash equity; they do not claim a market quote. `healthStatus` distinguishes flat, fresh synthetic, missing/stale, and unresolved states. ₹50k and ₹100k accounts are independent.
+
+These marks are **never live NSE prices, guaranteed executable depth, actual fills, real account equity or investment returns**. The old cash-only `/paper/api/summary` intentionally remains cash-only. The Worker still exposes no production trade-writing or synthetic-feed endpoint; all required feature flags are disabled by default. Native restart/fresh/stale/rollback and pure accounting regressions pass. [Phase22 audit](../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md).
+
 ## Offline verification
 
 ```sh
@@ -47,10 +55,10 @@ npm ci --ignore-scripts
 npm run test:runtime
 ```
 
-128 edge tests pass (including 13 private dashboard tests), plus 39 extension tests and 5 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling or real Kite reachability. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
+137 edge tests pass (including 14 private dashboard and 8 portfolio tests), plus 39 extension tests and 6 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, synthetic indicative MTM freshness/expiry, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling or real Kite reachability. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
 
 ## Remaining migration
 
-Worker status reports `marketRuntimeImplemented:true`, `marketRuntimeEnabled:false` by default. It **does not** run live Kite tests, auto-choose option contracts, deliver real market data into decision/exit/ledger rules, send Telegram, activate a live mobile dashboard, compute portfolio MTM or export paper history. The Python monolith is not a drop-in Worker deployment.
+Worker status reports `marketRuntimeImplemented:true`, `marketRuntimeEnabled:false` by default. It **does not** run live Kite tests, auto-choose option contracts, deliver real market data into decision/exit/ledger rules, send Telegram, activate a live mobile dashboard, compute **live** portfolio MTM or export complete paper history. Only explicitly labeled offline synthetic indicative MTM exists. The Python monolith is not a drop-in Worker deployment.
 
 `wrangler.example.jsonc` is an undeployed template. No deploy/migration command was run. See [audit](../audit/FULL_PROJECT_AUDIT_2026-10-23.md) for capacity forecast and dependency blockers. The [deployment gate](../cloud-alerts/docs/DEPLOYMENT_APPROVAL_REQUEST.md) is a draft awaiting prerequisites, not permission to create resources.

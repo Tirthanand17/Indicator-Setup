@@ -151,7 +151,8 @@ test('login key only goes in a bounded form body and is never echoed or stored',
 
 test('private GET APIs require cookie, validate queries, and never expose outbox messages',async()=>{
   const s=storage();const e=env();
-  for (const path of ['/paper/api/summary','/paper/api/trades','/paper/api/daily'])
+  for (const path of ['/paper/api/summary','/paper/api/trades','/paper/api/daily',
+    '/paper/api/portfolio'])
     assert.equal((await handlePrivateDashboard(req(path),e,s)).status,404);
   const headers={cookie:await cookie()};
   const summary=await handlePrivateDashboard(req('/paper/api/summary',{headers}),e,s);
@@ -159,6 +160,15 @@ test('private GET APIs require cookie, validate queries, and never expose outbox
   const data=await summary.json();
   assert.equal(data.status,'READY');
   assert.equal(JSON.stringify(data).includes('message'),false);
+  const portfolio=await handlePrivateDashboard(req('/paper/api/portfolio',{headers}),e,s);
+  assert.equal(portfolio.status,200);
+  const capital=await portfolio.json();
+  assert.equal(capital.source,'OFFLINE_SYNTHETIC_TEST_ONLY');
+  assert.equal(capital.accounts[0].valuationStatus,'FLAT_CASH');
+  assert.equal(capital.accounts[1].valuationStatus,'MISSING_SYNTHETIC_MARK');
+  assert.equal(capital.accounts[1].indicativeEquityRupees,null);
+  assert.equal(capital.accounts[1].availableCashPaise,safeCash());
+  assert.equal(JSON.stringify(capital).includes('message'),false);
   const history=await handlePrivateDashboard(req('/paper/api/trades?account=PAPER_100K&limit=1',{headers}),e,s);
   assert.equal((await history.json()).trades.length,1);
   const daily=await handlePrivateDashboard(req('/paper/api/daily?date=2026-10-23',{headers}),e,s);
@@ -168,7 +178,21 @@ test('private GET APIs require cookie, validate queries, and never expose outbox
   assert.equal((await handlePrivateDashboard(req('/paper/api/trades?hack=true',{headers}),e,s)).status,404);
   assert.equal((await handlePrivateDashboard(req('/paper/api/trades?limit=2&limit=3',{headers}),e,s)).status,404);
   assert.equal((await handlePrivateDashboard(req('/paper/api/summary?unused=true',{headers}),e,s)).status,404);
+  assert.equal((await handlePrivateDashboard(req('/paper/api/portfolio?unused=true',{headers}),e,s)).status,404);
+  assert.equal((await handlePrivateDashboard(req('/paper/api/portfolio',{method:'POST',headers,body:'x'}),e,s)).status,404);
   assert.equal((await handlePrivateDashboard(req('/paper/api/summary',{method:'POST',headers,body:'x'}),e,s)).status,404);
+});
+
+function safeCash() { return populatedLedger().accounts.PAPER_100K.cashPaise; }
+
+test('invalid synthetic marks fail closed on valuation but do not leak partial holdings',async()=>{
+  const headers={cookie:await cookie()};
+  const s=storage();
+  const original=s.get;
+  s.get=async key=>key==='synthetic-portfolio-marks-v1'?{schema:999}:original(key);
+  const result=await handlePrivateDashboard(req('/paper/api/portfolio',{headers}),env(),s);
+  assert.equal(result.status,503);
+  assert.deepEqual(await result.json(),{status:'BLOCKED_INVALID_REPORT_STATE_OR_QUERY',paperOnly:true});
 });
 
 test('corrupt stored paper ledger fails closed on authenticated GET',async()=>{
@@ -189,6 +213,7 @@ test('logout clears cookie; assets are inert and secure; methods restricted',asy
   const js=await script.text();
   assert.doesNotThrow(()=>new Script(js));
   assert.equal(js.includes(KEY),false);
+  assert.match(js,/\/paper\/api\/portfolio/);
   assert.equal((await handlePrivateDashboard(req('/paper/assets/dashboard.css'),env(),storage())).headers.get('Content-Type'),'text/css; charset=utf-8');
   assert.equal((await handlePrivateDashboard(req('/paper/assets/dashboard.js',{method:'POST',body:'x'}),env(),storage())).status,404);
   assert.equal((await handlePrivateDashboard(req('/paper/unknown'),env(),storage())).status,404);
