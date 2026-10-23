@@ -62,7 +62,7 @@ def review_host(plan: object, *, now: datetime | None = None) -> dict:
         blockers.append('PROVIDER_NOT_DECLARED')
     if not isinstance(tier, str) or not tier.strip() or len(tier) > 80:
         blockers.append('PLAN_TIER_NOT_DECLARED')
-    if service_class not in CLASSES:
+    if not isinstance(service_class, str) or service_class not in CLASSES:
         blockers.append('SERVICE_CANNOT_RUN_PERSISTENT_WORKER')
     if (isinstance(provider, str) and provider.lower() == 'render'
             and isinstance(tier, str) and tier.lower() == 'free'):
