@@ -1,0 +1,23 @@
+name = "indicator-paper-edge-inert"
+main = "src/index.mjs"
+compatibility_date = "2026-10-23"
+workers_dev = true
+
+# Free account: each invocation gets only 10 ms of CPU. Scheduled handler
+# persists an inert heartbeat; NO real Kite/Telegram requests or paper fills.
+[triggers]
+crons = ["*/5 3-10 * * 1-5"]
+
+[vars]
+TOKEN_RELAY_ENABLED = "false"
+
+# Populate DB binding manually after confirming Workers Free and D1 Free
+# on the user's OWN Cloudflare account; never reuse FlowMinute databases.
+[[d1_databases]]
+binding = "DB"
+database_name = "indicator-paper-edge-inert"
+database_id = "bda7e02e-ffb9-4bec-9126-b9985642dc53"
+
+# Must set these as Wrangler SECRETS only when the cloud security gate is
+# approved; do not put actual values into wrangler.toml or GitHub:
+# RELAY_HMAC_KEY, EDGE_AES_KEY, KITE_API_KEY.
