@@ -2,6 +2,10 @@
 
 **Date:** 2026-10-23. **Status:** local implementation and synthetic end-to-end rehearsals only. No cloud host activated, no live credentials used, no real orders, no spending limits altered.
 
+## Merge status
+
+GitHub **PR #2 merged into main** on 2026-10-23 with merge commit `118a5b5c37018a50a6da1c86e1838c308292c436`, after the full offline Linux Python 3.12 suite passed **608 tests, 0 failed, 1 skipped**. The code changes were isolated to host qualification; no production resource was started or activated. The live-host, secure-credential, Telegram-phone and five-market-session gates remain unverified.
+
 ## What was verified without creating a cloud resource
 
 1. Inspected the connected Render workspace read-only. Its existing Free web services are associated with **other repositories**, while the existing Free PostgreSQL instance is suspended. None is an approved persistent always-on host for this NIFTY project. No service or database was modified or repurposed.
