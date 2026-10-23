@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { MarketSession } from './worker.mjs';
 import { assessAlarm, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
+import { createHmac, randomBytes } from 'node:crypto';
 
 const KEY = 'SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const ist = (day, time) => Date.parse(`${day}T${time}+05:30`);
@@ -14,6 +15,7 @@ const request = (path = '/internal/bootstrap', key = KEY, method = 'POST') =>
 class Storage {
   data = new Map(); alarmAt = null; fail = false; queue = Promise.resolve();
   async get(key) { return structuredClone(this.data.get(key)); }
+  async put(key, value) { this.data.set(key,structuredClone(value)); }
   transaction(fn) {
     const run = this.queue.then(async () => {
       const data = structuredClone(this.data);
@@ -34,16 +36,36 @@ class Storage {
   }
 }
 
-function setup(t, now = OPEN - 60_000) {
+function setup(t, now = OPEN - 60_000, outbound = () => assert.fail('external I/O forbidden')) {
   let clock = now;
   t.mock.method(Date, 'now', () => clock);
-  t.mock.method(globalThis, 'fetch', () => assert.fail('external I/O forbidden'));
+  t.mock.method(globalThis, 'fetch', outbound);
   const storage = new Storage();
   const env = { SCHEDULER_ADMIN_KEY: KEY, OFFLINE_SCHEDULER_ENABLED: 'true' };
   const session = new MarketSession({ storage }, env);
   env.MARKET_SESSION = { idFromName: name => name, get: () => session };
   return { storage, env, session, set: value => { clock = value; },
     state: () => storage.get('scheduler-v1') };
+}
+
+const fakeToken = 'SYNTHETIC-ACCESS-TOKEN-FOR-TEST-0123456789';
+function tokenRequest(env,{now=Date.now(),value=fakeToken,nonce=randomBytes(20).toString('hex'),
+  apiKey=env.KITE_API_KEY,signature}={}) {
+  const timestamp = String(Math.floor(now/1000));
+  const body = JSON.stringify({api_key:apiKey,access_token:value});
+  const digest = signature ?? createHmac('sha256',env.TOKEN_RELAY_HMAC_KEY)
+    .update(timestamp+'\n'+nonce+'\n'+body).digest('hex');
+  return new Request('https://unit.invalid/internal/token', {method:'POST',
+    headers:{'content-type':'application/json','x-relay-timestamp':timestamp,
+      'x-relay-nonce':nonce,'x-relay-signature':digest},body});
+}
+function configureMarket(s) {
+  s.env.READONLY_MARKET_RUNTIME_ENABLED='true';
+  s.env.KITE_API_KEY='synthetic-key';
+  s.env.TOKEN_RELAY_HMAC_KEY='long-synthetic-relay-signature-secret-0123456789';
+  s.env.TOKEN_VAULT_AES_KEY=randomBytes(32).toString('base64');
+  s.env.KITE_FUTURE_SYMBOL='NIFTY26OCTFUT';
+  s.env.KITE_FUTURE_INSTRUMENT_TOKEN='12345';
 }
 
 test('unauthenticated, wrong methods and disabled requests never touch a DO', async t => {
@@ -150,4 +172,92 @@ test('corrupt dedupe and reverse tick history fail closed', () => {
   }
   assert.equal(assessAlarm({observedAtMs:OPEN,scheduledAtMs:OPEN,
     lastClaimedTickId:'2026-10-23:1',calendarVersion:NSE_FO_CALENDAR_VERSION}).status,'BLOCKED_CLOCK_ROLLBACK');
+});
+
+test('token route is hard-disabled by default; no signed body accepted or forwarded',async t=>{
+  const s=setup(t);configureMarket(s);s.env.READONLY_MARKET_RUNTIME_ENABLED='false';
+  assert.equal((await worker.fetch(tokenRequest(s.env),s.env)).status,404);
+  assert.equal(await s.storage.get('daily-token-v1'),undefined);
+});
+
+test('authenticated daily handoff seals token; replay, rollback, equal-time conflict are rejected',async t=>{
+  const s=setup(t); configureMarket(s);
+  const nonce='unique-and-very-long-01234567890';
+  const req=()=>tokenRequest(s.env,{nonce});
+  assert.equal((await worker.fetch(req(),s.env)).status,200);
+  const stored=await s.storage.get('daily-token-v1');
+  assert.ok(!JSON.stringify(stored).includes(fakeToken));
+  assert.equal(stored.schema,1);
+  assert.equal((await worker.fetch(req(),s.env)).status,409);
+  assert.equal((await worker.fetch(tokenRequest(s.env,{value:fakeToken+'x'}),s.env)).status,409);
+  assert.equal((await worker.fetch(tokenRequest(s.env,{now:Date.now()-1000}),s.env)).status,409);
+  assert.equal((await worker.fetch(tokenRequest(s.env,{signature:'0'.repeat(64)}),s.env)).status,401);
+  assert.equal((await worker.fetch(tokenRequest(s.env,{apiKey:'wrong-key'}),s.env)).status,401);
+  assert.equal((await worker.fetch(tokenRequest(s.env,{now:Date.now()-91_000}),s.env)).status,401);
+  assert.deepEqual(await s.storage.get('daily-token-v1'),stored);
+});
+
+test('synthetic market alarm samples exact allowlisted GET paths; no orders and no secret in status',async t=>{
+  const calls=[];
+  const mockFetch=async(url,init)=>{
+    calls.push({url,init});
+    assert.equal(init.method,'GET');
+    assert.equal(new URL(url).origin,'https://api.kite.trade');
+    assert.equal(init.redirect,'error');
+    if(url.includes('/quote'))return Response.json({status:'success',data:{
+      'NFO:NIFTY26OCTFUT':{last_price:123.4,timestamp:'2026-10-23 09:15:00'}}});
+    return Response.json({status:'success',data:{candles:[
+      ['2026-10-23T09:15:00+05:30',100,105,97,103,900]]}});
+  };
+  const s=setup(t, OPEN-60_000,mockFetch);configureMarket(s);
+  assert.equal((await worker.fetch(tokenRequest(s.env),s.env)).status,200);
+  assert.equal((await s.session.fetch(request())).status,200);
+  s.set(OPEN);
+  const first=await s.session.alarm();
+  assert.equal(first.marketStatus,'HISTORY_OBSERVED');
+  assert.equal(calls.length,3);
+  assert.ok(calls.every(c=>!c.url.includes('/orders') && c.init.headers.Authorization.includes(fakeToken)));
+  const status=await (await s.session.fetch(request('/internal/scheduler',KEY,'GET'))).json();
+  assert.equal(status.marketRuntimeEnabled,true);
+  assert.equal(status.market.status,'HISTORY_OBSERVED');
+  assert.equal(status.market.fiveMinuteCount,1);
+  assert.ok(!JSON.stringify(status).includes(fakeToken));
+  assert.equal(status.realOrdersEnabled,false);
+  assert.equal((await s.session.alarm()).shouldPoll,false);
+  assert.equal(calls.length,3);
+  s.set(OPEN+20_000);
+  assert.equal((await s.session.alarm()).marketStatus,'QUOTE_OBSERVED');
+  assert.equal(calls.length,4); // No repeated history within the same 5-minute window.
+});
+
+test('market sampler fails closed for missing/invalid token and HTTP faults without leaking secrets',async t=>{
+  const s=setup(t, OPEN-60_000,async()=>{throw new Error('leaked '+fakeToken);});
+  configureMarket(s);
+  await s.session.fetch(request());s.set(OPEN);
+  const missing=await s.session.alarm();
+  assert.equal(missing.marketStatus,'BLOCKED_MARKET_DATA');
+  assert.equal((await worker.fetch(tokenRequest(s.env),s.env)).status,200);
+  s.set(OPEN+20_000);
+  const failed=await s.session.alarm();
+  assert.equal(failed.marketStatus,'BLOCKED_MARKET_DATA');
+  const status=await (await worker.fetch(request('/internal/scheduler',KEY,'GET'),s.env)).text();
+  assert.ok(!status.includes(fakeToken));
+  assert.ok(!status.includes('leaked'));
+  assert.equal((await s.storage.get('scheduler-v1')).totalClaims,2);
+});
+
+test('corrupt vault never overwritten and stale exchange quote never becomes observed',async t=>{
+  const s=setup(t, OPEN-60_000,async()=>Response.json({status:'success',data:{
+    'NFO:NIFTY26OCTFUT':{last_price:123,timestamp:'2026-10-23 09:12:00'}}}));
+  configureMarket(s);
+  s.storage.data.set('daily-token-v1',{bad:'corrupt'});
+  assert.equal((await worker.fetch(tokenRequest(s.env),s.env)).status,409);
+  assert.deepEqual(await s.storage.get('daily-token-v1'),{bad:'corrupt'});
+  s.storage.data.delete('daily-token-v1');
+  assert.equal((await worker.fetch(tokenRequest(s.env),s.env)).status,200);
+  await s.session.fetch(request());s.set(OPEN);
+  assert.equal((await s.session.alarm()).marketStatus,'BLOCKED_MARKET_DATA');
+  const status=await (await s.session.fetch(request('/internal/scheduler',KEY,'GET'))).json();
+  assert.equal(status.market.status,'BLOCKED_MARKET_DATA');
+  assert.equal(status.market.lastPrice,undefined);
 });
