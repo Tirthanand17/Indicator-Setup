@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-21 (Phase 44 — draft, unmerged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 45 — Linux Python 3.12 full suite GREEN; merge review). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,15 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 45 — verified Ubuntu WSL 2 and full Linux Python 3.12 regression GREEN (October 23, 2026)
+
+1. Installed **Microsoft WSL 3.0.3.0 + Ubuntu 24.04.5 LTS on WSL 2** on the existing Nirala Windows 11 laptop using normal UAC elevation; installer exit **0**, with no forced Windows restart, no change to the protected Desktop trading folder, and no cloud/CI usage. Ubuntu default user is dedicated non-root `indicatorqa`, and existing `[boot] systemd=true` configuration is preserved. `python3 --version` is **3.12.3**, with Ubuntu `python3.12-venv` installed.
+2. Copied the exact GitHub source into Ubuntu native ext4, not NTFS, at `/home/indicatorqa/work/indicator-setup`; virtualenv `/home/indicatorqa/work/.venv` includes repository and pytest dependencies. Ran the **entire** `cloud-alerts` suite with `env -i` and all broker alert/paper activation flags false.
+3. First actual Linux run: **584 passed, 1 failed, 1 skipped**. Root cause: a synthetic concurrent Kite SDK lifecycle test improperly expected only two historical connections to be closed, while the engine correctly closed **three clients** (the metadata/quote client plus each history thread). Corrected the test to assert that ALL created SDK sessions are closed, and maintained separate 5m and 15m identities. Fix commit `a449165`.
+4. Second complete Linux Python 3.12 run on corrected source `a449165`: **585 passed, 0 failed, 1 skipped, 1 deprecation warning**, exit **0**. Added [reusable safe test script](../scripts/Run-Local-WSL-Py312-Regression.sh) to the feature branch. After syncing script commit `c96703f` into WSL and normalizing Windows Git CRLF to LF, **reran the CHECKED-IN runner**: again **585 passed, 0 failed, 1 skipped, exit 0**. JUnit XML and output logs stay in `/home/indicatorqa/work/reports/`.
+5. **The prior "full Linux test blocker" is now resolved through actual execution evidence**, not CircleCI, Codespaces or GitHub Actions. Codespaces remained blocked under the user's $0 budget; no new external resources were created. The GitHub PR is mergeable by GitHub CLI, but no CI status is attached. Full test success does NOT imply real Kite data, Telegram handset receipt, durable cloud hosting or five live market sessions: **0/5 actual acceptance gates** verified.
+6. **Overall expanded-goal estimate remains 53%** pending real deployment/evidence milestones; the major Linux regression gate is complete. Detailed installation, run commands and logs: [Phase 45 WSL evidence](PHASE45_WSL_LINUX_REGRESSION.md). No real broker orders or production flags were enabled.
 
 ## Linux Python 3.12 CircleCI regression path
 
