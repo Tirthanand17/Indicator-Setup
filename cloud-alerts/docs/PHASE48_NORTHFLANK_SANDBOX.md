@@ -1,5 +1,8 @@
 # Phase 48 — Northflank Sandbox card-free host preparation (NOT DEPLOYED)
 
+> **SUPERSEDED 2026-10-23 by [Phase 50](PHASE50_CARD_FREE_HOST_REASSESSMENT.md): DO NOT DEPLOY NORTHFLANK SANDBOX FOR THIS USER.** Actual signup screenshots show that the first build/deployment starts a **60-minute no-card window**; continuing afterward requires a payment card, which this user does not have. This is a mandatory stop, not merely an unverified billing risk. The configuration below is an archived candidate, not an actionable deployment instruction.
+
+
 **Date:** 2026-10-23. **Status:** prospective route only. No Northflank account, resource, charge, secrets, DNS change or broker/Telegram interaction is verified by this document. Both cloud alerting and autonomous paper-trade flags remain OFF.
 
 ## Why this option is now first to try

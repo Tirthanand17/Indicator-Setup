@@ -67,6 +67,14 @@ def review_host(plan: object, *, now: datetime | None = None) -> dict:
     if (isinstance(provider, str) and provider.lower() == 'render'
             and isinstance(tier, str) and tier.lower() == 'free'):
         blockers.append('RENDER_FREE_SLEEP_AND_EPHEMERAL_STATE')
+    if (isinstance(provider, str) and provider.strip().lower() == 'northflank'
+            and isinstance(tier, str) and tier.strip().lower() in
+            {'sandbox_free', 'developer_sandbox', 'sandbox'}):
+        # On the user's actual Oct 2026 no-card signup, the first build or
+        # deployment starts a 60-minute account verification window.
+        # A payment card is required to keep workloads running afterward.
+        # Marketing 'always-on' does not override this account restriction.
+        blockers.append('NORTHFLANK_SANDBOX_NO_CARD_60_MINUTE_WINDOW')
     for key in REQUIRED_TRUE:
         if plan.get(key) is not True:
             blockers.append('NOT_CONFIRMED_' + key.upper())
