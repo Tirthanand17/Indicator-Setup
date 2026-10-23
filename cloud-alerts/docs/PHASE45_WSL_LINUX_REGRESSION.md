@@ -26,6 +26,13 @@
   wsl -d Ubuntu-24.04 -- bash /home/indicatorqa/work/indicator-setup/cloud-alerts/scripts/Run-Local-WSL-Py312-Regression.sh
   ```
 
+## Final post-merge main verification
+
+- Synced current GitHub `main` into the disposable Windows TEMP checkout and then into Ubuntu's native ext4 filesystem. Linux Git HEAD was **`86c208a12f2efa508352a27382211ad82530264a`** (the post-merge main with updated progress documents).
+- Ran the repository's own `cloud-alerts/scripts/Run-Local-WSL-Py312-Regression.sh` from default non-root `indicatorqa` account, Python 3.12.3, with empty inherited credential environment and live/paper activation OFF.
+- **FULL MERGED-MAIN RESULT: 585 PASSED, 0 FAILED, 1 SKIPPED, 1 non-fatal Starlette/httpx deprecation warning, exit 0, 26.82 seconds.** JUnit, log and exit-status file are kept under `/home/indicatorqa/work/reports/`.
+- No cloud account, CircleCI, Codespaces, GitHub Actions or Docker required for this run. Cloud acceptance remains 0/5.
+
 ## What this does and DOES NOT prove
 
 - **Now verified:** WSL 2 installation, Ubuntu 24.04, non-root environment, Python 3.12, all cloud-alerts unit/integration tests under Linux and repeatable offline full suite. This clears the earlier Linux regression blocker, without CircleCI, Codespaces, GitHub Actions, paid infrastructure or a Windows reboot.
