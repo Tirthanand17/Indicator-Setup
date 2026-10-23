@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 46 — cloud host qualification gate; local-only). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 46 — host qualification merged; cloud remains OFF). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,11 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 46 merge checkpoint — verified local gate, NOT live activation
+
+- [PR #2](https://github.com/Tirthanand17/Indicator-Setup/pull/2) **merged into main** at `118a5b5c37018a50a6da1c86e1838c308292c436`. The diff is limited to the host qualification CLI, blocked host example, strict regression tests, and documentation. The Ubuntu Linux Python 3.12 full suite passed **608/608 runnable tests (plus 1 skipped)**, exit 0, before merge.
+- Render workspace reviewed read-only; there is NO eligible always-on durable ₹0 service for the worker among the existing unrelated Free web services. No service created, no secrets read, no budget/plan changes, no real orders. **Actual cloud acceptance remains 0/5; expanded engineering estimate remains 53%.**
 
 ## Phase 46 — no-cost cloud host safety and local rehearsal (NOT DEPLOYED)
 
