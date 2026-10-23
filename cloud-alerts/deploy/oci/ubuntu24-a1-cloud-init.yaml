@@ -1,0 +1,25 @@
+#cloud-config
+# PHASE 48: user-provisioned OCI Ubuntu 24.04 Always Free A1 VM ONLY.
+# Software setup, NOT a cloud-resource creation request. Zero broker secrets.
+# Do not paste this into a paid VM or any unreviewed plan.
+package_update: true
+package_upgrade: false
+packages:
+  - ca-certificates
+  - git
+  - docker.io
+  - docker-compose-v2
+write_files:
+  - path: /etc/indicator-deployment-disabled
+    owner: root:root
+    permissions: '0644'
+    content: |
+      Indicator OCI worker is NOT deployed or activated.
+      No Kite or Telegram credentials may appear in cloud-init.
+      Review free capacity, persistence, private HTTPS ingress and
+      paid-resource restrictions before any operator-controlled setup.
+runcmd:
+  - [install, -d, -o, root, -g, root, -m, '0700', /private/nifty-alerts]
+  - [install, -d, -o, root, -g, root, -m, '0750', /srv/nifty-alerts]
+  - [systemctl, enable, --now, docker]
+final_message: "Indicator prerequisites installed only; trading/paper alerts NOT deployed or enabled."
