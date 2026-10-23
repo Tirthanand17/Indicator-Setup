@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 46 — host qualification merged; cloud remains OFF). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 47 — Azure Student connection prepared; account verification pending). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 47 — Azure Student subscription discovery (connection awaits user academic verification)
+
+1. Nirala Ubuntu 24.04 WSL2 now has official **Azure CLI 2.91.0** installed successfully; the [Azure for Students](https://azure.microsoft.com/en-in/free/students/) academic activation page and official device-login page were opened in the browser. No payment card, public cloud instance, credentials in repo, billable plan, or Azure role was created/modified.
+2. Azure CLI sign-in was initiated, but `az account list` showed **no accessible subscription**, and a tenant query requested authentication. **Azure for Students active subscription not yet verified**; the user's eligible academic verification and Microsoft authorization are the actual human-only blockers.
+3. Added `cloud_alerts.azure_student_audit`, which supports read-only Azure subscription offer inspection with sanitized output, safe malformed-account handling and a strict no-deploy result. **8/8 synthetic tests passed**; the **whole Linux Python 3.12 suite: 616 passed, 0 failed, 1 skipped**, exit 0.
+4. See [Phase 47 exact account verification and cost-safety runbook](PHASE47_AZURE_STUDENT_CONNECTION.md). After human activation and authenticated CLI sign-in, verify student quota ID, sponsorship balance, expiration, covered persistent disk/IP/network and VM availability before asking for a particular host approval.
+5. Overall expanded engineering estimate **53% unchanged**, actual live cloud acceptance **0/5**. No real orders and no production paper alerts have been enabled.
 
 ## Phase 46 final — post-merge Python 3.12 verification
 
