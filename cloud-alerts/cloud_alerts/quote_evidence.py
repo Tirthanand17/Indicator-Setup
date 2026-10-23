@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from .evaluation import Costs, EvidenceError, PaperQuotePair, score_pair, summarize
 from .models import OptionQuote
+from .trading_calendar import regular_session, CalendarUnavailable
 
 IST = ZoneInfo('Asia/Kolkata')
 SCHEMA = 'nifty-paper-quote-observation-v1'
@@ -77,6 +78,11 @@ def validate_snapshot(row: dict) -> dict:
         if dt.tzinfo is None or dt.utcoffset() is None:
             raise EvidenceError('observation timestamps must include timezone')
     signal_ist, observed_ist = signal.astimezone(IST), observed.astimezone(IST)
+    try:
+        if not regular_session(observed_ist.date()):
+            raise EvidenceError('observation outside regular NSE session')
+    except CalendarUnavailable:
+        raise EvidenceError('NSE calendar unavailable for observation') from None
     if (signal_ist.date()!=observed_ist.date() or observed_ist.date()>expiry
             or observed_ist.weekday()>=5 or signal_ist.time()<time(9,15)
             or observed_ist.time()>time(15,30) or signal>observed

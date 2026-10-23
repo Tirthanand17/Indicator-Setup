@@ -19,6 +19,14 @@ const result = (status, nextAlarmAtMs = null, tickId = null, latenessMs = null) 
   });
 const validMillis = (v) => Number.isSafeInteger(v) && Number.isFinite(v);
 
+export function validClaimedTickId(value) {
+  if (typeof value !== 'string' || !/^2026-\d{2}-\d{2}:(0|[1-9]\d{0,3})$/.test(value)) return false;
+  const [date, slot] = value.split(':');
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === date &&
+    Number(slot) < 1125 && !CLOSED_2026.has(date) && ![0, 6].includes(parsed.getUTCDay());
+}
+
 // Re-arm across nights, weekends and known 2026 F&O holidays.
 // Return null when the pinned calendar ends rather than assuming a 2027 session.
 function nextMarketOpenAfter(observedAtMs) {
@@ -52,7 +60,7 @@ export function assessAlarm({
   if (calendarVersion !== NSE_FO_CALENDAR_VERSION) {
     return result('BLOCKED_CALENDAR_VERSION');
   }
-  if (lastClaimedTickId !== null && typeof lastClaimedTickId !== 'string') {
+  if (lastClaimedTickId !== null && !validClaimedTickId(lastClaimedTickId)) {
     return result('BLOCKED_INVALID_DEDUPE_STATE');
   }
 
@@ -85,6 +93,12 @@ export function assessAlarm({
   }
   const tickId = `${date}:${dueSlot}`;
   const lateness = observedAtMs - scheduledAtMs;
+  if (lastClaimedTickId !== null) {
+    const [claimedDate, claimedSlot] = lastClaimedTickId.split(':');
+    if (claimedDate > date || (claimedDate === date && Number(claimedSlot) > dueSlot)) {
+      return result('BLOCKED_CLOCK_ROLLBACK');
+    }
+  }
   if (lastClaimedTickId === tickId) {
     return result('SKIP_DUPLICATE_ALARM', next, tickId, lateness);
   }

@@ -186,6 +186,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/summary')
     async def paper_summary(request:Request):
         _authorize_paper(request)
+        if paper_book is None:
+            raise HTTPException(404,'Not found')
         response=paper_book.dashboard()
         try:
             integrity=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
@@ -221,6 +223,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/opportunities')
     async def paper_opportunities(request:Request):
         _authorize_paper(request)
+        if paper_audit is None:
+            raise HTTPException(404,'Not found')
         query_day=request.query_params.get('date')
         try:
             selected=date.fromisoformat(query_day) if query_day else None
@@ -234,6 +238,8 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/trades')
     async def paper_trades(request:Request):
         _authorize_paper(request)
+        if paper_book is None:
+            raise HTTPException(404,'Not found')
         _require_balanced_paper_accounts()
         return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
                              'trades':paper_book.trade_history(limit=100)},

@@ -1,43 +1,54 @@
-# Overall progress board — NIFTY API alerts + autonomous paper accounts
+# Canonical engineering progress — 23 October 2026
 
-**As of:** 2026-10-23 (Phase 54 — Offline-only Cloudflare alarm eligibility prototype, 9 synthetic Node tests passed; no account or cloud resource created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**Latest type/dependency verification:** Complete configured mypy check: zero issues across49 application files; full offline Python suite777 passed/1 skipped (one third-party warning); Node63 passed; Linux pip check clean. Earlier Linux3.12 hashed wheel verification covered29 artifacts. [Evidence](../../audit/TYPE_AND_LOCK_PROGRESS.md). Item21 is now complete **for the Linux offline baseline**, not a live deployment approval.
 
-```text
-Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
-Legacy alert-bot engineering   [████████████████████░░░░] 80%
-NEW paper-trade functionality  [███████████░░░░░░░░░░░░░] 43%
-Live verification              [░░░░░░░░░░░░░░░░░░░░░░░░] 0/5
-PAPER_AUTOTRADE_ENABLED        false by default
-Real order placement           impossible by design
-```
+**Dependency status:** the trading-capable Kite SDK dependency chain was removed from the default runtime, and the diagnostic WebSocket shadow remains disabled pending separate review. The original23 pip-audit advisory records referred to the historical environment; a prior fresh REST dependency scan found no known advisories at that point. This does not replace a new live-host security review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md).
 
-This is a **scope rebaseline**. New expanded engineering estimate uses a transparent weighted index: 50% weight on existing alerts-only preparation (80%), 30% on new paper-trading subsystem (43%), and 20% on real live delivery/validation (0%), producing 52.9%, displayed as **53%**. It does not supersede actual acceptance gates.
+
+**IN DEVELOPMENT / PAPER ONLY. Not deployed. Live acceptance 0/5.**
+
+Engineering checklist v1: **16/25 completed = 64%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
 
 ```text
-Historical alerts-only engineering progress   [████████████████████░░░░] 80%
-Remaining estimated scope      [░░░░░░░░░░░░░░░░░█████] 20%
-Live cloud alerts enabled      NO
-Actual live acceptance        0/5 gates verified
-Real-money execution enabled   NO (by design)
+Offline engineering [################---------] 64% (16/25)
+Live acceptance     [-----]                      0/5
 ```
 
-The estimate is the mean of ten phase completion fractions, **not** based on lines of code and **not** a promise about timing or future profitability. Partial phases reflect synthetic code/test evidence only.
+| # | Fixed checklist deliverable | Complete? | Evidence or remaining work |
+|---|---|---|---|
+|1|Repository inventory and reproducible baseline|Yes|Audit inventory; baseline744 passed/1 skipped|
+|2|Read-only Python HTTP boundary|Yes|Allowed GET paths/TLS/pacing regressions|
+|3|Python signed daily-token relay and encrypted vault|Yes|Synthetic relay/restart tests; no live handoff|
+|4|Python indicator and completed-candle integrity gates|Yes|Full suite; alignment/session-volume fixes|
+|5|Python dynamic contracts and quote validation|Yes|Synthetic instrument/quote tests|
+|6|Python independent paper account transaction core|Yes|Ledger tests; display/MTM remains item22|
+|7|Versioned fee/slippage model|Yes|Official schedule review and36 exact fee parity cases|
+|8|Python restart/idempotency core|Yes|Synthetic replay/ledger tests|
+|9|Python durable Telegram outbox core|Yes|Atomic event/outbox tests; reliability completion item24|
+|10|Python private dashboard/report foundation|Yes|Existing synthetic route/report tests; cloud views item20|
+|11|Python offline snapshot verification|Yes|Existing snapshot tests; cloud restore item23|
+|12|Transactional local DO scheduler|Yes|10 handler tests + native workerd transaction/restart test|
+|13|JS indicator/fee numerical port|Yes|Five parity tests; full decisions item16|
+|14|Repository safety regressions and script repair|Yes|771 passed/1 skipped; PowerShell parse clean|
+|15|Audit/register/verification and deployment gate docs|Yes|audit/ and this checklist|
+|16|Complete Python/JS decision/exit parity|No|Numerical functions only ported|
+|17|Cloud read-only market-data and daily-token integration|No|Scheduler has no external HTTP or token relay|
+|18|Cloud transactional two-account ledger/outbox|No|Not implemented|
+|19|Full cloud synthetic market-session end-to-end|No|Scheduler-only simulation exists|
+|20|Private mobile cloud dashboard and daily reporting|No|Not implemented|
+|21|Dependency remediation, reproducible lock/type baseline|Yes|Linux Python3.12 hashed wheel lock previously verified; full mypy49 files pass with pinned stubs; WebSocket intentionally disabled|
+|22|Complete portfolio MTM, capital and health views|No|A14 open|
+|23|Cloud retention, export/restore and capacity measurements|No|A13/A18 open|
+|24|Telegram ambiguous delivery/retry_after/retention handling|No|A15 open|
+|25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
 
-| Phase | Scope | Estimated implementation | Evidence / blocker |
-|---|---|---:|---|
-| P0 | Requirements, read-only permissions, architecture | 100% | GitHub architecture and runbook |
-| P1 | Five indicators, contract/quote selection, decision rules | 90% | Synthetic integrity tests now reject malformed 15-minute confirmation bars and nonfinite/mismatched option quotes; real signal performance not validated |
-| P2 | Daily token relay, HMAC and encrypted vault | 95% | Signed relay-timestamp ordering prevents token rollback and 06:00 expiry confusion across restart; **no real cloud TLS handoff** |
-| P3 | Real REST 5/15m candles, broker quote depth | 90% | Live-mode option BID/ASK is now checked against actual HTTP response time instead of the earlier REST poll time; broker smoke limited and cloud quote remains unverified |
-| P4 | Telegram delivery, dedupe/outbox, health | 98% | Per-session missing-token operational warning added with durable dedupe and retry/TTL; still no actual phone receipt or live host |
-| P5 | Approved always-on hosting, persistence and laptop-off test | 79% | Strict opt-in HTTPS public-ingress acceptance probe added; Docker, **host activation, deployed TLS and laptop-off verification remain 0%** |
-| P6 | WebSocket shadow monitoring and REST reconciliation | 85% | Async lifecycle, token/instrument rotation, optional KiteTicker shadow, completed REST comparison and privacy-limited health wired to runtime; synthetic tests only |
-| P7 | Virtual/option-premium exit tracking | 90% | Unattended 20-second premium BID watcher now checks the clock after network response and cannot score a late cutoff quote; offline-tested only, not live-validated |
-| P8 | Walk-forward option backtests & reliability dashboard | 73% | Official 2026 NSE F&O holiday exclusions now protect session coverage and historical replay; real option quote provenance and out-of-sample proof absent |
-| P9 | Multi-day production-style paper monitoring | 0% | Needs 5+ real market sessions and phone receipts |
+Latest verified offline evidence: **777 Python passed,1 skipped,1 third-party warning;63 Node passed; full configured mypy49 files passed; pip check clean**. The **1 native local workerd test also passed** in the temporary checkout. The previous advisory scan is historical and was not rerun this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include history review, cloud service integration, delivery ambiguity and portfolio reports. See [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
-The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
+Five live gates are individually unverified: cloud Kite data, phone Telegram receipt, real session scheduling, dashboard/ledger recovery, laptop-off continuation. No broker orders, live credentials, phone messages, cloud resources or billing changes in this round.
 
+## Historical phase log (not current status)
+
+All percentages/test counts below are dated historical records superseded by the checklist above. Statements about future actions in these historical entries are not current authorization.
 
 ## Phase 54 — offline Cloudflare alarm scheduling gate (2026-10-23; NO CLOUD ACTION)
 

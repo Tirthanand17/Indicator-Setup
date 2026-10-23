@@ -51,10 +51,14 @@ def _server(state_dir: Path, env: dict[str, str], port: int, *, startup_timeout:
     base = Path(__file__).resolve().parents[1]
     cmd = [sys.executable, '-m', 'uvicorn', 'cloud_alerts.main:app',
            '--host', LOCAL_HOST, '--port', str(port), '--workers', '1', '--no-access-log']
-    options = {'umask': 0o077} if os.name == 'posix' else {}
-    proc = subprocess.Popen(cmd, cwd=base, env=env,
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, **options)
+    if os.name == 'posix':
+        proc = subprocess.Popen(cmd, cwd=base, env=env,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, umask=0o077)
+    else:
+        proc = subprocess.Popen(cmd, cwd=base, env=env,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
     try:
         endpoint = f'http://{LOCAL_HOST}:{port}'
         until = time.monotonic() + startup_timeout

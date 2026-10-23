@@ -21,6 +21,24 @@ def decide(candles:list[Candle],now:datetime,confirm_15m:list[Candle], *, adx_mi
         return Decision('NO_TRADE','outside configured entry session')
     if len(candles)<75 or len(confirm_15m)<30:
         return Decision('WAIT_DATA','not enough complete candle history')
+    # Validate before clock arithmetic or indicator calculation. A partial
+    # same-day prefix silently changes session VWAP even when recent bars agree.
+    for bars, minutes, label in ((candles, 5, '5-minute'), (confirm_15m, 15, '15-minute')):
+        try:
+            for bar in bars:
+                bar.validate()
+                start = bar.start.astimezone(IST)
+                if (start.second or start.microsecond or
+                        (start.hour * 60 + start.minute - 555) % minutes or
+                        not time(9,15) <= start.time() < time(15,30)):
+                    raise ValueError('off-boundary candle')
+            today = [b for b in bars if b.start.astimezone(IST).date() == local.date()]
+            if (not today or today[0].start.astimezone(IST).time() != time(9,15) or
+                    any(b.start-a.start != timedelta(minutes=minutes) for a,b in zip(today,today[1:])) or
+                    any(b.volume <= 0 for b in today)):
+                raise ValueError('incomplete session history or volume')
+        except (ValueError, TypeError, AttributeError, OverflowError):
+            return Decision('WAIT_DATA', 'invalid ' + label + ' session history')
     if candles[-1].start.astimezone(IST).date()!=local.date():
         return Decision('WAIT_DATA','no same-day complete bar')
     if timedelta(seconds=0)>(now-candles[-1].start) or (now-candles[-1].start)>timedelta(minutes=7):

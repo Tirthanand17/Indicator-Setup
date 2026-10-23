@@ -1,10 +1,14 @@
 # Test matrix and acceptance gates
 
+**Dependency follow-up:** default REST SDK dependency chain removed; fresh Linux suite774 passed/1 skipped, REST contract suite15 passed, pip check clean and advisory scan reports no known vulnerabilities. Live WebSocket shadow is explicitly disabled pending review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md). Engineering remains15/25 (60%) because type-checking/reproducibility work remains. Earlier round counts below are historical snapshots.
+
+
+Current round: **771 Python passed,1 skipped,1 warning;63 Node passed;1 native local workerd test passed.** [Exact environment/results and limitations](../../audit/FIX_VERIFICATION_MATRIX.md). Live acceptance **0/5**, engineering checklist **15/25 (60%)**. Static type checking and Python vulnerability remediation remain open. Historical test totals below are dated records, not current totals. Full cloud end-to-end coverage remains absent; the DO test covers scheduler persistence only.
+
 **Current automated suite:** unit/fail-closed tests on **synthetic data only**. No real Zerodha REST or Telegram integration is activated by tests. Run from this folder:
 
 ```bash
-python -m pip install -r requirements.txt
-python -m pip install pytest pytest-asyncio httpx
+python -m pip install -r requirements-test.txt
 python -m pytest -q
 python -m compileall -q cloud_alerts
 ```
@@ -12,7 +16,7 @@ python -m compileall -q cloud_alerts
 | Test group | Acceptance | Implemented? |
 |---|---|---|
 | Indicator math | 5m HLC3 session VWAP, EMA9/EMA21, Wilder +DI/−DI/ADX14, ATR14; malformed/OHLC gaps rejected | Unit tests pass |
-| Clock / strategy | 5m close+8s only, 15m context, no-trade on conflicts, stale/out-of-order/timezone invalid | Unit tests pass; live calendar missing |
+| Clock / strategy | 5m close+8s only, 15m context, no-trade on conflicts, stale/out-of-order/timezone invalid | Verified2026 regular-calendar gates; exceptional sessions and2027 require updates |
 | Dynamic instruments | NFO-FUT current month, nearest eligible NFO-OPT expiry, listed strike and lot size | Unit tests pass |
 | Option liquidity | Quote must include fresh timestamp, BID below ASK, ≥1-lot top depth, spread cap | Unit tests pass |
 | Protected folder | Existing `.env` only read, source untouched, no secrets echoed | Unit test with synthetic read-only fixture |

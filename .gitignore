@@ -1,0 +1,23 @@
+# Credentials and runtime state must never enter this public repository.
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+*.enc
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.pem
+*.key
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+.wrangler/
+.coverage
+htmlcov/
+test-results/
+

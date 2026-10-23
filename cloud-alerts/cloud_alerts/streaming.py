@@ -7,7 +7,7 @@ No broker order interfaces, cookies, credentials logging, or account endpoints.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, time
+from datetime import date, datetime, timedelta, time
 from math import isfinite
 from zoneinfo import ZoneInfo
 from typing import Any, Callable
@@ -99,14 +99,18 @@ class FiveMinuteTickAggregator:
         self.rejected_count = 0
         self.emitted_count = 0
         self.reset_count = 0
-        self._session_day = None
-        self._last_tick_time = None
-        self._last_volume = None
-        self._bucket_time = None
-        self._open = self._high = self._low = self._close = None
+        self._session_day: date | None = None
+        self._last_tick_time: datetime | None = None
+        self._last_volume: int | None = None
+        self._bucket_time: datetime | None = None
+        self._open: float | None = None
+        self._high: float | None = None
+        self._low: float | None = None
+        self._close: float | None = None
         self._volume = 0
         self._ticks = 0
-        self._first_at = self._last_at = None
+        self._first_at: datetime | None = None
+        self._last_at: datetime | None = None
         self._ready = False
         self._discard_initial_bucket = True
 
@@ -145,8 +149,12 @@ class FiveMinuteTickAggregator:
         try:
             now = _as_ist(received_at)
             ts = _as_ist(tick.get('exchange_timestamp'))
-            price = float(tick.get('last_price'))
-            cumulative = int(tick.get('volume_traded'))
+            raw_price = tick.get('last_price')
+            raw_volume = tick.get('volume_traded')
+            if raw_price is None or raw_volume is None:
+                raise ValueError('MISSING_TICK_PRICE_OR_VOLUME')
+            price = float(raw_price)
+            cumulative = int(raw_volume)
             if not isfinite(price) or price <= 0 or cumulative < 0:
                 raise ValueError('BAD_TICK_PRICE_OR_VOLUME')
             latency = (now-ts).total_seconds()
@@ -166,13 +174,17 @@ class FiveMinuteTickAggregator:
         self._session_day = ts.date()
 
         if self._last_tick_time is not None:
+            previous_volume = self._last_volume
+            if previous_volume is None:
+                self.reset('INCOMPLETE_TICK_BASELINE')
+                return []
             if ts < self._last_tick_time:
                 self.rejected_count += 1
                 self.reset('OUT_OF_ORDER_TICK')
                 return []
             if (ts-self._last_tick_time).total_seconds() > self.max_gap_seconds:
                 self.reset('TICK_GAP_REQUIRES_RECONCILIATION')
-            elif cumulative < self._last_volume:
+            elif cumulative < previous_volume:
                 self.rejected_count += 1
                 self.reset('CUMULATIVE_VOLUME_RESET')
                 return []
@@ -183,6 +195,14 @@ class FiveMinuteTickAggregator:
             self._last_volume = cumulative
             self._last_tick_time = ts
             self.reason = 'WARMING_UP_FIRST_PARTIAL_BUCKET'
+            return []
+
+        # Incomplete internal aggregation state must never produce a candle.
+        # A new bar begins only with a complete previous tick baseline.
+        if (self._last_volume is None or self._last_tick_time is None or
+                self._open is None or self._high is None or self._low is None or
+                self._close is None or self._first_at is None or self._last_at is None):
+            self.reset('INCOMPLETE_TICK_BASELINE')
             return []
 
         # Repeated ticks in the same second with identical price and volume
@@ -254,8 +274,7 @@ class KiteTickerShadow:
         self.on_bar = on_bar
         self.on_diagnostic = on_diagnostic or (lambda event: None)
         if ticker_factory is None:
-            from kiteconnect import KiteTicker
-            ticker_factory = KiteTicker
+            raise RuntimeError("Live WebSocket shadow disabled pending dependency review")
         self._ticker = ticker_factory(api_key,token)
         self._ticker.on_ticks = self._on_ticks
         self._ticker.on_connect = self._on_connect

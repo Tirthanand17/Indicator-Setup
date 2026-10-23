@@ -40,7 +40,9 @@ def realized_analytics(path:str,now:datetime)->dict:
         all_rows=by[account]
         closed=[r for r in all_rows if r[4]=='CLOSED' and r[5] is not None and r[2]]
         unresolved=[r for r in all_rows if r[4]!='CLOSED']
-        daily=defaultdict(int);by_kind=defaultdict(lambda:[0,0]);hours=defaultdict(int)
+        daily: defaultdict[str, int] = defaultdict(int)
+        by_kind: defaultdict[str, list[int]] = defaultdict(lambda:[0,0])
+        hours: defaultdict[str, int] = defaultdict(int)
         gross_win=gross_loss=0;peak=equity=initial;max_dd=0
         max_win_streak=max_loss_streak=run_win=run_loss=0
         for r in closed:

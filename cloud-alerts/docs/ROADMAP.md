@@ -1,8 +1,15 @@
 # Phase-by-phase delivery board
 
-**Latest local validation (20 Oct 2026):** 421/421 tests passed, including a real localhost HTTP token/restart smoke rehearsal with synthetic data. Hosting, real HTTPS, cloud-phone Telegram delivery and live paper sessions are still pending. See [the Phase 30 report](LOOPBACK_LIFECYCLE_REHEARSAL.md).
+**Dependency follow-up:** default REST SDK dependency chain removed; fresh Linux suite774 passed/1 skipped, REST contract suite15 passed, pip check clean and advisory scan reports no known vulnerabilities. Live WebSocket shadow is explicitly disabled pending review. [Evidence](../../audit/DEPENDENCY_REMEDIATION_2026-10-23.md). Engineering remains15/25 (60%) because type-checking/reproducibility work remains. Earlier round counts below are historical snapshots.
 
-**Approximate milestone-weighted implementation progress: 80%**, as documented in [PROGRESS.md](PROGRESS.md). A code commit is not proof of live accuracy, and a bot TEST message is not proof that it caught a valid trade.
+
+**Current status:** checklist v1 **60% (15/25)**; **0/5 live gates**. Python771 passed/1 skipped, Node63 passed and local workerd1 passed. See [PROGRESS.md](PROGRESS.md) for the only current completion calculation and [audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md) for blockers.
+
+Next sequence: isolate/remediate vulnerable SDK dependencies; complete JS decision parity and cloud market/token integration; transactional portfolios/outbox; private mobile dashboard; full synthetic session and restore/capacity proof; then a separate deployment approval request. No cloud or credential actions authorized by this roadmap.
+
+## Historical alerts-only milestones
+
+The following table and dated phase details describe the earlier scope, not current engineering or live readiness.
 
 | Phase | Item | State on 2026-10-19 | Acceptance |
 |---|---|---|---|

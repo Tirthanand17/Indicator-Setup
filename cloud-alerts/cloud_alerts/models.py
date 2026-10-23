@@ -20,8 +20,8 @@ class Candle:
             raise ValueError('invalid OHLC')
         if not self.high >= max(self.open,self.close,self.low) or not self.low <= min(self.open,self.close,self.high):
             raise ValueError('inconsistent OHLC')
-        if self.volume < 0:
-            raise ValueError('negative volume')
+        if type(self.volume) is not int or self.volume < 0:
+            raise ValueError('invalid volume')
 
 @dataclass(frozen=True)
 class Indicators:

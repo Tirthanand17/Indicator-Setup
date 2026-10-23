@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from cloud_alerts.evaluation import PaperQuotePair, Costs, EvidenceError
 from cloud_alerts.walkforward import walk_forward_windows
+from cloud_alerts.trading_calendar import regular_session
 IST = ZoneInfo('Asia/Kolkata')
 COSTS = Costs(slippage_bps=12,roundtrip_charges_rs=35)
 
@@ -12,16 +13,16 @@ COSTS = Costs(slippage_bps=12,roundtrip_charges_rs=35)
 def fake_rows(sessions=12):
     result=[]
     for i in range(sessions):
-        # Weekday-only sample session dates: October 2026 weekdays.
+        # Official regular sessions, not merely weekdays.
         d=date(2026,10,1)+timedelta(days=i)
-        while d.weekday()>=5:
+        while not regular_session(d):
             d+=timedelta(days=1)
         # Unique distinct trading sessions regardless of weekends.
         if result:
             prev=result[-1].signal_entry_at.date()
             if d<=prev:
                 d=prev+timedelta(days=1)
-                while d.weekday()>=5:d+=timedelta(days=1)
+                while not regular_session(d):d+=timedelta(days=1)
         entry=datetime(d.year,d.month,d.day,10,0,tzinfo=IST)
         result.append(PaperQuotePair(
             event_id=f'PAPER-SESSION-{i:02}',option_symbol='NIFTY26OCT24500CE',

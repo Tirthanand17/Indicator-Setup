@@ -1,9 +1,8 @@
 # Review lock versions before production; this is a version-bounded prototype.
 fastapi>=0.115,<1
 uvicorn>=0.30,<1
-kiteconnect==5.2.2  # official reviewed SDK transport; update only after full regression
 requests>=2.32,<3
-cryptography>=43,<47
+cryptography>=50.0.2,<51
 
 # Windows lacks the system IANA tzdb required by Asia/Kolkata during QA.
 tzdata>=2026.1,<2027; platform_system=="Windows"

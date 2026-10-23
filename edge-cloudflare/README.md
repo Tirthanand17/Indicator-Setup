@@ -1,33 +1,26 @@
-# Cloudflare alarm prototype — offline only (Phase 54)
+# Offline Cloudflare migration — scheduler and numerical core
 
-**Deployment status:** NOT DEPLOYED. This folder does **not** create a Cloudflare account, Worker, Durable Object, database, API token, custom domain, payment mandate, or production alert. It does **not** fetch Kite data, send Telegram messages, or place real broker orders.
+**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist15/25 (60%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
-## What is implemented
+`worker.mjs` exports a Worker and `MarketSession` Durable Object. Only authenticated POST `/internal/bootstrap` with empty body and GET `/internal/scheduler` are supported. `SCHEDULER_ADMIN_KEY` must be32–256 characters with at least8 distinct characters; `OFFLINE_SCHEDULER_ENABLED` must explicitly be `true`. Authentication is checked before accessing the binding and again inside the object. The example disables scheduling and workers.dev/preview URLs.
 
-- `alarm-core.mjs` is a deterministic, dependency-free JS module for a potential Cloudflare Durable Objects alarm handler. Given observed/scheduled epoch milliseconds, a pinned calendar version, and the previous claimed tick ID, it returns a frozen synthetic eligibility decision. No I/O or side effects.
-- Uses fixed **Asia/Kolkata UTC+05:30** clock conversion and pinned **2026 NSE F&O regular-session** weekday/holiday list matching `cloud-alerts/cloud_alerts/trading_calendar.py`.
-- Eligible regular session: **09:15:00 through 15:29:59.999 IST**, nominal 20-second anchored ticks. Alarm callbacks **may be late or duplicated**; lateness of 20 seconds or more is dropped rather than replayed. A repeated previously claimed tick is dropped.
-- When the market closes or a weekend/known holiday intervenes, returns the **next verified 09:15 opening** to re-arm. No 2027 schedule is guessed; annual calendar updates and exchange exceptional-session announcements require a new checked release.
-- Always returns `realOrdersEnabled: false`. `shouldPoll: true` means only that an **offline synthetic tick is eligible for downstream freshness checks**. It does **not** permit a trade, even on paper, without the main engine's verified data/portfolio logic.
+SQLite-backed DO transactions persist claim and next alarm atomically. The constructor does not schedule. Duplicate ticks cannot claim twice across restart; delayed slots are dropped, not replayed. Corrupt state is preserved for diagnosis and alarms stopped; bootstrap cannot overwrite it. Clock rollback, unsupported year and4096 callbacks/UTC-day halt scheduling. Diagnostics retain128 events, not a complete paper ledger.
+
+`alarm-core.mjs` uses verified2026 NSE F&O regular sessions09:15–15:30 IST with requested20-second slots. No callback SLA is claimed. `strategy-core.mjs` ports VWAP, EMA, Wilder DMI/ADX/ATR and versioned fees. Three synthetic indicator fixtures match Python within1e-8;36 fee cases match exactly in paise. Full strategy decisions/exits are not ported.
 
 ## Offline verification
 
-From repository root on Node 20+:
-
 ```sh
-node --test edge-cloudflare/alarm-core.test.mjs
+node --test edge-cloudflare/*.test.mjs
+cd edge-cloudflare
+npm ci --ignore-scripts
+npm run test:runtime
 ```
 
-The suite covers market open/cutoff, 20-second alignment and late wakeups, weekends, pinned holiday, next-day re-arming, duplicate claims, unsupported year, invalid inputs and immutable no-real-orders results. No credentials or external network required.
+24 edge tests pass (9 alarm,10 worker,5 parity), plus1 native local workerd SQLite test. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. The native test verifies transaction rollback of values/alarms and persistence across Miniflare restart, not hosted scheduling. `generate_parity.py` regenerates Python reference fixtures; review changes explicitly.
 
-## Critical work NOT completed
+## Remaining migration
 
-1. Implement and offline-test an actual **Cloudflare Worker + SQLite-backed Durable Object** handler. It must read and atomically commit `lastClaimedTickId` and `nextAlarmAtMs` in transactional durable storage **before** side effects, so simultaneous or retried alarms cannot double-send. Alarm scheduling must survive restarts.
-2. Port the existing Python Kite quote freshness gates, alerts outbox, complete options paper portfolios, market history and authentication to a runtime that meets Workers/Durable Objects Free CPU, memory, request, storage and outbound network limits. The Python FastAPI/Kite SDK process is **not a drop-in deployment**.
-3. Validate hosting's genuine **no-card/no-UPI-AutoPay/₹0** eligibility for this user's account, quotas, operational latencies, custom domain and restore/export plan. An advertised free tier is not a contractual hard zero-cost guarantee.
-4. Obtain **fresh explicit user approval** before any signup/project/Worker/DO/domain/secret/payment action. No card, UPI mandate, payment verification hold or paid upgrade is allowed.
-5. Run five independent live acceptance gates after separate approved provisioning: actual Kite read-only quote/candle flow, phone Telegram delivery, uninterrupted session alarms, paper dashboard persistence/recovery, and laptop-off operation. Keep **broker execution disabled**.
+Worker status explicitly reports `marketRuntimeImplemented:false`. It does not fetch Kite data, accept daily tokens, maintain portfolios, send Telegram, serve a mobile dashboard or export paper history. Those are required before full end-to-end/capacity verification. The Python monolith is not a drop-in Worker deployment.
 
-**Today:** expanded engineering scope **53% estimated**, live-cloud acceptance **0/5**, production/paper autonomy **not live**. This prototype changes neither figure.
-
-See `cloud-alerts/docs/PHASE53_CLOUDFLARE_DURABLE_OBJECTS_FREE_FEASIBILITY.md` for eligibility limitations.
+`wrangler.example.jsonc` is an undeployed template. No deploy/migration command was run. See [audit](../audit/FULL_PROJECT_AUDIT_2026-10-23.md) for capacity forecast and dependency blockers. The [deployment gate](../cloud-alerts/docs/DEPLOYMENT_APPROVAL_REQUEST.md) is a draft awaiting prerequisites, not permission to create resources.
