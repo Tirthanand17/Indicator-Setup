@@ -39,6 +39,23 @@ def test_render_free_forced_block_even_with_every_operator_box_ticked():
     assert 'RENDER_FREE_SLEEP_AND_EPHEMERAL_STATE' in result['blockers']
 
 
+@pytest.mark.parametrize('provider,tier', [
+    ('Northflank', 'sandbox_free'),
+    ('northflank', 'DEVELOPER_SANDBOX'),
+    (' NORTHFLANK ', 'Sandbox'),
+])
+def test_northflank_card_free_hour_long_window_is_never_host_approval(provider, tier):
+    # Even a forged all-green local declaration cannot turn the provider's
+    # mandatory 60-minute verification cutoff into an unattended cloud host.
+    result = review_host(plan(
+        provider=provider, plan_tier=tier,
+        service_class='dedicated_container_worker',
+    ), now=NOW)
+    assert result['result'] == 'BLOCKED'
+    assert 'NORTHFLANK_SANDBOX_NO_CARD_60_MINUTE_WINDOW' in result['blockers']
+    assert result['approved_to_provision_or_deploy'] is False
+
+
 @pytest.mark.parametrize('flag', REQUIRED_TRUE)
 def test_every_required_flag_must_be_literal_true(flag):
     assert 'NOT_CONFIRMED_' + flag.upper() in review_host(
