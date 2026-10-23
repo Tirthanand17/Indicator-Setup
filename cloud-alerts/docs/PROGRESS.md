@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 45 — Linux Python 3.12 GREEN; PR #1 merged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 46 — cloud host qualification gate; local-only). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,14 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 46 — no-cost cloud host safety and local rehearsal (NOT DEPLOYED)
+
+1. Inspected the already-connected Render account read-only. Existing Free sleeping web services and suspended Free PostgreSQL cannot support an unattended SQLite/token-vault worker; no unrelated services were changed and no new resources/billing enabled. See [Phase 46 hosting evidence](PHASE46_HOST_QUALIFICATION.md).
+2. Added an offline `cloud_alerts.host_qualification` CLI and an intentionally **blocked** host-plan template. The gate hard-rejects Render Free; requires recently reviewed explicit no-incremental-cost, spend protection, unslept worker and durable storage declarations; refuses unrecognized or secret-like input fields. **Self-reported passing plans do not approve provisioning or attest live host checks.**
+3. In Nirala's non-root WSL Ubuntu 24.04 / Python 3.12 environment, ran the real-process localhost [loopback rehearsal](LOOPBACK_LIFECYCLE_REHEARSAL.md): **all 12 synthetic HTTP/restart/encryption/replay checks PASSED**, without real broker, Telegram, production TLS or a host.
+4. Initial complete Linux Python 3.12 suite for this phase: **607 PASSED, 0 FAILED, 1 SKIPPED**. Added further blocked-example coverage; final branch test rerun required before merge.
+5. **Expanded engineering index remains 53%**, live host/token/phone/five-market-session acceptance **0/5**. Next material blocker is an authorized, demonstrably no-incremental-charge **persistent always-on Linux host** distinct from Nirala. No real orders.
 
 ## Phase 45 completion — verified merge into main (October 23, 2026)
 
