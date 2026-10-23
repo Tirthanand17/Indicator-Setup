@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 53 — AWS India Free signup blocked by the user's actual ₹2 verification / ₹15,000 UPI AutoPay mandate; Cloudflare Workers Free + SQLite Durable Objects alarms researched as a conditional no-card serverless alternative; no cloud account or resources created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 54 — Offline-only Cloudflare alarm eligibility prototype, 9 synthetic Node tests passed; no account or cloud resource created). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,13 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 54 — offline Cloudflare alarm scheduling gate (2026-10-23; NO CLOUD ACTION)
+
+- Added `edge-cloudflare/alarm-core.mjs` pure JS candidate scheduler and `edge-cloudflare/alarm-core.test.mjs`. It checks pinned 2026 NSE F&O holidays/weekends, 09:15–15:30 IST regular session, 20-second slot alignment, alarm duplication and lateness, invalid clock/calendar, and next-day re-arm across holidays/weekends. It never places broker orders or contacts Kite/Telegram.
+- **9 new offline Node tests passed (0 failed)**; all **16 holiday dates match** the existing Python pinned calendar. This is a source-level synthetic unit test, **not** a live Durable Objects handler, accurate real-world polling, or any trading signal-performance validation.
+- See `edge-cloudflare/README.md` for critical future tasks: transactional alarm-claim persistence, porting Kite/Telegram/paper engine with Free tier limitations, account no-card qualification, and **fresh user approval** before any cloud resource creation.
+- No Cloudflare account/project/Worker/DO/domain, billing method, UPI mandate, DNS or secrets created; no laptop-hosting deployment. **Engineering estimate still 53%**, real cloud acceptance **0/5**. Previous **744 passed/1 skipped Python suite** is from Phase 52 and was not rerun in this filesystem-read-only environment.
 
 ## Phase 53 — next no-card candidate: Cloudflare Workers Free + Durable Objects alarms (2026-10-23; RESEARCH ONLY)
 
