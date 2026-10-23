@@ -191,6 +191,8 @@ test('native synthetic pipeline commits 5m/15m signal, two accounts, exits and j
     const before=await (await stub.fetch('https://unit.invalid/test/pipeline/state')).json();
     assert.equal(before.session.totalTicks,2);
     assert.equal(before.ledger.positions.filter(p=>p.status==='CLOSED').length,2);
+    assert.equal(before.marks.source,'OFFLINE_SYNTHETIC_TEST_ONLY');
+    assert.equal(before.marks.marks.length,0); // last exit tick clears marks
     const aggregate=await (await mf.dispatchFetch('https://unit.invalid/internal/synthetic-session',
       {headers})).json();
     assert.equal(aggregate.status,'READY');
@@ -202,6 +204,78 @@ test('native synthetic pipeline commits 5m/15m signal, two accounts, exits and j
     assert.deepEqual(after,before);
     assert.equal(after.ledger.accounts.PAPER_50K.initialPaise,5000000);
     assert.equal(after.ledger.accounts.PAPER_100K.initialPaise,10000000);
+  } finally {await mf.dispose();}
+});
+
+test('native synthetic marks, private indicative equity, stale state and restart fail closed',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-portfolio-native-do-'));
+  const viewKey='portfolio-private-view-AaBb-0123456789-AbCdEfGh';
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PAPER_LEDGER_ENABLED:'true',OFFLINE_SYNTHETIC_SESSION_ENABLED:'true',
+      OFFLINE_PRIVATE_DASHBOARD_ENABLED:'true',PAPER_DASHBOARD_VIEW_KEY:viewKey},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('External requests forbidden by local test');}};
+  const fixtures=JSON.parse(readFileSync(path.join(root,'decision-parity-fixtures.json'),'utf8'));
+  const fixture=fixtures.cases.find(c=>c.expected.status==='REVIEW_PE');
+  const origin=Date.parse('2026-10-23T09:15:00+05:30');
+  const stamp=slot=>origin+slot*20000;
+  const q=slot=>({contract:{symbol:'NIFTY26OCT23000PE',kind:'PE',
+    expiry:'2026-10-29',token:23456,lotSize:65},bid:100,ask:100.5,
+    bidQuantity:650,askQuantity:650,updatedAtMs:stamp(slot)-1000});
+  let mf=new Miniflare(options);
+  const stubFor=async()=>{
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));
+  };
+  try {
+    let stub=await stubFor();
+    const setTime=at=>stub.fetch('https://unit.invalid/test/pipeline/clock',
+      {method:'POST',body:JSON.stringify({nowMs:at})});
+    const at=stamp(271);
+    const event={source:'OFFLINE_SYNTHETIC_TEST_ONLY',tickId:'2026-10-23:271',
+      observedAtMs:at,futures:{symbol:'NFO:NIFTY26OCTFUT',instrumentToken:777,
+        exchangeAtMs:at-1000,lastPrice:fixture.candles.at(-1).close},
+      candles5:fixture.candles,candles15:fixture.confirm15m,
+      strategyConfig:{adxMin:fixture.adxMin,atrBuffer:fixture.atrBuffer},
+      optionQuotes:{PE:q(271)}};
+    const traded=await (await stub.fetch('https://unit.invalid/test/pipeline/turn',
+      {method:'POST',body:JSON.stringify(event)})).json();
+    assert.equal(traded.entered,2);
+    const marked=await (await stub.fetch('https://unit.invalid/test/pipeline/state')).json();
+    assert.equal(marked.marks.marks.length,1);
+    await setTime(at+1000);
+    const login=await mf.dispatchFetch('https://unit.invalid/paper/login',{
+      method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({key:viewKey}).toString(),redirect:'manual'});
+    assert.equal(login.status,303);
+    const cookie=login.headers.get('set-cookie').split(';')[0];
+    const get=()=>mf.dispatchFetch('https://unit.invalid/paper/api/portfolio',{headers:{cookie}});
+    const fresh=await (await get()).json();
+    assert.equal(fresh.healthStatus,'SYNTHETIC_MARKS_FRESH');
+    assert.equal(fresh.accounts[0].markedToMarket,true);
+    assert.equal(fresh.accounts[1].markedToMarket,true);
+    assert.equal(fresh.accounts[0].indicativeEquityPaise > 0,true);
+    assert.equal(fresh.valuationIsLive,false);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/paper/api/portfolio')).status,404);
+    await setTime(at+17_000);
+    const stale=await (await get()).json();
+    assert.equal(stale.healthStatus,'MISSING_OR_STALE_QUOTE');
+    assert.equal(stale.accounts[0].indicativeEquityPaise,null);
+    const unchanged=await (await stub.fetch('https://unit.invalid/test/pipeline/rollback')).json();
+    assert.equal(unchanged.unchanged,true);
+    await mf.dispose();mf=new Miniflare(options);stub=await stubFor();
+    const restored=await (await stub.fetch('https://unit.invalid/test/pipeline/state')).json();
+    assert.deepEqual(restored,marked);
+    const liveClock=await stub.fetch('https://unit.invalid/test/pipeline/clock',
+      {method:'POST',body:JSON.stringify({nowMs:at+1000})});
+    assert.equal(liveClock.status,200);
+    const after=await (await get()).json();
+    assert.equal(after.accounts[0].markedToMarket,true);
+    assert.equal(after.accounts[1].markedToMarket,true);
+    assert.equal(after.liveMarketConnected,false);
   } finally {await mf.dispose();}
 });
 

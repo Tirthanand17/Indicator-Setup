@@ -11,6 +11,8 @@ import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
 import { SYNTHETIC_SESSION_KEY, newSyntheticSession, auditSyntheticSession,
   advanceSyntheticMarketTurn, syntheticSessionSummary } from './synthetic-session.mjs';
 import { isPrivateDashboardPath, handlePrivateDashboard } from './private-dashboard.mjs';
+import { PORTFOLIO_MARKS_KEY, auditPortfolioMarks,
+  captureSyntheticPortfolioMarks } from './portfolio-valuation.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -86,7 +88,7 @@ export class MarketSession {
     const path = new URL(request.url).pathname;
     if (isPrivateDashboardPath(path)) {
       return handlePrivateDashboard(request, this.env, this.storage,
-        STATE_KEY, PAPER_LEDGER_KEY, SYNTHETIC_SESSION_KEY);
+        STATE_KEY, PAPER_LEDGER_KEY, SYNTHETIC_SESSION_KEY, PORTFOLIO_MARKS_KEY);
     }
     const tokenRoute = path === '/internal/token' && request.method === 'POST' &&
       new URL(request.url).protocol === 'https:' && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true';
@@ -238,17 +240,22 @@ export class MarketSession {
       throw new Error('SYNTHETIC_SESSION_DISABLED');
     }
     return this.storage.transaction(async txn => {
-      const [storedLedger, storedSession] = await Promise.all([
-        txn.get(PAPER_LEDGER_KEY), txn.get(SYNTHETIC_SESSION_KEY),
+      const [storedLedger, storedSession, storedMarks] = await Promise.all([
+        txn.get(PAPER_LEDGER_KEY), txn.get(SYNTHETIC_SESSION_KEY), txn.get(PORTFOLIO_MARKS_KEY),
       ]);
       const currentLedger = storedLedger === undefined ?
         newPaperLedger(input?.observedAtMs) : storedLedger;
       const currentSession = storedSession === undefined ? newSyntheticSession() : storedSession;
       auditPaperLedger(currentLedger);
       auditSyntheticSession(currentSession);
+      if (storedMarks !== undefined) auditPortfolioMarks(storedMarks, currentSession);
       const outcome = advanceSyntheticMarketTurn(currentSession, currentLedger, input);
+      const newTick = outcome.result.status === 'SYNTHETIC_TICK_PROCESSED';
+      const marks = newTick ?
+        captureSyntheticPortfolioMarks(outcome.ledger, outcome.session, input) : storedMarks;
       if (outcome.ledger !== storedLedger) await txn.put(PAPER_LEDGER_KEY, outcome.ledger);
       if (outcome.session !== storedSession) await txn.put(SYNTHETIC_SESSION_KEY, outcome.session);
+      if (newTick) await txn.put(PORTFOLIO_MARKS_KEY, marks);
       return outcome.result;
     });
   }

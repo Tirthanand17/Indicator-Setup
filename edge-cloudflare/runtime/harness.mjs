@@ -10,6 +10,12 @@ export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
     if (path === '/test/now') return Response.json({ now: Date.now() });
+    if (path === '/test/pipeline/clock' && request.method === 'POST') {
+      const { nowMs } = await request.json();
+      if (!Number.isSafeInteger(nowMs) || nowMs <= 0) return Response.json({ error: 'INVALID_TEST_CLOCK' }, { status: 400 });
+      clock = nowMs;
+      return Response.json({ now: Date.now(), testOnly: true });
+    }
     if (path === '/test/token-sealed') {
       const stored = await this.storage.get('daily-token-v1');
       return Response.json({ present: !!stored, encrypted: !!stored?.ciphertext,
@@ -49,21 +55,25 @@ export class TestSession extends MarketSession {
     }
     if (path === '/test/pipeline/state') {
       return Response.json({ session: await this.storage.get('synthetic-session-v1') ?? null,
-        ledger: await this.storage.get('paper-ledger-v1') ?? null });
+        ledger: await this.storage.get('paper-ledger-v1') ?? null,
+        marks: await this.storage.get('synthetic-portfolio-marks-v1') ?? null });
     }
     if (path === '/test/pipeline/rollback') {
       const before = await this.storage.get('synthetic-session-v1');
       const ledgerBefore = await this.storage.get('paper-ledger-v1');
+      const marksBefore = await this.storage.get('synthetic-portfolio-marks-v1');
       try {
         await this.storage.transaction(async txn => {
           await txn.put('synthetic-session-v1', { schema: 999 });
           await txn.put('paper-ledger-v1', { schema: 999 });
+          await txn.put('synthetic-portfolio-marks-v1', { schema: 999 });
           throw new Error('abort synthetic pipeline transaction');
         });
       } catch { /* expected */ }
       return Response.json({ unchanged:
         JSON.stringify(before) === JSON.stringify(await this.storage.get('synthetic-session-v1')) &&
-        JSON.stringify(ledgerBefore) === JSON.stringify(await this.storage.get('paper-ledger-v1')) });
+        JSON.stringify(ledgerBefore) === JSON.stringify(await this.storage.get('paper-ledger-v1')) &&
+        JSON.stringify(marksBefore) === JSON.stringify(await this.storage.get('synthetic-portfolio-marks-v1')) });
     }
     if (path === '/test/tick') {
       if (!ticked) {
