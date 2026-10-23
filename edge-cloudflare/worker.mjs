@@ -10,6 +10,7 @@ import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
   paperLedgerSummary } from './paper-ledger.mjs';
 import { SYNTHETIC_SESSION_KEY, newSyntheticSession, auditSyntheticSession,
   advanceSyntheticMarketTurn, syntheticSessionSummary } from './synthetic-session.mjs';
+import { isPrivateDashboardPath, handlePrivateDashboard } from './private-dashboard.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -56,8 +57,11 @@ function validState(s) {
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
+    const dashboardRoute = isPrivateDashboardPath(path) &&
+      env.OFFLINE_PRIVATE_DASHBOARD_ENABLED === 'true' &&
+      env.OFFLINE_PAPER_LEDGER_ENABLED === 'true';
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
-    if (!tokenRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
+    if (!tokenRoute && !dashboardRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
           (path === '/internal/paper-ledger' && request.method === 'GET') ||
           (path === '/internal/synthetic-session' && request.method === 'GET')) ||
@@ -80,6 +84,10 @@ export class MarketSession {
 
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if (isPrivateDashboardPath(path)) {
+      return handlePrivateDashboard(request, this.env, this.storage,
+        STATE_KEY, PAPER_LEDGER_KEY, SYNTHETIC_SESSION_KEY);
+    }
     const tokenRoute = path === '/internal/token' && request.method === 'POST' &&
       new URL(request.url).protocol === 'https:' && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true';
     if (!tokenRoute && !await authorized(request, this.env)) return reply({ error: 'Not found' }, 404);
