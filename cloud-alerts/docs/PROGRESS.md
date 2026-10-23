@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 50 — Northflank free no-card 60-minute cutoff confirmed from signup; alternate host review underway). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 51 — offline AWS Free expiry/credit/migration preflight added; still NO approved host). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,12 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 51 — AWS Free time-limit + cost + data-retention fail-closed preflight (2026-10-23; NOT DEPLOYED)
+
+- Added `cloud_alerts.aws_free_preflight`, a **network-free, no-credentials** qualification worksheet/gate for the new AWS Free plan. It checks no-card/no-paid-plan declarations, six-calendar-month expiration, conservative monthly EC2/EBS/IPv4/egress estimates, ≥20% credit reserve, an independently recoverable off-AWS backup, and a migration cutover ≥14 days ahead of AWS closure. **Even if all declarations pass, it never authorizes deployment.** Shipping JSON sample is intentionally BLOCKED.
+- AWS first-party billing says an expired Free plan account **automatically closes, with resource/data access lost**: this is a temporary six-month-or-credit-limited candidate, NOT permanent free hosting. The user has not yet selected it or supplied actual account/billing/backup evidence. No AWS signup, card, EC2, keys, DNS, billing changes, Kite renewal, telegram send or broker orders.
+- Added regression tests and [Phase 51 safeguard runbook](PHASE51_AWS_FREE_NO_CARD_EXPIRY_PREFLIGHT.md). **Engineering index stays 53%; verified cloud delivery remains 0/5.**
 
 ## Phase 50 — mandatory Northflank card-block and safer no-card replan (2026-10-23)
 
