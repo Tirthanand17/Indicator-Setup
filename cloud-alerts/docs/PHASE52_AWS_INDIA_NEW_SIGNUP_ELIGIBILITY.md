@@ -1,5 +1,7 @@
 # Phase 52 — AWS new Free signup eligibility for an Indian owner (READ-ONLY / NOT DEPLOYED)
 
+> **Post-Phase-52 outcome (2026-10-23; supersedes its eligibility checklist):** The owner subsequently authorized the *new AWS Free signup and its automatically created Sydney project only if no payment method/hold was required*. In the actual Indian AWS flow the user encountered a **₹2 verification and a ₹15,000 UPI AutoPay/e-mandate request**. This fails the owner's absolute no-card/no-hold/no-mandate restriction. AWS is now **BLOCKED**, not a temporary eligible host. Do **not** approve the mandate on the theory it can be revoked immediately; cancelling a payment mandate does not establish that the service stays usable at ₹0. No AWS project or resource creation has been confirmed. See [Phase 53 provider reassessment](PHASE53_CLOUDFLARE_DURABLE_OBJECTS_FREE_FEASIBILITY.md).
+
 **Research:** 2026-10-23. **Owner decision:** AWS is approved as a **temporary candidate at ₹0 without any payment method**; the owner explicitly requires approval **before any AWS account/project/EC2 creation**. All cloud resource and credential operations remain forbidden until that distinct approval.
 
 ## Decisive updates from AWS first-party documentation
