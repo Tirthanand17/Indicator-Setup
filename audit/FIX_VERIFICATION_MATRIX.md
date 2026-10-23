@@ -8,7 +8,7 @@ Baseline: `05df18881160b52ecbbd1c118d439b0f9db5ea2e`, merged PR11. Original audi
 | Earlier complete Linux Python suite | **771 passed, 1 skipped, 1 third-party warning; 57.83s** | Historical calendar/data/ledger/transport regression result |
 | Latest fresh Python3.12 virtualenv suite | **777 passed, 1 skipped, 1 third-party warning; 13.97s** | Two extra fail-closed regressions included; synthetic only |
 | Combined edge and legacy extension Node tests | **63 passed, 0 failed**; 0.60s latest | 24 edge + 39 extension; offline rerun |
-| Native local workerd SQLite DO runtime test | **1 passed, 0 failed** historically; not rerun | Actual storage/alarm transaction rollback, duplicate callback, restart persistence; outbound service rejects all traffic |
+| Native local workerd SQLite DO runtime test | **1 passed, 0 failed**; rerun in temporary checkout | Actual storage/alarm transaction rollback, duplicate callback, restart persistence; outbound service rejects all traffic |
 | JS numerical parity | 3 indicator fixtures at tolerance1e-8; 36 fee cases exact paise | Covered by five of the edge tests; not full strategy parity |
 | Python compileall / AST | Passed; baseline122 Python files parsed | Not static type checking |
 | Baseline local relative import graph | No cycles detected | Limited graph, not dynamic-import or unused-code proof |
