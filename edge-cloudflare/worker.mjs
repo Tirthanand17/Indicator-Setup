@@ -8,6 +8,8 @@ import { createReadOnlyKite } from './market-readonly.mjs';
 import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
   enterPaperBasket, exitPaperPosition, markPaperUnverifiable,
   paperLedgerSummary } from './paper-ledger.mjs';
+import { SYNTHETIC_SESSION_KEY, newSyntheticSession, auditSyntheticSession,
+  advanceSyntheticMarketTurn, syntheticSessionSummary } from './synthetic-session.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -57,7 +59,8 @@ export default {
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
     if (!tokenRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
-          (path === '/internal/paper-ledger' && request.method === 'GET')) ||
+          (path === '/internal/paper-ledger' && request.method === 'GET') ||
+          (path === '/internal/synthetic-session' && request.method === 'GET')) ||
         !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
     if (env.OFFLINE_SCHEDULER_ENABLED !== 'true' || !env.MARKET_SESSION) {
       return reply({ status: 'DISABLED', paperOnly: true }, 503);
@@ -99,6 +102,19 @@ export class MarketSession {
         if (stored === undefined) return reply({ status: 'NOT_INITIALIZED', paperOnly: true });
         try { return reply({ status: 'READY', ...paperLedgerSummary(stored) }); }
         catch { return reply({ status: 'BLOCKED_CORRUPT_PAPER_LEDGER', paperOnly: true }, 503); }
+      }
+      if (path === '/internal/synthetic-session' && request.method === 'GET') {
+        if (this.env.OFFLINE_SYNTHETIC_SESSION_ENABLED !== 'true' ||
+            this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true') {
+          return reply({ status: 'DISABLED', paperOnly: true }, 503);
+        }
+        const [stored, ledger] = await Promise.all([
+          this.storage.get(SYNTHETIC_SESSION_KEY), this.storage.get(PAPER_LEDGER_KEY),
+        ]);
+        if (stored === undefined || ledger === undefined)
+          return reply({ status: 'NOT_INITIALIZED', syntheticOnly: true });
+        try { return reply({ status: 'READY', ...syntheticSessionSummary(stored, ledger) }); }
+        catch { return reply({ status: 'BLOCKED_CORRUPT_SYNTHETIC_SESSION' }, 503); }
       }
       if (path !== '/internal/bootstrap' || request.method !== 'POST') return reply({ error: 'Not found' }, 404);
       // No input or token upload is accepted by this scheduler-only endpoint.
@@ -202,6 +218,31 @@ export class MarketSession {
 
   markPaperUnverifiable(nowMs) {
     return this.withPaperLedger(state => markPaperUnverifiable(state, nowMs), nowMs);
+  }
+
+  /** Test-only provenance is mandatory. Production provides no HTTP POST
+   * endpoint to feed this method, nor any automatic bridge from Kite polling.
+   */
+  async processSyntheticMarketTurn(input) {
+    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true' ||
+        this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true' ||
+        this.env.OFFLINE_SYNTHETIC_SESSION_ENABLED !== 'true') {
+      throw new Error('SYNTHETIC_SESSION_DISABLED');
+    }
+    return this.storage.transaction(async txn => {
+      const [storedLedger, storedSession] = await Promise.all([
+        txn.get(PAPER_LEDGER_KEY), txn.get(SYNTHETIC_SESSION_KEY),
+      ]);
+      const currentLedger = storedLedger === undefined ?
+        newPaperLedger(input?.observedAtMs) : storedLedger;
+      const currentSession = storedSession === undefined ? newSyntheticSession() : storedSession;
+      auditPaperLedger(currentLedger);
+      auditSyntheticSession(currentSession);
+      const outcome = advanceSyntheticMarketTurn(currentSession, currentLedger, input);
+      if (outcome.ledger !== storedLedger) await txn.put(PAPER_LEDGER_KEY, outcome.ledger);
+      if (outcome.session !== storedSession) await txn.put(SYNTHETIC_SESSION_KEY, outcome.session);
+      return outcome.result;
+    });
   }
 
   async alarm() {

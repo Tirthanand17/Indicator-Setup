@@ -8,7 +8,8 @@
   "vars": {
     "OFFLINE_SCHEDULER_ENABLED": "false",
     "READONLY_MARKET_RUNTIME_ENABLED": "false",
-    "OFFLINE_PAPER_LEDGER_ENABLED": "false"
+    "OFFLINE_PAPER_LEDGER_ENABLED": "false",
+    "OFFLINE_SYNTHETIC_SESSION_ENABLED": "false"
   },
   "durable_objects": {
     "bindings": [{ "name": "MARKET_SESSION", "class_name": "MarketSession" }]
