@@ -1,6 +1,6 @@
 # Overall progress board — NIFTY API alerts + autonomous paper accounts
 
-**As of:** 2026-10-23 (Phase 45 — Linux Python 3.12 full suite GREEN; merge review). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
+**As of:** 2026-10-23 (Phase 45 — Linux Python 3.12 GREEN; PR #1 merged). **Expanded-objective estimated engineering completion: 53%**; previous alerts-only engineering preparation estimate remains **80%**. This is NOT a trading win rate, strategy performance claim or evidence of a live service.
 
 ```text
 Expanded NIFTY paper autopilot  [█████████████░░░░░░░░░░░░] 53%
@@ -38,6 +38,12 @@ The estimate is the mean of ten phase completion fractions, **not** based on lin
 
 The legacy phase percentages still sum to **80.0%, rounded to 80% of the ORIGINAL alerts-only scope**. **Actual readiness for time-critical phone alerts is below engineering completion**, because P5 and P9 are blocked and P3 has only a limited real-data smoke test while cloud P4 has no live integration test.
 
+
+## Phase 45 completion — verified merge into main (October 23, 2026)
+
+- GitHub [PR #1](https://github.com/Tirthanand17/Indicator-Setup/pull/1) was marked ready after two complete, isolated local **Ubuntu 24.04 WSL 2 / Python 3.12** green runs (both **585 passed / 0 failed / 1 skipped**), then merged with **merge commit `536e27422505a956f469dded28c115ba7b529345`**. The full GitHub commit history was retained.
+- Confirmed on merged `main`: `ALERTS_ENABLED=false`, `PAPER_AUTOTRADE_ENABLED=false`, `PAPER_DASHBOARD_ENABLED=false` and `KITE_SHADOW_ENABLED=false` in the example environment. Source merge **does not** turn on worker/cloud/phone monitoring or submit broker orders.
+- This clears the **local full Linux regression and branch merge** subphases. **Actual live cloud acceptance remains 0/5.** Future development must use merged main as the current source of truth; historic draft-branch instructions below are retained only as prior audit records.
 
 ## Phase 45 — verified Ubuntu WSL 2 and full Linux Python 3.12 regression GREEN (October 23, 2026)
 
