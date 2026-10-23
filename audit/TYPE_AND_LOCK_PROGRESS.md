@@ -13,7 +13,7 @@ cd cloud-alerts
 python -m pytest -q
 ```
 
-Results after the two new regression tests: **mypy passed 49 files; Python 777 passed, 1 skipped, 1 third-party Starlette deprecation warning; Node 63 passed; `pip check` clean**. The two added tests cover a REVIEW signal with no candle and corrupted shadow tick state; both fail closed. The prior native workerd SQLite Durable Object test (1 passed) was not rerun in this environment.
+Results after the two new regression tests: **mypy passed 49 files; Python 777 passed, 1 skipped, 1 third-party Starlette deprecation warning; Node 63 passed; `pip check` clean**. The two added tests cover a REVIEW signal with no candle and corrupted shadow tick state; both fail closed. The native local workerd SQLite Durable Object regression was also rerun in this environment: **1 passed** with synthetic local storage, restart and duplicate-alarm checks.
 
 Typing scope: `check_untyped_defs = True` but this is **not strict typing**; `ignore_missing_imports = True` and `follow_imports = silent` remain as before. The installed Requests stubs exposed an additional HTTPAdapter override signature defect, now corrected without weakening its GET-only market-data guard. Passing mypy does not prove runtime security, performance, profitability, or cloud operation.
 
