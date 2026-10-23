@@ -190,3 +190,54 @@ def test_paper_opportunity_date_filter_rejects_bad_calendar_input(tmp_path):
         response=client.get('/paper/api/opportunities?date=2026-10-21',headers=auth)
         assert response.status_code==200
         assert response.json()['evaluations']==[]
+
+def test_private_dashboard_reports_balanced_cash_only_to_authenticated_request(tmp_path):
+    import sqlite3
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        assert client.get('/paper/api/summary').status_code==404
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        healthy=client.get('/paper/api/summary',headers=auth)
+        assert healthy.status_code==200
+        state=healthy.json()['paper_recovery_integrity']
+        assert state['cash_reconciliation']['status']=='BALANCED'
+        assert state['cash_reconciliation']['accounts_verified']==2
+        with sqlite3.connect(conf.root/'alerts.sqlite3') as db:
+            db.execute("UPDATE paper_accounts SET cash_paise=cash_paise+1 WHERE account_id='PAPER_100K'")
+        broken=client.get('/paper/api/summary',headers=auth)
+        assert broken.status_code==200
+        integrity=broken.json()['paper_recovery_integrity']
+        assert integrity['cash_reconciliation']=={
+            'status':'FAIL_CLOSED','cash_entries_permitted':False}
+        assert integrity['new_entries_permitted'] is False
+        assert all(a['available_cash_rs'] is None and a['realized_pnl_rs'] is None
+                   and a['equity_rs'] is None for a in broken.json()['accounts'])
+        assert client.get('/paper/api/trades',headers=auth).status_code==503
+        assert client.get('/paper/api/analytics',headers=auth).status_code==503
+        assert 'token' not in broken.text.lower()
+
+def test_private_integrity_api_fails_closed_on_corrupt_review_clock(tmp_path):
+    import sqlite3
+    from cloud_alerts.paper_integrity import initialize_activation
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        initialize_activation(str(conf.root/'alerts.sqlite3'),NOW)
+        with sqlite3.connect(conf.root/'alerts.sqlite3') as db:
+            db.execute("INSERT INTO events(event_id,status,at,payload) VALUES(?,?,?,?)",
+                       ('CORRUPT_REVIEW','REVIEW_CE','INVALID_TIME','PAPER TEST'))
+        auth={'X-Paper-Dashboard-Key':conf.paper_dashboard_key}
+        response=client.get('/paper/api/summary',headers=auth)
+        assert response.status_code==200
+        state=response.json()['paper_recovery_integrity']
+        assert state['status']=='FAIL_CLOSED'
+        assert state['new_entries_permitted'] is False
+        assert state['cash_reconciliation']['status']=='BALANCED'
+
+def test_dashboard_frontend_does_not_plot_invalid_paper_cash(tmp_path):
+    conf=settings(tmp_path)
+    with TestClient(build_app(conf)) as client:
+        page=client.get('/paper/dashboard')
+        assert page.status_code==200
+        assert 'PAPER CASH INTEGRITY FAILURE' in page.text
+        assert 'Simulated P&L hidden' in page.text
+        assert 'localStorage' not in page.text

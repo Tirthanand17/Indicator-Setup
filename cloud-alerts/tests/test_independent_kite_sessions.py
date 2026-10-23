@@ -56,7 +56,11 @@ async def test_two_concurrent_history_queries_use_distinct_kite_sdk_sessions(tmp
     assert {interval for _,interval in observations} == {'5minute', '15minute'}
     assert len(observations) == 2
     assert observations[0][0] != observations[1][0]
-    assert {sdk_id for sdk_id,_ in observations} == TrackedKite.closed_ids
+    assert {sdk_id for sdk_id,_ in observations}.issubset(TrackedKite.closed_ids)
+    # The metadata/option-quote client is ALSO correctly closed by Engine.
+    # Requiring exact equality against only the two history sessions would
+    # incorrectly fail when resource cleanup works as designed.
+    assert {id(sdk) for sdk in TrackedKite.instances} == TrackedKite.closed_ids
     assert len(TrackedKite.instances) >= 3  # metadata, 5m, 15m
     assert not instance.telegram.sent
 

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime,date
 from pathlib import Path
 from zoneinfo import ZoneInfo
-import asyncio,os,json,logging,signal,hmac,secrets
+import asyncio,os,json,logging,signal,hmac,secrets,sqlite3
 from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse,HTMLResponse
 from .engine import Engine
@@ -16,6 +16,7 @@ from .paper_book import PaperBook
 from .paper_dashboard_view import page as paper_dashboard_page
 from .signal_audit import SignalAudit
 from .paper_analytics import realized_analytics
+from .paper_integrity import initialize_activation, audit_entry_coverage, audit_cash_reconciliation
 from .state import State
 from .security import TokenVault,verify_relay,TokenRollbackError
 from .telegram import Telegram
@@ -75,10 +76,16 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     if getattr(cfg,'paper_autotrade_enabled',False) and (
             not paper_enabled or not getattr(cfg,'enabled',False)):
         raise RuntimeError('Automatic paper trading requires enabled monitoring and secured dashboard')
+    if getattr(cfg,'paper_autotrade_enabled',False):
+        # Never silently consider old alert-only REVIEW rows simulated trades.
+        # A preexisting paper position without this activation marker requires
+        # explicit review; price history can NEVER recreate a valid fill.
+        initialize_activation(str(cfg.root/'alerts.sqlite3'),datetime.now(IST))
     engine=Engine(cfg.api_key,vault,state,Telegram(cfg.bot_token,cfg.chat_id),
                   enabled=cfg.enabled,shadow=shadow,
                   paper_premium_tracking=getattr(cfg,"paper_premium_tracking",False),
-                  paper_book=(paper_book if getattr(cfg,'paper_autotrade_enabled',False) else None))
+                  paper_book=(paper_book if getattr(cfg,'paper_autotrade_enabled',False) else None),
+                  paper_integrity_enforced=bool(getattr(cfg,'paper_autotrade_enabled',False)))
 
     supervisor=WorkerSupervisor()
 
@@ -153,6 +160,14 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
                 or not hmac.compare_digest(candidate, paper_key)):
             raise HTTPException(404,'Not found')
 
+    def _require_balanced_paper_accounts():
+        try:
+            audit_cash_reconciliation(str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            # Do not serve convincing-looking performance statistics from
+            # corrupted or inconsistent simulated broker cash.
+            raise HTTPException(503,'Paper accounting integrity unavailable') from None
+
     @app.get('/paper/dashboard')
     async def paper_dashboard():
         if paper_book is None:
@@ -171,11 +186,35 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/summary')
     async def paper_summary(request:Request):
         _authorize_paper(request)
-        return JSONResponse(paper_book.dashboard(),headers={'Cache-Control':'no-store'})
+        response=paper_book.dashboard()
+        try:
+            integrity=audit_entry_coverage(str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            integrity={'status':'FAIL_CLOSED','new_entries_permitted':False,
+                       'missing_account_outcomes':None}
+        try:
+            integrity['cash_reconciliation']=audit_cash_reconciliation(
+                str(cfg.root/'alerts.sqlite3'))
+        except (RuntimeError,ValueError,sqlite3.DatabaseError):
+            # A private read-only API must show the safety blocker without
+            # echoing potentially sensitive/invalid on-disk ledger contents.
+            integrity['cash_reconciliation']={
+                'status':'FAIL_CLOSED','cash_entries_permitted':False}
+            integrity['new_entries_permitted']=False
+        if integrity['cash_reconciliation']['status']!='BALANCED':
+            # Keep account identity/initial-capital visible, but do not label
+            # a corrupted saved balance or P&L as verified simulation.
+            for account in response['accounts']:
+                for field in ('available_cash_rs','realized_pnl_rs',
+                              'equity_rs','closed_trades','wins','open_positions'):
+                    account[field]=None
+        response['paper_recovery_integrity']=integrity
+        return JSONResponse(response,headers={'Cache-Control':'no-store'})
 
     @app.get('/paper/api/analytics')
     async def paper_analytics(request:Request):
         _authorize_paper(request)
+        _require_balanced_paper_accounts()
         return JSONResponse(realized_analytics(str(cfg.root/'alerts.sqlite3'),datetime.now(IST)),
                             headers={'Cache-Control':'no-store'})
 
@@ -195,6 +234,7 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
     @app.get('/paper/api/trades')
     async def paper_trades(request:Request):
         _authorize_paper(request)
+        _require_balanced_paper_accounts()
         return JSONResponse({'mode':'PAPER_ONLY','actual_orders':False,
                              'trades':paper_book.trade_history(limit=100)},
                             headers={'Cache-Control':'no-store'})

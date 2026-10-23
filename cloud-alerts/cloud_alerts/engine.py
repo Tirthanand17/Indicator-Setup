@@ -4,7 +4,7 @@ Prototype uses Kite historical 5minute / 15minute REST candles and quote depth.
 For millisecond/second tick updates, see the *planned* KiteTicker WebSocket stage.
 """
 from __future__ import annotations
-import asyncio,json,os,logging
+import asyncio,json,os,logging,sqlite3
 from contextvars import ContextVar
 from datetime import datetime,timedelta,time
 from zoneinfo import ZoneInfo
@@ -13,6 +13,7 @@ from .contracts import select_future,select_option,validate_quote
 from .kite_readonly import KiteReadOnly
 from .models import Decision,Contract
 from .signal_audit import SignalAudit
+from .paper_integrity import audit_entry_coverage,recover_missing_outcomes,audit_cash_reconciliation
 from .security import TokenVault
 from .state import State
 from .signals import decide
@@ -30,10 +31,12 @@ logger=logging.getLogger('cloud_alerts')
 class Engine:
     def __init__(self,api_key:str,vault:TokenVault,db:State,telegram:Telegram, *,enabled:bool=False,
                  shadow:ShadowSupervisor|None=None, paper_premium_tracking:bool=False,
-                 premium_hypothesis:PremiumHypothesis|None=None, paper_book=None):
+                 premium_hypothesis:PremiumHypothesis|None=None, paper_book=None,
+                 paper_integrity_enforced:bool=False):
         self.api_key=api_key;self.vault=vault;self.db=db;self.telegram=telegram;self.enabled=enabled
         self.shadow=shadow
         self.paper_book=paper_book
+        self.paper_integrity_enforced=paper_integrity_enforced and paper_book is not None
         self.signal_audit=SignalAudit(db.path) if paper_book is not None else None
         self.paper_status='DISABLED' if paper_book is None else 'IDLE'
         self.paper_premium_tracking=paper_premium_tracking or paper_book is not None
@@ -69,6 +72,7 @@ class Engine:
           'mode':'READ_ONLY_PAPER','order_execution':False,
           'paper_premium_tracking':self.paper_premium_tracking,'premium_status':self.premium_status,
           'paper_automation_enabled':self.paper_book is not None,'paper_status':self.paper_status,
+          'paper_account_integrity_enforced':self.paper_integrity_enforced,
           'premium_quote_at':self.last_premium_quote_at.isoformat() if self.last_premium_quote_at else None,
           'shadow_stream':self.shadow.health() if self.shadow is not None else {'status':'DISABLED'},
           'shadow_quality_30d':self.db.shadow_summary(datetime.now(IST)) if self.shadow is not None else None}
@@ -159,6 +163,15 @@ class Engine:
         self._rest_verified_at=None
         outcome='WAIT_DATA'
         try:
+            # Entirely local accounting reconciliation needs no broker login.
+            # Repair last session's interrupted paper entries even if today's
+            # Kite token is absent; do not backdate simulated quote fills.
+            # Reconcile interrupted 50k/100k paper basket entries BEFORE
+            # any next opportunity. Delayed missing entries are rejections,
+            # never backdated hypothetical fills or cash movements.
+            if not self.reconcile_paper_journal(now,market_poll=True):
+                await self._deliver_outbox(now)
+                return
             token=self.vault.get(now)
             if not token:
                 self.set_status('WAIT_TOKEN','Daily Kite access token not delivered or expired')
@@ -196,6 +209,40 @@ class Engine:
                 outcome='REST_VALID'
             if boundary_for(now) is not None:
                 self.db.record_rest_attempt(now,outcome)
+
+    def reconcile_paper_journal(self,now:datetime,*,market_poll:bool=False)->bool:
+        """Pure-local durable recovery independent of market hours and Kite login.
+
+        Called before live candle polls and during the minute housekeeping
+        cycle. Never backfill paper fills or release capital from old quotes.
+        """
+        if not self.paper_integrity_enforced:
+            return True
+        if not isinstance(now,datetime) or now.tzinfo is None or now.utcoffset() is None:
+            self.paper_status='WAIT_PAPER_RECONCILIATION'
+            if market_poll:
+                self.set_status('WAIT_DATA','Paper recovery clock is invalid')
+            return False
+        try:
+            # Before altering even a rejection ledger, confirm that the
+            # separate 50k and 100k account cash exactly matches recorded
+            # simulated debits/credits. Corruption cannot authorize trades.
+            audit_cash_reconciliation(self.db.path)
+            result=recover_missing_outcomes(self.db.path,now)
+            coverage=audit_entry_coverage(self.db.path)
+            if not (result['new_entries_permitted'] and coverage['new_entries_permitted']):
+                self.paper_status='WAIT_PAPER_RECONCILIATION'
+                if market_poll:
+                    self.set_status('WAIT_DATA','Paper account recovery grace in progress')
+                return False
+            if result['recovered']:
+                self.paper_status='CRASH_GAP_RECORDED_AS_MISSED'
+            return True
+        except (ValueError,RuntimeError,sqlite3.DatabaseError):
+            self.paper_status='WAIT_PAPER_RECONCILIATION'
+            if market_poll:
+                self.set_status('WAIT_DATA','Paper account recovery requires review')
+            return False
 
     async def _collect_once(self,now:datetime,token:str)->None:
         # Own and release the metadata/quote SDK as well as the two transient
@@ -687,7 +734,12 @@ class Engine:
             # responsive to upcoming market-data boundaries.
             if minute!=last_outbox_minute:
                 last_outbox_minute=minute
-                if self.paper_book is not None and now.time()>=time(15,30):
+                # Local crash recovery is also essential AFTER the 15:26
+                # trading cutoff, on holidays and during token outages.
+                # Recover before any end-of-day paper summary is finalized.
+                paper_integrity_ok=self.reconcile_paper_journal(now)
+                if (paper_integrity_ok and self.paper_book is not None
+                        and now.time()>=time(15,30)):
                     await self.report_paper_session()
                 if self.shadow is not None:
                     try:
