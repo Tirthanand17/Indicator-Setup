@@ -132,3 +132,12 @@ def test_shipped_host_template_is_explicitly_blocked_and_contains_no_secrets():
     assert 'NOT_CONFIRMED_ZERO_INCREMENTAL_CHARGE_VERIFIED' in result['blockers']
     assert not any('token' in key.lower() or 'secret' in key.lower()
                    for key in plan_values)
+
+
+@pytest.mark.parametrize('tier', ['FREE', 'new_free', 'AWS_FREE'])
+def test_aws_temporary_free_account_requires_special_expiry_review(tier):
+    result = review_host(plan(provider='AWS', plan_tier=tier,
+                              service_class='linux_vm'), now=NOW)
+    assert result['result'] == 'BLOCKED'
+    assert 'AWS_FREE_REQUIRES_EXPIRY_AND_MIGRATION_PREFLIGHT' in result['blockers']
+    assert result['approved_to_provision_or_deploy'] is False
