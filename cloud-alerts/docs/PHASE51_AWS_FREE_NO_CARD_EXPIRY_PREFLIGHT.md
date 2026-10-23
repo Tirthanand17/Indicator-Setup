@@ -2,6 +2,8 @@
 
 **Reviewed:** 2026-10-23. **Status:** PREPARATION ONLY. Never create resources, sign up, use a payment card, change DNS, buy Kite, or start a cloud service from this document without a new approval and verified nonsecret provider evidence.
 
+**Phase 52 update:** Owner now accepts AWS Free only as a temporary ₹0 no-card candidate, **not** signup or any cloud resource creation. AWS's new signup automatically provisions a project; for an Indian contact address its Region is currently Sydney, not Mumbai. The older AWS India advanced signup requests a card/₹2 verification and is incompatible. Follow [Phase 52 new-signup restrictions](PHASE52_AWS_INDIA_NEW_SIGNUP_ELIGIBILITY.md) before this earlier checklist.
+
 ## Decision boundary
 
 The owner's requirements are **₹0, no card and no payment hold, no laptop as a host, private persistent paper trading, phone Telegram alerts, a full-session intraday worker, and no real broker orders**. AWS's new Free plan is **a conditional temporary trial**, not a permanent free VPS. AWS advertises no credit card **for most eligible new customers**; eligibility can differ on actual account signup. If a payment card, paid account, charge authorization or verification hold is requested, **STOP**. Do not bypass verification, open a second account, or provision a service.
