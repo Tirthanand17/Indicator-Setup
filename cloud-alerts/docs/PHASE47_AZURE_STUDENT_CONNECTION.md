@@ -26,6 +26,13 @@ An authenticated account with no active verified Student subscription remains `B
 
 Independently inspect remaining credit/expiry in [Azure Sponsorships](https://www.microsoftazuresponsorships.com/balance), and VM region availability, EBS-like disk costs, IP, outbound traffic, quota and credit cap. **Azure for Students is a finite $100 subsidy, not a perpetual ₹0 always-on VM guarantee**. If credit is exhausted or the offer expires, Microsoft disables the subscription rather than silently upgrading it to pay-as-you-go unless the user chooses that upgrade. Do not provision without the reviewed exact host and user approval.
 
+## GitHub main merge and re-verification
+
+- [PR #3](https://github.com/Tirthanand17/Indicator-Setup/pull/3) merged successfully with source merge commit `ff22dabd234acd36f15497658c7ec4a88d23b18e`.
+- Fetched actual post-merge `main` commit `6d3150ff71e517afe4962f5434cafad8e5398a6b` into the existing disposable Nirala checkout and Ubuntu's ext4 working tree.
+- Ran the checked-in no-secret Linux regression against merged main: **616 passed, 0 failed, 1 skipped**, exit **0**, in 67.20 seconds. This is a full-suite test of the actual merged source, not only a feature-branch test.
+- Azure CLI remains installed, but `az account list` returned **no accessible subscriptions** and a tenant inspection requested login. **Student academic subscription activation and authenticated account access remain human-only prerequisites**; no VM, persistent volume, costs, tokens, broker orders or messages were created.
+
 ## Project acceptance unchanged
 
 The Render Free services reviewed earlier sleep and lack persistent local storage. Oracle sign-up requires identity/payment-card verification and was not initiated. Current Indicator cloud deployment, real Kite access-token handoff, actual options depth, Telegram phone receipt while Nirala is OFF, and five NSE paper sessions remain **0/5 confirmed**. `ALERTS_ENABLED=false`, `PAPER_AUTOTRADE_ENABLED=false`, no real broker orders. The legacy expanded engineering progress estimate remains **53%**, not a profitability claim.
