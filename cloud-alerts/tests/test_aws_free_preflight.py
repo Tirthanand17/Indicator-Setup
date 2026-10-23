@@ -194,14 +194,17 @@ def test_cli_rejects_corrupt_and_oversize_json_without_leaks(tmp_path, capsys):
 
 def test_cli_complete_fake_plan_never_provisions(tmp_path, capsys):
     candidate = tmp_path / "aws-plan.json"
+    current = datetime.now(timezone.utc)
     candidate.write_text(json.dumps(proposed(
-        reviewed_at_utc=datetime.now(timezone.utc).isoformat(),
-        pricing_reviewed_at_utc=datetime.now(timezone.utc).isoformat(),
+        account_opened_at_utc=(current-timedelta(days=1)).isoformat(),
+        free_plan_expires_at_utc=(current+timedelta(days=179)).isoformat(),
+        migration_cutover_at_utc=(current+timedelta(days=90)).isoformat(),
+        reviewed_at_utc=current.isoformat(),
+        pricing_reviewed_at_utc=current.isoformat(),
+        planned_run_days=30,
     )), encoding="utf-8")
-    # The fixed October-2026 account opens in the past, but cutoff may already
-    # have occurred when this test is rerun years later. The plan remains safe.
-    rc = main(["--plan", str(candidate), "--json"])
+    assert main(["--plan", str(candidate), "--json"]) == 0
     outcome = json.loads(capsys.readouterr().out)
-    assert rc in (0, 2)
+    assert outcome["result"] == "DECLARATIONS_COMPLETE_ONLY"
     assert outcome["approved_to_provision_or_deploy"] is False
     assert outcome["hosting_resource_created"] is False
