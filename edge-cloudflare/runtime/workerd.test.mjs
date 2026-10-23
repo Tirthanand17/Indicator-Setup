@@ -75,3 +75,66 @@ test('native local workerd verifies HMAC, encrypts token, persists it across res
       {present:true,encrypted:true,containsPlainToken:false});
   } finally {await mf.dispose();}
 });
+
+test('native local workerd commits two-account paper debits/outbox atomically and survives restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-paper-native-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PAPER_LEDGER_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw new Error('External requests forbidden by local test');}};
+  let mf=new Miniflare(options);
+  const nowMs=Date.parse('2026-10-23T04:30:00Z');
+  const makeQuote=(at,bid=100,ask=100.5)=>({
+    contract:{symbol:'NIFTY26OCT23000CE',kind:'CE',expiry:'2026-10-29',
+      token:12345,lotSize:65},bid,ask,bidQuantity:600,askQuantity:600,
+    updatedAtMs:at-1000,
+  });
+  const stubFor=async()=>{
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));
+  };
+  try {
+    const stub=await stubFor();
+    const request=async(path,body)=>stub.fetch(`https://unit.invalid/test/paper/${path}`,
+      {method:'POST',body:JSON.stringify(body)});
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/paper-ledger')).status,404);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/paper-ledger',
+      {headers})).status,200);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/orders',{method:'POST',headers})).status,404);
+    const [raceA,raceB]=await Promise.all([
+      request('enter',{signalId:'cloud-signal-001',nowMs,quote:makeQuote(nowMs)}),
+      request('enter',{signalId:'cloud-signal-001',nowMs,quote:makeQuote(nowMs)}),
+    ]);
+    const [resultA,resultB]=await Promise.all([raceA.json(),raceB.json()]);
+    const statuses=[resultA.results.PAPER_50K.status,resultB.results.PAPER_50K.status].sort();
+    assert.deepEqual(statuses,['DUPLICATE','OPEN']);
+    const first=resultA.results.PAPER_50K.status==='OPEN'?resultA:resultB;
+    assert.equal(first.results.PAPER_50K.status,'OPEN');
+    assert.equal(first.results.PAPER_100K.status,'OPEN');
+    const replay=await (await request('enter',
+      {signalId:'cloud-signal-001',nowMs:nowMs+1000,quote:makeQuote(nowMs+1000)})).json();
+    assert.equal(replay.results.PAPER_50K.status,'DUPLICATE');
+    assert.equal((await (await stub.fetch('https://unit.invalid/test/paper/rollback')).json()).unchanged,true);
+    const id=first.results.PAPER_50K.tradeId;
+    const exited=await (await request('exit',{tradeId:id,nowMs:nowMs+120000,
+      quote:makeQuote(nowMs+120000,79.8,80.2)})).json();
+    assert.equal(exited.result.status,'CLOSED');
+    const before=await (await stub.fetch('https://unit.invalid/test/paper/state')).json();
+    assert.equal(before.outbox.length,3);
+    assert.equal(before.positions.length,2);
+    assert.equal(before.positions.filter(p=>p.status==='CLOSED').length,1);
+    const publicSummary=await (await mf.dispatchFetch('https://unit.invalid/internal/paper-ledger',
+      {headers})).json();
+    assert.equal(publicSummary.status,'READY');
+    assert.equal(publicSummary.pendingOutboxCount,3);
+    assert.equal(JSON.stringify(publicSummary).includes('message'),false);
+    await mf.dispose();mf=new Miniflare(options);
+    const recovered=await (await (await stubFor()).fetch('https://unit.invalid/test/paper/state')).json();
+    assert.deepEqual(recovered,before);
+    assert.equal(recovered.outbox.filter(e=>e.kind==='PAPER_EXIT').length,1);
+    assert.equal(recovered.accounts.PAPER_100K.initialPaise,10000000);
+  } finally {await mf.dispose();}
+});
