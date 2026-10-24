@@ -6,7 +6,8 @@
     "test": "node --test *.test.mjs",
     "test:runtime": "node --test runtime/*.test.mjs",
     "preflight:offline": "node offline-preflight.mjs",
-    "bench:offline": "node runtime/offline-capacity-benchmark.mjs"
+    "bench:offline": "node runtime/offline-capacity-benchmark.mjs",
+    "metrics:probe": "node cloudflare-metrics-cli.mjs"
   },
   "devDependencies": { "miniflare": "4.20260730.0" },
   "overrides": { "undici": "7.29.1", "sharp": "0.35.5" }

@@ -2,6 +2,20 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase36 read-only Cloudflare metrics collection gate (not activated):**
+`cloudflare-metrics-readonly.mjs` prepares tightly scoped GraphQL queries for
+the exact Worker name and account-level Durable Object metrics. The CLI
+`npm run metrics:probe` makes **zero HTTP calls by default**. Actual read-only
+queries need a separate owner approval (`CLOUDFLARE_METRICS_READ_APPROVED=yes`),
+an account-scoped Analytics Read token, an account tag and a completed UTC
+day; `npm run metrics:probe -- --run` is the explicit invocation. Never add
+real tokens to this repository or chats. Query results are **not** release
+approval because DO observations are account-wide, results can be sampled,
+and paid/billed row and duration measurements require further verification.
+**219 JavaScript and 18 native SQLite tests pass** with fake GraphQL data.
+There is no verified cloud Worker deployment or real resource sample yet.
+[Phase36 gate and operator procedure](../audit/PHASE36_CLOUDFLARE_READONLY_METRICS_GATE.md).
+
 **Phase35 local native capacity baseline (not cloud activation):**
 Run `npm run bench:offline` for 64 scheduler-only callbacks or
 `npm run bench:offline -- --samples=128` for a larger local-only sample.
