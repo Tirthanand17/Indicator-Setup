@@ -2,6 +2,17 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase35 local native capacity baseline (not cloud activation):**
+Run `npm run bench:offline` for 64 scheduler-only callbacks or
+`npm run bench:offline -- --samples=128` for a larger local-only sample.
+Disposable native workerd/SQLite state is exercised, checked for monotonic
+claims and reopened to prove restart persistence. Unexpected network access
+is prohibited, and the report labels its timings as **local wall time,
+not production Worker CPU or billable DO duration**. The new integrity
+tests fail if restarts lose claims or any external request occurs.
+**211 JS + 18 native SQLite tests pass**, but real cloud and phone acceptance
+remains 0/5. No flags were turned on. [Phase35 evidence](../audit/PHASE35_OFFLINE_NATIVE_CAPACITY_BASELINE.md).
+
 **Phase34 Telegram HTTPS sender wired, still disabled:**
 `telegram-sender.mjs` offers a fixed-host `sendMessage` POST to one pinned
 numeric private chat, a four-second timeout, bounded JSON parsing, strict
