@@ -3,6 +3,16 @@ const ROOT = 'https://api.kite.trade';
 const MAX_JSON_BYTES = 512 * 1024;
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
+/** Kite's documented history timestamps use +0530 (without a colon).
+ * Canonicalize the explicit offset before Date.parse; never infer host time.
+ */
+export function parseAwareCandleTimestamp(value) {
+  if (typeof value !== 'string' ||
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:?\d\d)$/.test(value))
+    return NaN;
+  return Date.parse(value.replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+}
+
 export function permittedMarketUrl(value) {
   let url;
   try { url = new URL(value); } catch { return false; }
@@ -27,9 +37,7 @@ function credential(value) {
 
 function recentCandle(row) {
   return Array.isArray(row) && row.length === 6 &&
-    typeof row[0] === 'string' &&
-    /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/.test(row[0]) &&
-    !Number.isNaN(Date.parse(row[0])) &&
+    Number.isFinite(parseAwareCandleTimestamp(row[0])) &&
     row.slice(1, 5).every(v => typeof v === 'number' && Number.isFinite(v) && v > 0) &&
     Number.isSafeInteger(row[5]) && row[5] >= 0 &&
     row[2] >= Math.max(row[1], row[4], row[3]) && row[3] <= Math.min(row[1], row[4]);

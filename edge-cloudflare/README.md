@@ -2,6 +2,16 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase28 disabled read-only futures review:** `market-review.mjs` can now
+transform strictly validated Kite 5m/15m candles into a `WAIT_DATA`,
+`NO_TRADE`, `REVIEW_CE` or `REVIEW_PE` futures-only diagnostic. The official
+Kite `+0530` timestamp format is accepted without inferring local timezone.
+The new `OFFLINE_READONLY_REVIEW_ENABLED=false` gate prevents evaluation
+unless separately configured; on review-mode five-minute polls the Worker
+waits one 20s alarm slot after the close-completeness margin. This does **not**
+provide option premium/depth, paper fills, Telegram delivery, or live approval.
+Offline **178 JS + 8 native** tests pass. [Phase28 audit](../audit/PHASE28_READONLY_FUTURES_REVIEW.md).
+
 **Phase27 confidential research backup (not an activated backup service):** The Phase23 HMAC-signed archive is **plaintext** and must remain private. The new `paper-archive-sealed.mjs` verifies the signed ledger and encrypts it using a **separate 256-bit AES-GCM key and random nonce**, then requires both the decryption key and the HMAC secret to restore to an **empty** storage target. There is still no HTTP export, no scheduled backup, no off-host destination, no key management or real restore approval. Never upload plaintext archive data or secrets to GitHub. [Phase27 security checkpoint](../audit/PHASE27_ENCRYPTED_ARCHIVE_OFFLINE.md).
 
 **Phase26 offline Cloudflare Free preflight:** Run `npm run preflight:offline` to check that this exact example template has all feature flags disabled, no public routes or deploy scripts, and to print a 1,125-slot market-day **estimated** SQLite/DO quota forecast. Cloudflare Free documentation currently allows SQLite-backed Durable Objects, but actual CPU, duration, account conditions and five-session health remain unverified. This command never deploys or connects to an account. [Forecast assumptions and evidence](../audit/PHASE26_FREE_TIER_PREFLIGHT.md).
