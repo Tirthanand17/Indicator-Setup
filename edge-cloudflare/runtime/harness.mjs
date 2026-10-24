@@ -1,6 +1,9 @@
 // LOCAL TEST ENTRYPOINT ONLY. Never referenced by deployment configuration.
 import worker, { MarketSession } from '../worker.mjs';
 import { newPaperLedger } from '../paper-ledger.mjs';
+import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
+  claimOptionSnapshot, finishOptionSnapshot, optionStatus } from '../option-runtime.mjs';
+import { validatePairEvidence } from '../option-readonly.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -21,6 +24,41 @@ export class TestSession extends MarketSession {
       const stored = await this.storage.get('daily-token-v1');
       return Response.json({ present: !!stored, encrypted: !!stored?.ciphertext,
         containsPlainToken: JSON.stringify(stored).includes('SYNTHETIC-ACCESS-TOKEN') });
+    }
+    // Offline-only fixtures for the protected option cadence. Production
+    // worker.mjs exposes NONE of these write routes.
+    if (path === '/test/option/pacing' && request.method === 'POST') {
+      const input=await request.json();
+      return Response.json(await this.reserveReadOnlyQuote(
+        input.tickId,input.observedAtMs,input.kind));
+    }
+    if (path === '/test/option/master' && request.method === 'POST') {
+      const input=await request.json();
+      await this.refreshOptionMaster(input.tickId,input.observedAtMs,
+        input.futuresLastPrice,{instrumentsNfoCsv:async()=>input.csv});
+      const saved=await this.storage.get(READONLY_OPTION_STATE_KEY);
+      return Response.json(optionStatus(saved,input.observedAtMs));
+    }
+    if (path === '/test/option/snapshot' && request.method === 'POST') {
+      const input=await request.json();
+      const result=await this.storage.transaction(async txn=>{
+        const old=await txn.get(READONLY_OPTION_STATE_KEY);
+        const claim=claimOptionSnapshot(old,{tickId:input.tickId,
+          observedAtMs:input.observedAtMs});
+        if(!claim.allowed) return {status:'SKIPPED'};
+        const evidence=validatePairEvidence({pair:claim.state.pair,
+          quotes:input.quotes,observedAtMs:input.observedAtMs});
+        const state=finishOptionSnapshot(claim.state,{tickId:input.tickId,evidence});
+        await txn.put(READONLY_OPTION_STATE_KEY,state);
+        return optionStatus(state,input.observedAtMs);
+      });
+      return Response.json(result);
+    }
+    if (path === '/test/option/state') {
+      const [option,pace]=await Promise.all([
+        this.storage.get(READONLY_OPTION_STATE_KEY),
+        this.storage.get(READONLY_QUOTE_PACE_KEY)]);
+      return Response.json({option:optionStatus(option,Date.now()),pace:pace??null});
     }
     // These methods exist only in this LOCAL test harness; production has no
     // HTTP write route for simulated trades or alert dispatch.
