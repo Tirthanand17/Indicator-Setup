@@ -1,5 +1,18 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase36 Cloudflare read-only metrics gate (source only):**
+Built a narrowly scoped GraphQL Analytics reader for Worker CPU P50/P99,
+requests, errors, subrequests, and account-wide Durable Object usage. Fixed
+endpoint, explicit finished-day scope, secret-free sanitized output, bounded
+response and fail-closed timeouts are covered by mocked tests. `npm run
+metrics:probe` makes **no** request unless the owner explicitly opts in and
+provides an Analytics Read token in environment variables. No real Cloudflare
+account metrics exist in the project evidence: no Worker deployed, no live
+CPU/DO duration/billable rows observed. **219/219 JS and 18/18 native tests,
+plus safe template preflight passed. No charges, deployment, trades or
+Telegram notifications.** [Phase36 checkpoint](../../audit/PHASE36_CLOUDFLARE_READONLY_METRICS_GATE.md).
+Offline engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+
 **24 October Phase35 native SQLite capacity baseline (offline only):**
 Added `npm run bench:offline` to run up to 256 deterministic scheduler-only
 callbacks in disposable Miniflare/workerd SQLite, measure **local wall time**
