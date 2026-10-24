@@ -1,5 +1,20 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase30 disabled durable option snapshot checkpoint (outside fixed checklist):**
+Added an optional Worker/SQLite DO option-only alarm path alongside existing
+read-only futures sampling, with quote requests reserved transactionally
+before Kite GETs to prevent duplicate, burst and restart replay. Durable
+HTTP 429 cooldown and 401/403 new-token release gates are included. Same-day
+master selection is bounded to three attempts/day, 30 minutes apart; only
+the selected CE/PE contract and validated latest BID/ASK evidence persist.
+Authenticated scheduler status reports observation freshness and pacing only.
+`OFFLINE_OPTION_SNAPSHOT_ENABLED=false` in the deployment template and is
+checked by strict offline preflight. **192/192 JS, 9/9 native SQLite and safe
+preflight all pass.** **No live sampling, real cloud CPU/quota benchmark,
+paper entry, Telegram send, trade or deployment.**
+[Phase30 audit](../../audit/PHASE30_DURABLE_OPTION_SAMPLING_OFFLINE.md).
+Engineering **23/25 = 92%**, live acceptance **0/5**, unchanged.
+
 **24 October Phase29 offline NIFTY options checkpoint (outside fixed checklist):**
 Added official-shaped NFO daily master CE/PE discovery by equal expiry/strike/
 lot size, excludes expiry-day instruments, requires same-day master fetch and

@@ -2,6 +2,19 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase30 disabled read-only option snapshot cadence:** `option-runtime.mjs`
+adds transactional single-DO quote request reservation, restart-safe dedupe,
+one-minute 429 cooldown, sticky 403 auth guard cleared by a **fresh signed
+daily token**, and bounded same-day master download attempts. With the new
+`OFFLINE_OPTION_SNAPSHOT_ENABLED` flag deliberately enabled *only after a
+separate cloud approval*, every third 20-second slot is dedicated to one
+read-only CE+PE GET rather than a simultaneous futures quote. Only compact
+contracts and validated BID/ASK evidence are saved; the existing `/internal/scheduler`
+authenticated status shows freshness and cooldown without broker keys.
+The example config keeps the feature **false**; no paper entry, message or
+trade action can result. Worker Free CPU/daily master parsing remains an
+unmeasured activation blocker. [Phase30 audit](../audit/PHASE30_DURABLE_OPTION_SAMPLING_OFFLINE.md).
+
 **Phase29 read-only NIFTY option pair evidence (not connected or active):**
 `option-readonly.mjs` parses same-day, official-shaped Kite NFO CSV to select
 matching non-expiry-day ATM CE/PE contracts, then normalizes only fresh

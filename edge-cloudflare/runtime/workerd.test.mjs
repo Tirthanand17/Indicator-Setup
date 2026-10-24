@@ -12,6 +12,71 @@ const root=fileURLToPath(new URL('..',import.meta.url));
 const key='SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const headers={authorization:'Bearer '+key};
 
+test('native SQLite read-only option master, durable quote cadence and evidence survive restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-option-native-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_OPTION_SNAPSHOT_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('No real Kite or Telegram requests allowed');}};
+  const observed=Date.parse('2026-10-23T09:15:00+05:30');
+  const symbolCe='NIFTY26O2925100CE',symbolPe='NIFTY26O2925100PE';
+  const header='instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange';
+  const row=(token,symbol,kind)=>[token,token+1,symbol,'NIFTY',0,'2026-10-29',
+    25100,0.05,65,kind,'NFO-OPT','NFO'].join(',');
+  const csv=[header,row(10101,symbolCe,'CE'),row(10102,symbolPe,'PE'),''].join('\n');
+  let mf=new Miniflare(options);
+  const doStub=async()=>{
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));
+  };
+  const jsonPost=(stub,path,data)=>stub.fetch('https://unit.invalid/test/option/'+path,
+    {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+  try {
+    let stub=await doStub();
+    await stub.fetch('https://unit.invalid/test/pipeline/clock',
+      {method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({nowMs:observed})});
+    let claim=await (await jsonPost(stub,'pacing',{tickId:'2026-10-23:0',
+      observedAtMs:observed,kind:'FUTURE'})).json();
+    assert.equal(claim.allowed,true);
+    claim=await (await jsonPost(stub,'pacing',{tickId:'2026-10-23:0',
+      observedAtMs:observed,kind:'FUTURE'})).json();
+    assert.equal(claim.allowed,false);
+    const master=await (await jsonPost(stub,'master',{tickId:'2026-10-23:0',
+      observedAtMs:observed,futuresLastPrice:25105,csv})).json();
+    assert.equal(master.status,'MASTER_READY');
+    assert.equal(master.strike,25100);
+    await stub.fetch('https://unit.invalid/test/pipeline/clock',
+      {method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({nowMs:observed+42_000})});
+    claim=await (await jsonPost(stub,'pacing',{tickId:'2026-10-23:2',
+      observedAtMs:observed+40_000,kind:'OPTION_PAIR'})).json();
+    assert.equal(claim.allowed,true);
+    const quote=(token)=>({instrument_token:token,timestamp:'2026-10-23 09:15:40',
+      depth:{buy:[{price:100,quantity:130}],sell:[{price:100.5,quantity:130}]}});
+    const saved=await (await jsonPost(stub,'snapshot',{tickId:'2026-10-23:2',
+      observedAtMs:observed+42_000,quotes:{CE:quote(10101),PE:quote(10102)}})).json();
+    assert.equal(saved.status,'OPTION_OBSERVED');
+    assert.equal(saved.evidenceFresh,true);
+    assert.equal(saved.paperEntryAuthorized,false);
+    const state=await (await stub.fetch('https://unit.invalid/test/option/state')).json();
+    assert.equal(state.pace.count,2);
+    assert.equal(state.option.evidenceFresh,true);
+    await mf.dispose();mf=new Miniflare(options);
+    stub=await doStub();
+    const after=await (await stub.fetch('https://unit.invalid/test/option/state')).json();
+    assert.equal(after.option.status,'OPTION_OBSERVED');
+    assert.equal(after.option.expiry,'2026-10-29');
+    assert.equal(after.pace.count,2);
+    const repeated=await (await jsonPost(stub,'pacing',{tickId:'2026-10-23:2',
+      observedAtMs:observed+42_000,kind:'OPTION_PAIR'})).json();
+    assert.equal(repeated.allowed,false);
+  } finally {await mf.dispose();}
+});
+
 test('real local workerd SQLite transactions, duplicate alarms and persisted restart',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-offline-do-'));
   const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
