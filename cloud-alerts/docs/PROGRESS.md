@@ -1,5 +1,15 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase28 read-only futures review checkpoint (outside fixed checklist):**
+Corrected a Kite historical-candle format incompatibility (`+0530` in the
+official API example) and implemented an opt-in, strictly bounded read-only
+5m/15m futures strategy review. It emits sanitized candidate statuses only,
+never entries, option fills, alerts or orders. The Worker review flag is
+disabled by default, and no live service was contacted. **178/178 JS and
+8/8 native workerd tests pass**, plus disabled-template offline preflight.
+Engineering **23/25 = 92%**, live acceptance **0/5**, unchanged.
+[Phase28 audit](../../audit/PHASE28_READONLY_FUTURES_REVIEW.md).
+
 **24 October Phase27 offline archive confidentiality checkpoint (outside fixed checklist):** New `paper-archive-sealed.mjs` adds AES-256-GCM confidentiality around a separately HMAC-authenticated paper archive. Fresh random nonce, strict authenticated envelope and key separation, no plaintext positions/outbox fields, tamper/wrong-key rejection and empty-only isolated recovery are exercised with synthetic tests. **172 Cloudflare unit and 8 native SQLite tests pass.** **No actual user backup, export route, key escrow, GitHub archive upload or off-host recovery was performed.** Item23 private cloud retention/restore remains **No**; engineering **23/25 = 92%**, live **0/5**. [Phase27 evidence](../../audit/PHASE27_ENCRYPTED_ARCHIVE_OFFLINE.md).
 
 **24 October Phase26 source-only free-tier preflight (new checkpoint, outside the fixed checklist):** Reviewed official Cloudflare Free Worker + SQLite Durable Object quotas and added an executable `npm run preflight:offline` source check. The strict guard rejects accidentally enabled `wrangler.example.jsonc` services/public bindings and deploy scripts. A deliberately conservative 1,125-alarm market-day model estimates 1,226 DO requests, 7,551 SQL rows read, 6,751 rows written and 4 MB stored, all **forecast only**. Workers 10 ms CPU invocation cap and DO duration remain **unmeasured**; all release/paid/broker actions remain blocked. Original fixed checklist **23/25 = 92%**, real acceptance **0/5**, unchanged. [Phase26 evidence](../../audit/PHASE26_FREE_TIER_PREFLIGHT.md).

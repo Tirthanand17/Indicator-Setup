@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createReadOnlyKite,permittedMarketUrl} from './market-readonly.mjs';
+import {createReadOnlyKite,permittedMarketUrl,
+  parseAwareCandleTimestamp} from './market-readonly.mjs';
 
 const apiKey='SYNTHETIC-KEY', accessToken='SYNTHETIC-ACCESS-NEVER-LIVE-0123456789';
 const candles=[['2026-10-23T09:15:00+05:30',100,104,98,103,900]];
@@ -73,4 +74,16 @@ test('reject malformed OHLC, no timestamps, impossible ranges and unusual creden
   await assert.rejects(client.history(123,'5minute','2026-10-23 09:15:00','2026-10-23 09:30:00'));
   await assert.rejects(client.history(123,'5minute','2026-10-23 10:00:00','2026-10-23 09:30:00'));
   assert.throws(()=>createReadOnlyKite({apiKey:'key\r\nORDER',accessToken}));
+});
+
+test('documented Kite +0530 historical timestamps are read as IST, without host timezone',async()=>{
+  const documented='2017-12-15T09:15:00+0530';
+  assert.equal(parseAwareCandleTimestamp(documented),
+    Date.parse('2017-12-15T09:15:00+05:30'));
+  assert.equal(parseAwareCandleTimestamp('2017-12-15T09:15:00'),NaN);
+  assert.equal(parseAwareCandleTimestamp('2017-12-15 09:15:00'),NaN);
+  const client=createReadOnlyKite({apiKey,accessToken,
+    fetchImpl:async()=>json({candles:[[documented,100,104,98,103,900]]})});
+  assert.equal((await client.history(123,'5minute','2017-12-15 09:15:00',
+    '2017-12-15 09:20:00'))[0][0],documented);
 });

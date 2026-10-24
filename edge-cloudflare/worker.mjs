@@ -5,6 +5,7 @@
 import { assessAlarm, validClaimedTickId, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
 import { verifyDailyRelay, sealDailyToken, openDailyToken, expiryForSignedSecond } from './daily-token.mjs';
 import { createReadOnlyKite } from './market-readonly.mjs';
+import { reviewReadOnlyMarket } from './market-review.mjs';
 import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
   enterPaperBasket, exitPaperPosition, markPaperUnverifiable,
   paperLedgerSummary } from './paper-ledger.mjs';
@@ -445,11 +446,16 @@ export class MarketSession {
         throw new Error('stale or mismatched market timestamp/instrument');
       report = { schema: 1, tickId, observedAtMs: nowMs, status: 'QUOTE_OBSERVED',
         exchangeAtMs: parsedTimestamp, lastPrice: quote.last_price };
-      // Only every five-minute boundary: about 75*2 historical GETs a session.
+      // Review mode waits one 20-second slot for the five-minute candle to
+      // close and pass the 8-second source-completeness guard. The old
+      // observational-only cadence remains unchanged when review is disabled.
       const slot = Number(tickId.split(':')[1]);
-      if (slot % 15 === 0) {
+      const reviewEnabled = this.env.OFFLINE_READONLY_REVIEW_ENABLED === 'true';
+      if (slot % 15 === (reviewEnabled ? 1 : 0)) {
         const local = ms => new Date(ms + 19_800_000).toISOString().slice(0, 19).replace('T', ' ');
-        const from = local(nowMs - 7 * 86_400_000);
+        // At most ~five ordinary NSE trading days of 5m bars (under the
+        // transport's 400-row cap), not an unbounded week of candles.
+        const from = local(nowMs - 6 * 86_400_000);
         const to = local(nowMs - 300_000);
         const [m5, m15] = await Promise.all([
           client.history(instrumentToken, '5minute', from, to),
@@ -457,6 +463,14 @@ export class MarketSession {
         ]);
         report = { ...report, status: 'HISTORY_OBSERVED', fiveMinuteCount: m5.length,
           fifteenMinuteCount: m15.length };
+        if (reviewEnabled) {
+          // FUTURES-ONLY diagnostic, not a bridge into synthetic paper entries.
+          // Never persist raw candles, options, Kite responses or credentials.
+          report.review = reviewReadOnlyMarket({ tickId, observedAtMs: nowMs,
+            futures: { symbol: `NFO:${symbol}`, instrumentToken,
+              exchangeAtMs: parsedTimestamp, lastPrice: quote.last_price },
+            candles5: m5, candles15: m15 });
+        }
       }
     } catch {
       // Never log exception text/response bodies/request headers/credentials.
