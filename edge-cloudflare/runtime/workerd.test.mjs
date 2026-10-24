@@ -78,6 +78,90 @@ test('native separate ₹50k/₹100k read-only paper bridge survives restart wit
   } finally {await mf.dispose();}
 });
 
+test('native read-only paper Telegram rehearsal is isolated, restart-safe and never sends',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-readonly-delivery-native-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+      OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('No Telegram or broker network requests permitted');}};
+  const openedAt=Date.parse('2026-10-23T10:45:20+05:30');
+  const optionAt=openedAt+20_000;
+  const futures={symbol:'NFO:NIFTY26OCTFUT',instrumentToken:12345,
+    exchangeAtMs:openedAt-1000,lastPrice:22046};
+  const review={source:'READONLY_FUTURES_REVIEW_ONLY',status:'REVIEW_CE',
+    paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false,
+    fiveMinuteCandleAtMs:Date.parse('2026-10-23T10:40:00+05:30')};
+  const leg=(kind,token)=>({contract:{symbol:`NIFTY26O2922050${kind}`,kind,
+    expiry:'2026-10-29',strike:22050,token,lotSize:65},
+    bid:100,ask:100.5,bidQuantity:650,askQuantity:650,updatedAtMs:optionAt-1000});
+  const evidence={source:'READONLY_OPTION_EVIDENCE_ONLY',paperEntryAuthorized:false,
+    telegramAuthorized:false,realOrdersEnabled:false,
+    CE:leg('CE',51001),PE:leg('PE',51002)};
+  let mf=new Miniflare(options);
+  const stub=async()=>{const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));};
+  const call=(s,route,data)=>s.fetch(`https://unit.invalid/test/${route}`,{
+    method:'POST',body:JSON.stringify(data)});
+  const status=()=>mf.dispatchFetch('https://unit.invalid/internal/readonly-delivery',{headers});
+  try {
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/readonly-delivery')).status,404);
+    assert.equal((await status()).status,503);
+    let s=await stub();
+    const staged=await (await call(s,'read-only-paper/review',{
+      tickId:'2026-10-23:271',observedAtMs:openedAt,review,futures})).json();
+    assert.equal(staged.staged,true);
+    const turn=await (await call(s,'read-only-paper/turn',{
+      tickId:'2026-10-23:272',observedAtMs:optionAt,evidence})).json();
+    assert.equal(turn.entered,2);
+    let report=await (await status()).json();
+    assert.equal(report.status,'READY');
+    assert.equal(report.queued,2);
+    assert.equal(report.networkSenderImplemented,false);
+    const claimed=await (await call(s,'read-only-delivery/claim',{nowMs:optionAt+100})).json();
+    assert.equal(claimed.status,'SIMULATED_ATTEMPT_CLAIM');
+    assert.equal(claimed.sent,false);
+    assert.equal((await (await s.fetch('https://unit.invalid/test/delivery/state')).json()),null);
+    await mf.dispose();mf=new Miniflare(options);
+    s=await stub();
+    const repeated=await (await call(s,'read-only-delivery/claim',{nowMs:optionAt+200})).json();
+    assert.equal(repeated.status,'AMBIGUOUS_ACK_REQUIRED');
+    assert.equal((await (await status()).json()).attempted,1);
+    const rate=await (await call(s,'read-only-delivery/settle',{
+      eventId:claimed.eventId,attempt:1,nowMs:optionAt+1000,httpStatus:429,
+      botResponse:{ok:false,error_code:429,parameters:{retry_after:5}}})).json();
+    assert.equal(rate.status,'RATE_LIMIT_WAIT');
+    assert.equal((await (await call(s,'read-only-delivery/claim',{
+      nowMs:optionAt+5999})).json()).status,'RATE_LIMIT_WAIT');
+    const retry=await (await call(s,'read-only-delivery/claim',{
+      nowMs:optionAt+6000})).json();
+    assert.equal(retry.attempt,2);
+    const accepted=await (await call(s,'read-only-delivery/settle',{
+      eventId:retry.eventId,attempt:retry.attempt,nowMs:optionAt+7000,
+      httpStatus:200,botResponse:{ok:true,result:{message_id:54321}}})).json();
+    assert.equal(accepted.status,'ACCEPTED_API_ONLY');
+    assert.equal(accepted.phoneDelivered,false);
+    report=await (await status()).json();
+    assert.equal(report.acceptedByBotApi,1);
+    assert.equal(report.phoneDeliveredVerified,false);
+    assert.equal(report.cursor,1);
+    assert.equal(report.queued,1);
+    const endAt=Date.parse('2026-10-23T15:26:00+05:30');
+    const end=await (await call(s,'read-only-paper/eod',{nowMs:endAt})).json();
+    assert.equal(end.marked,2);
+    const afterEnd=await (await status()).json();
+    assert.equal(afterEnd.status,'READY');
+    assert.equal(afterEnd.cursor,1);
+    assert.equal(afterEnd.queued,3);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/readonly-delivery/claim',{
+      method:'POST',headers,body:'x'})).status,404);
+  } finally {await mf.dispose();}
+});
+
 test('native 15:26 close marks missing-quote exits unverifiable instead of booking profit',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-paper-unverifiable-do-'));
   const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),

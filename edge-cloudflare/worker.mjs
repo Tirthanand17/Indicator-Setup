@@ -26,6 +26,7 @@ import { PORTFOLIO_MARKS_KEY, auditPortfolioMarks,
 import { PAPER_DELIVERY_KEY, newPaperDeliveryJournal,
   claimPaperDelivery, settlePaperDelivery, suppressAmbiguousDelivery,
   paperDeliverySummary } from './paper-delivery.mjs';
+import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from './readonly-delivery.mjs';
 import { assessOfflineRelease } from './release-readiness.mjs';
 
 const STATE_KEY = 'scheduler-v1';
@@ -84,6 +85,7 @@ export default {
           (path === '/internal/release-readiness' && request.method === 'GET') ||
           (path === '/internal/paper-ledger' && request.method === 'GET') ||
           (path === '/internal/readonly-paper' && request.method === 'GET') ||
+          (path === '/internal/readonly-delivery' && request.method === 'GET') ||
           (path === '/internal/synthetic-session' && request.method === 'GET')) ||
         !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
     if (env.OFFLINE_SCHEDULER_ENABLED !== 'true' || !env.MARKET_SESSION) {
@@ -108,6 +110,11 @@ export class MarketSession {
       this.env.OFFLINE_READONLY_REVIEW_ENABLED==='true' &&
       this.env.READONLY_MARKET_RUNTIME_ENABLED==='true' &&
       this.env.OFFLINE_SCHEDULER_ENABLED==='true';
+  }
+
+  get readonlyDeliveryRehearsalEnabled() {
+    return this.readonlyPaperEnabled &&
+      this.env.OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED === 'true';
   }
 
   async fetch(request) {
@@ -173,6 +180,19 @@ export class MarketSession {
           return reply({status:'NOT_INITIALIZED',paperOnly:true});
         try {return reply({status:'READY',...readOnlyBridgeSummary(bridge,ledger)});}
         catch {return reply({status:'BLOCKED_CORRUPT_READONLY_PAPER',paperOnly:true},503);}
+      }
+      if(path==='/internal/readonly-delivery'&&request.method==='GET') {
+        if(!this.readonlyDeliveryRehearsalEnabled)
+          return reply({status:'DISABLED',paperOnly:true},503);
+        const [ledger,journal]=await Promise.all([
+          this.storage.get(READONLY_PAPER_LEDGER_KEY),
+          this.storage.get(READONLY_PAPER_DELIVERY_KEY)]);
+        if(!ledger||!journal)
+          return reply({status:!journal&&ledger?.outbox?.length?
+            'BLOCKED_MISSING_REPLAY_WATERMARK':'NOT_INITIALIZED',paperOnly:true},503);
+        try {return reply({status:'READY',source:'READONLY_PAPER_ONLY',
+          ...paperDeliverySummary(journal,ledger)});}
+        catch {return reply({status:'BLOCKED_CORRUPT_READONLY_DELIVERY',paperOnly:true},503);}
       }
       if (path === '/internal/synthetic-session' && request.method === 'GET') {
         if (this.env.OFFLINE_SYNTHETIC_SESSION_ENABLED !== 'true' ||
@@ -385,6 +405,41 @@ export class MarketSession {
     return paperDeliverySummary(stored, ledger);
   }
 
+  /** No production route invokes claim/settle/suppress; this is a local-only
+   * rehearsal of the separate read-only-paper alert journal. The source
+   * ledger is never replaced by the synthetic counterpart.
+   */
+  async withReadOnlyPaperDelivery(operation,nowMs) {
+    if(!this.readonlyDeliveryRehearsalEnabled)
+      throw Error('READONLY_DELIVERY_REHEARSAL_DISABLED');
+    return this.storage.transaction(async txn=>{
+      const [ledger,stored]=await Promise.all([
+        txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
+      if(!ledger) throw Error('READONLY_DELIVERY_MISSING_LEDGER');
+      if(!stored&&ledger.outbox.length)
+        throw Error('READONLY_DELIVERY_MISSING_REPLAY_WATERMARK');
+      const current=stored??newPaperDeliveryJournal(nowMs);
+      const outcome=operation(current,ledger);
+      if(outcome.journal!==stored) await txn.put(READONLY_PAPER_DELIVERY_KEY,outcome.journal);
+      return {...outcome.result};
+    });
+  }
+
+  claimReadOnlyPaperDeliveryRehearsal(nowMs) {
+    return this.withReadOnlyPaperDelivery((journal,ledger)=>
+      claimPaperDelivery(journal,ledger,nowMs),nowMs);
+  }
+
+  settleReadOnlyPaperDeliveryRehearsal(input) {
+    return this.withReadOnlyPaperDelivery((journal,ledger)=>
+      settlePaperDelivery(journal,ledger,input),input?.nowMs);
+  }
+
+  suppressReadOnlyPaperDeliveryRehearsal(input) {
+    return this.withReadOnlyPaperDelivery((journal,ledger)=>
+      suppressAmbiguousDelivery(journal,ledger,input),input?.nowMs);
+  }
+
   /** Test-only provenance is mandatory. Production provides no HTTP POST
    * endpoint to feed this method, nor any automatic bridge from Kite polling.
    */
@@ -580,11 +635,15 @@ export class MarketSession {
   async finalizeReadOnlyPaperDay(nowMs) {
     if(!this.readonlyPaperEnabled) throw Error('READONLY_PAPER_DISABLED');
     return this.storage.transaction(async txn=>{
-      const old=await txn.get(READONLY_PAPER_LEDGER_KEY);
+      const [old,delivery]=await Promise.all([
+        txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
       if(!old) return {marked:0};
       auditPaperLedger(old);
       if(!old.positions.some(p=>p.status==='OPEN')) return {marked:0};
       const result=markPaperUnverifiable(old,nowMs);
+      if(this.readonlyDeliveryRehearsalEnabled)
+        await txn.put(READONLY_PAPER_DELIVERY_KEY,
+          reconcileReadOnlyDeliveryJournal(delivery,old,result.ledger,nowMs));
       if(result.marked.length) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
       return {marked:result.marked.length};
     });
@@ -663,12 +722,20 @@ export class MarketSession {
           if(this.readonlyPaperEnabled) {
             // Atomic double-entry paper debits, exits and pending outbox;
             // never use the separate synthetic test portfolio state.
-            const [oldBridge,oldLedger]=await Promise.all([
-              txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY)]);
+            const [oldBridge,oldLedger,oldDelivery]=await Promise.all([
+              txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
+              this.readonlyDeliveryRehearsalEnabled?
+                txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined)]);
             const currentBridge=oldBridge??newReadOnlyBridge();
             const currentLedger=oldLedger??newPaperLedger(nowMs);
             const advanced=advanceReadOnlyPaperTurn(currentBridge,currentLedger,{
               tickId,observedAtMs:Date.now(),evidence});
+            if(this.readonlyDeliveryRehearsalEnabled) {
+              const nextDelivery=reconcileReadOnlyDeliveryJournal(oldDelivery,oldLedger,
+                advanced.ledger,advanced.state.lastOptionAtMs);
+              if(nextDelivery!==oldDelivery)
+                await txn.put(READONLY_PAPER_DELIVERY_KEY,nextDelivery);
+            }
             if(advanced.state!==oldBridge)
               await txn.put(READONLY_PAPER_BRIDGE_KEY,advanced.state);
             if(advanced.ledger!==oldLedger)

@@ -1,5 +1,18 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase33 isolated observed-paper Telegram rehearsal checkpoint:**
+New opt-in `OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED=false` connects
+`readonly-paper-ledger-v1` to its **own** SQLite delivery journal with
+claim-before-send, uncertain-outcome no-resend, rate-limit cooldown, replay
+watermark checks and emergency 15:26 unresolved alert persistence. The
+separate synthetic delivery journal remains untouched. Authenticated
+`/internal/readonly-delivery` exposes sanitized state only; production has
+**no Telegram Bot API sender** and the phone has received no alert.
+**206 JS and 13 native SQLite tests passed**, along with disabled-template
+preflight. **Not deployed; ₹0 spend; no broker order.**
+[Phase33 checkpoint](../../audit/PHASE33_READONLY_TELEGRAM_RECONCILIATION_OFFLINE.md).
+Fixed offline engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+
 **24 October Phase32 disabled private read-only paper dashboard checkpoint:**
 The protected mobile page now selects a **separate read-only Kite-evidence
 paper account view** only behind all required scheduler, dashboard, futures
