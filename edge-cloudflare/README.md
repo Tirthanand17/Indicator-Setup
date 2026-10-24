@@ -46,6 +46,12 @@ Cookie-authenticated, read-only GET `/paper/api/portfolio` and an extra responsi
 
 These marks are **never live NSE prices, guaranteed executable depth, actual fills, real account equity or investment returns**. The old cash-only `/paper/api/summary` intentionally remains cash-only. The Worker still exposes no production trade-writing or synthetic-feed endpoint; all required feature flags are disabled by default. Native restart/fresh/stale/rollback and pure accounting regressions pass. [Phase22 audit](../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md).
 
+## Phase23 checkpoint: signed offline archive, retention limits and storage measurements
+
+`paper-archive.mjs` introduces HMAC-SHA256-authenticated, size-limited **offline-only** paper research archives and verifies atomic recovery to a fully empty transactional target. The archive excludes Kite tokens, market observations, alarms and admin secrets. It does contain detailed trades and pending alert messages and is **not encrypted**; never publish it in a public GitHub repository. Ledger capacity reporting warns at75%/90%, blocks at hard record caps rather than deleting history, and distinguishes the last-128 synthetic event ring from a complete decision log. Synthetic stress tests reached512 positions,1,024 pending messages and an archive of668,356 bytes; these are not hosted cloud performance measurements.
+
+**Checklist #23 is still OPEN** because no private off-host destination, production export endpoint, hosted restore drill, retention job or genuine capacity telemetry has been authorized or verified. Production `/internal/paper-archive`, `/internal/paper-capacity`, and `/internal/paper-restore` routes remain absent. No backup data, credentials or messages were sent to GitHub. [Phase23 checkpoint and approval boundary](../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md).
+
 ## Offline verification
 
 ```sh
@@ -55,7 +61,7 @@ npm ci --ignore-scripts
 npm run test:runtime
 ```
 
-137 edge tests pass (including 14 private dashboard and 8 portfolio tests), plus 39 extension tests and 6 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, synthetic indicative MTM freshness/expiry, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling or real Kite reachability. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
+144 edge tests pass (including 7 offline archive/capacity safeguards), plus 39 extension tests and 6 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, synthetic indicative MTM freshness/expiry, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling or real Kite reachability. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
 
 ## Remaining migration
 
