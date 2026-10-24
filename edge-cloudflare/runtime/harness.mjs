@@ -4,6 +4,9 @@ import { newPaperLedger } from '../paper-ledger.mjs';
 import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   claimOptionSnapshot, finishOptionSnapshot, optionStatus } from '../option-runtime.mjs';
 import { validatePairEvidence } from '../option-readonly.mjs';
+import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
+  newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
+  readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -59,6 +62,41 @@ export class TestSession extends MarketSession {
         this.storage.get(READONLY_OPTION_STATE_KEY),
         this.storage.get(READONLY_QUOTE_PACE_KEY)]);
       return Response.json({option:optionStatus(option,Date.now()),pace:pace??null});
+    }
+    // Test-only atomic bridge transitions, never included in worker.mjs routes.
+    if(path==='/test/read-only-paper/review'&&request.method==='POST') {
+      const input=await request.json();
+      const r=await this.storage.transaction(async txn=>{
+        const old=await txn.get(READONLY_PAPER_BRIDGE_KEY);
+        const next=stageReadOnlyReview(old??newReadOnlyBridge(),input);
+        await txn.put(READONLY_PAPER_BRIDGE_KEY,next);
+        return {staged:!!next.pending,signalId:next.pending?.signalId??null};
+      });
+      return Response.json(r);
+    }
+    if(path==='/test/read-only-paper/turn'&&request.method==='POST') {
+      const input=await request.json();
+      return Response.json(await this.storage.transaction(async txn=>{
+        const [oldBridge,oldLedger]=await Promise.all([
+          txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY)]);
+        const bridge=oldBridge??newReadOnlyBridge();
+        const ledger=oldLedger??newPaperLedger(input.observedAtMs);
+        const result=advanceReadOnlyPaperTurn(bridge,ledger,input);
+        if(result.state!==oldBridge) await txn.put(READONLY_PAPER_BRIDGE_KEY,result.state);
+        if(result.ledger!==oldLedger) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
+        return result.result;
+      }));
+    }
+    if(path==='/test/read-only-paper/state') {
+      const [bridge,ledger]=await Promise.all([
+        this.storage.get(READONLY_PAPER_BRIDGE_KEY),
+        this.storage.get(READONLY_PAPER_LEDGER_KEY)]);
+      if(!bridge||!ledger) return Response.json({status:'NOT_INITIALIZED'});
+      return Response.json(readOnlyBridgeSummary(bridge,ledger));
+    }
+    if(path==='/test/read-only-paper/eod'&&request.method==='POST') {
+      const {nowMs}=await request.json();
+      return Response.json(await this.finalizeReadOnlyPaperDay(nowMs));
     }
     // These methods exist only in this LOCAL test harness; production has no
     // HTTP write route for simulated trades or alert dispatch.

@@ -2,6 +2,22 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase31 separate Kite-observation paper rehearsal (disabled):**
+`readonly-paper-bridge.mjs` closes the offline integration gap between
+read-only completed-candle CE/PE diagnostics and a verified next-slot option
+BID/ASK. With `OFFLINE_PAPER_BRIDGE_ENABLED=true` **and** the scheduler,
+read-only market, option snapshot and futures review gates separately true,
+it would use a new isolated `readonly-paper-ledger-v1` with ₹50k/₹100k
+independent paper accounts. Source proof, instrument identity, same-day
+market clock, maximum 30-second futures signal age, one option tick window,
+fees/lot-depth risk checks, atomic event persistence and duplicate replay
+protection are exercised offline. An EOD alarm can record unverifiable exits
+even when Kite has stopped providing data; it cannot invent sale prices.
+Protected `/internal/readonly-paper` reports the separate paper ledger
+without enabling a Telegram sender, browser portfolio view or any broker
+orders. **All feature flags remain false and nothing has been deployed.**
+[Phase31 evidence](../audit/PHASE31_READONLY_TO_PAPER_BRIDGE_OFFLINE.md).
+
 **Phase30 disabled read-only option snapshot cadence:** `option-runtime.mjs`
 adds transactional single-DO quote request reservation, restart-safe dedupe,
 one-minute 429 cooldown, sticky 403 auth guard cleared by a **fresh signed
