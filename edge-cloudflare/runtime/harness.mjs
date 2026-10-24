@@ -8,6 +8,7 @@ import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from '../readonly-delivery.mjs';
+import { sendTelegramPaperMessage } from '../telegram-sender.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -119,6 +120,25 @@ export class TestSession extends MarketSession {
     }
     if(path==='/test/read-only-delivery/state') {
       return Response.json((await this.storage.get(READONLY_PAPER_DELIVERY_KEY))??null);
+    }
+    // Native harness only. Inject a synthetic HTTPS response; NEVER contact
+    // Telegram even if a token-shaped fixture is supplied.
+    if(path==='/test/read-only-telegram/dispatch'&&request.method==='POST') {
+      const {scenario}=await request.json();
+      if(!['accepted','rate','forbidden','ambiguous'].includes(scenario))
+        return Response.json({error:'INVALID_TEST_SCENARIO'},{status:400});
+      return Response.json(await this.dispatchReadOnlyTelegram(args=>
+        sendTelegramPaperMessage({...args,fetchImpl:async(_url,options)=>{
+          if(options.method!=='POST'||options.redirect!=='error')
+            throw Error('UNSAFE_TEST_REQUEST');
+          if(scenario==='ambiguous') throw Error('SIMULATED_NETWORK_OUTAGE');
+          if(scenario==='rate') return Response.json({ok:false,error_code:429,
+            parameters:{retry_after:5}},{status:429});
+          if(scenario==='forbidden') return Response.json({ok:false,error_code:403},
+            {status:403});
+          return Response.json({ok:true,result:{message_id:7643,
+            chat:{id:Number(args.chatId)}}});
+        }})));
     }
     // These methods exist only in this LOCAL test harness; production has no
     // HTTP write route for simulated trades or alert dispatch.

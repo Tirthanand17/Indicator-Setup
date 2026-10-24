@@ -162,6 +162,73 @@ test('native read-only paper Telegram rehearsal is isolated, restart-safe and ne
   } finally {await mf.dispose();}
 });
 
+test('native Telegram sender integration accepts only simulated replies and blocks uncertain resend',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-telegram-sender-native-'));
+  const fakeToken='123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop';
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+      OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+      OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true',
+      OFFLINE_TELEGRAM_SENDER_ENABLED:'true',
+      TELEGRAM_BOT_TOKEN:fakeToken,TELEGRAM_PRIVATE_CHAT_ID:'123456789'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('Any real Telegram or broker request fails test');}};
+  const opening=Date.parse('2026-10-23T10:45:20+05:30');
+  const optionAt=opening+20_000;
+  const review={source:'READONLY_FUTURES_REVIEW_ONLY',status:'REVIEW_CE',
+    paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false,
+    fiveMinuteCandleAtMs:Date.parse('2026-10-23T10:40:00+05:30')};
+  const futures={symbol:'NFO:NIFTY26OCTFUT',instrumentToken:12345,
+    exchangeAtMs:opening-1000,lastPrice:22046};
+  const leg=(kind,i)=>({contract:{symbol:`NIFTY26O2922050${kind}`,kind,
+    expiry:'2026-10-29',strike:22050,token:61001+i,lotSize:65},
+    bid:100,ask:100.5,bidQuantity:650,askQuantity:650,updatedAtMs:optionAt-1000});
+  const evidence={source:'READONLY_OPTION_EVIDENCE_ONLY',paperEntryAuthorized:false,
+    telegramAuthorized:false,realOrdersEnabled:false,CE:leg('CE',0),PE:leg('PE',1)};
+  let mf=new Miniflare(options);
+  const stub=async()=>{const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));};
+  const post=(s,route,data)=>s.fetch(`https://unit.invalid/test/${route}`,{
+    method:'POST',body:JSON.stringify(data)});
+  const dispatch=(s,scenario)=>post(s,'read-only-telegram/dispatch',{scenario});
+  const owner=()=>mf.dispatchFetch('https://unit.invalid/internal/readonly-delivery',{headers});
+  try {
+    let s=await stub();
+    await post(s,'read-only-paper/review',{tickId:'2026-10-23:271',
+      observedAtMs:opening,review,futures});
+    const started=await (await post(s,'read-only-paper/turn',{
+      tickId:'2026-10-23:272',observedAtMs:optionAt,evidence})).json();
+    assert.equal(started.entered,2);
+    await post(s,'pipeline/clock',{nowMs:optionAt+100});
+    const first=await (await dispatch(s,'accepted')).json();
+    assert.equal(first.status,'ACCEPTED_API_ONLY');
+    assert.equal(first.phoneDelivered,false);
+    let data=await (await owner()).json();
+    assert.equal(data.acceptedByBotApi,1);
+    assert.equal(data.queued,1);
+    assert.equal(JSON.stringify(data).includes(fakeToken),false);
+    await post(s,'pipeline/clock',{nowMs:optionAt+1000});
+    const ambiguous=await (await dispatch(s,'ambiguous')).json();
+    assert.equal(ambiguous.status,'AMBIGUOUS_ACK_REQUIRED');
+    assert.equal((await (await dispatch(s,'accepted')).json()).status,
+      'AMBIGUOUS_ACK_REQUIRED');
+    await mf.dispose();mf=new Miniflare(options);
+    s=await stub();
+    assert.equal((await (await dispatch(s,'accepted')).json()).status,
+      'AMBIGUOUS_ACK_REQUIRED');
+    data=await (await owner()).json();
+    assert.equal(data.attempted,2);
+    assert.equal(data.acceptedByBotApi,1);
+    assert.equal(data.ambiguousResponses,1);
+    assert.equal(data.phoneDeliveredVerified,false);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/telegram/send',{
+      method:'POST',headers,body:'x'})).status,404);
+  } finally {await mf.dispose();}
+});
+
 test('native 15:26 close marks missing-quote exits unverifiable instead of booking profit',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-paper-unverifiable-do-'));
   const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
