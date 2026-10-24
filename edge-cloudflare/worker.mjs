@@ -75,7 +75,8 @@ export default {
     const path = new URL(request.url).pathname;
     const dashboardRoute = isPrivateDashboardPath(path) &&
       env.OFFLINE_PRIVATE_DASHBOARD_ENABLED === 'true' &&
-      env.OFFLINE_PAPER_LEDGER_ENABLED === 'true';
+      (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
+       env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
     if (!tokenRoute && !dashboardRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/emergency-halt' && request.method === 'POST') ||

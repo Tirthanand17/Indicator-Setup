@@ -1,5 +1,18 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase32 disabled private read-only paper dashboard checkpoint:**
+The protected mobile page now selects a **separate read-only Kite-evidence
+paper account view** only behind all required scheduler, dashboard, futures
+review, option snapshot and paper bridge gates. Audited ₹50k/₹100k records,
+realized daily reports, contract-level history, latest option-tick freshness
+and pending-alert counts are visible via cookie-authenticated
+`/paper/api/readonly` without combining synthetic and observed ledgers or
+revealing Telegram messages. Open-position equity and unrealized P&L remain
+unavailable, never inferred from cash. **202 JavaScript and 12 native SQLite
+tests pass.** Flags remain disabled, no hosted dashboard, Telegram delivery,
+broker orders, or expenditure. [Phase32 evidence](../../audit/PHASE32_PRIVATE_READONLY_PAPER_DASHBOARD.md).
+Offline engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+
 **24 October Phase31 disabled read-only market-to-paper bridge checkpoint:**
 Added a separate, transactional dual ₹50k/₹100k hypothetical portfolio
 pipeline behind five opt-in flags, including new
