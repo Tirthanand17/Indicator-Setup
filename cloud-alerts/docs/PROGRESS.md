@@ -1,5 +1,18 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase29 offline NIFTY options checkpoint (outside fixed checklist):**
+Added official-shaped NFO daily master CE/PE discovery by equal expiry/strike/
+lot size, excludes expiry-day instruments, requires same-day master fetch and
+selects the nearest paired strike to the validated futures price. Bounded,
+GET-only Kite `/quote` fetches one CE plus one PE; executable BID/ASK, best
+depth, exchange IST timestamp, underlying instrument-token identity, spread,
+and age are independently validated. A local quote-call guard, sanitized
+401/403/429 errors, and 16 MiB CSV cap are tested. **186/186 JS unit tests,
+8/8 native SQLite tests and the disabled-template offline preflight pass.**
+**No actual Kite option feed, cloud runtime wiring, paper entries, alerts or
+broker orders.** Engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+[Phase29 evidence](../../audit/PHASE29_NIFTY_OPTION_READONLY_OFFLINE.md).
+
 **24 October Phase28 read-only futures review checkpoint (outside fixed checklist):**
 Corrected a Kite historical-candle format incompatibility (`+0530` in the
 official API example) and implemented an opt-in, strictly bounded read-only

@@ -2,6 +2,8 @@
 const ROOT = 'https://api.kite.trade';
 const MAX_JSON_BYTES = 512 * 1024;
 const decoder = new TextDecoder('utf-8', { fatal: true });
+const MARKET_ERROR = 'KITE_READONLY_UNAVAILABLE';
+const OPTION_SYMBOL = /^NIFTY[A-Z0-9]+(?:CE|PE)$/;
 
 /** Kite's documented history timestamps use +0530 (without a colon).
  * Canonicalize the explicit offset before Date.parse; never infer host time.
@@ -18,8 +20,16 @@ export function permittedMarketUrl(value) {
   try { url = new URL(value); } catch { return false; }
   if (url.origin !== ROOT || url.username || url.password || url.hash) return false;
   if (url.pathname === '/quote') {
-    return [...url.searchParams.keys()].join(',') === 'i' &&
-      /^NFO:NIFTY[A-Z0-9]+$/.test(url.searchParams.get('i') ?? '');
+    const keys = [...url.searchParams.keys()];
+    const values = url.searchParams.getAll('i');
+    if (!keys.length || keys.length > 2 || keys.some(k => k !== 'i') ||
+        values.length !== keys.length ||
+        values.some(k => !/^NFO:NIFTY[A-Z0-9]+$/.test(k))) return false;
+    if (keys.length === 1) return true;
+    // Exactly one NIFTY CE and one PE; never bulk arbitrary instruments.
+    return values[0] !== values[1] &&
+      values.some(k => OPTION_SYMBOL.test(k.slice(4)) && k.endsWith('CE')) &&
+      values.some(k => OPTION_SYMBOL.test(k.slice(4)) && k.endsWith('PE'));
   }
   if (/^\/instruments\/historical\/[1-9]\d*\/(5minute|15minute)$/.test(url.pathname)) {
     return [...url.searchParams.keys()].sort().join(',') === 'continuous,from,oi,to' &&
@@ -66,34 +76,53 @@ export function createReadOnlyKite({ apiKey, accessToken, fetchImpl = globalThis
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 8000 ||
       typeof fetchImpl !== 'function') throw new Error('Read-only market configuration invalid');
 
+  let lastQuoteRequestMs = -Infinity;
   async function get(path, { asCsv = false } = {}) {
     const url = ROOT + path;
     if (!permittedMarketUrl(url)) throw new Error('Read-only market URL blocked');
+    if (path.startsWith('/quote?')) {
+      const at = Date.now();
+      // Kite's documented 1 quote request / second: no automatic retry,
+      // delay or over-quota burst inside this single client instance.
+      if (at - lastQuoteRequestMs < 1100)
+        throw new Error('KITE_READONLY_QUOTE_RATE_GUARD');
+      lastQuoteRequestMs = at;
+    }
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), timeoutMs);
     try {
       const result = await fetchImpl(url, { method: 'GET', redirect: 'error',
         credentials: 'omit', cache: 'no-store', signal: abort.signal,
         headers: { 'X-Kite-Version': '3', Authorization: `token ${apiKey}:${accessToken}` } });
+      if (result.status === 401 || result.status === 403)
+        throw new Error('KITE_READONLY_AUTH_EXPIRED');
+      if (result.status === 429) throw new Error('KITE_READONLY_RATE_LIMITED');
       if (result.status !== 200 || result.redirected || result.url && !permittedMarketUrl(result.url))
         throw new Error('HTTP failure');
       const contentType = result.headers.get('content-type')?.toLowerCase() ?? '';
       if (asCsv) {
         if (!contentType.includes('text/csv')) throw new Error('invalid CSV');
-        return await readBounded(result, 4 * 1024 * 1024);
+        // NFO's daily instrument master may be larger than the JSON quote cap.
+        // Keep an explicit 16 MiB ceiling; an oversized master fails closed.
+        return await readBounded(result, 16 * 1024 * 1024);
       }
       if (!contentType.includes('application/json')) throw new Error('invalid JSON');
       const parsed = JSON.parse(await readBounded(result, MAX_JSON_BYTES));
       if (!parsed || parsed.status !== 'success' || !parsed.data ||
           Array.isArray(parsed.data) || typeof parsed.data !== 'object') throw new Error('invalid envelope');
       return parsed.data;
-    } catch { throw new Error('Kite read-only market-data unavailable'); }
+    } catch (error) {
+      const code = error?.message;
+      if (['KITE_READONLY_AUTH_EXPIRED', 'KITE_READONLY_RATE_LIMITED'].includes(code))
+        throw new Error(code);
+      throw new Error(MARKET_ERROR);
+    }
     finally { clearTimeout(timer); }
   }
   return Object.freeze({
     async instrumentsNfoCsv() { return get('/instruments/NFO', { asCsv: true }); },
     async quote(symbol) {
-      if (typeof symbol !== 'string' || !/^NIFTY[A-Z0-9]+$/.test(symbol))
+      if (typeof symbol !== 'string' || !/^NIFTY[A-Z0-9]+FUT$/.test(symbol))
         throw new Error('Invalid NIFTY symbol');
       const key = `NFO:${symbol}`;
       const data = await get('/quote?i=' + encodeURIComponent(key));
@@ -102,6 +131,21 @@ export function createReadOnlyKite({ apiKey, accessToken, fetchImpl = globalThis
           typeof quote.last_price !== 'number' || !Number.isFinite(quote.last_price) || quote.last_price <= 0)
         throw new Error('Invalid NIFTY quote');
       return quote;
+    },
+    /** Exactly one CE + one PE option snapshot per GET, no transaction API. */
+    async optionPair(ceSymbol, peSymbol) {
+      if (typeof ceSymbol !== 'string' || typeof peSymbol !== 'string' ||
+          !OPTION_SYMBOL.test(ceSymbol) || !ceSymbol.endsWith('CE') ||
+          !OPTION_SYMBOL.test(peSymbol) || !peSymbol.endsWith('PE') ||
+          ceSymbol === peSymbol) throw new Error('Invalid NIFTY option pair');
+      const ceKey = `NFO:${ceSymbol}`, peKey = `NFO:${peSymbol}`;
+      const data = await get('/quote?i=' + encodeURIComponent(ceKey) +
+        '&i=' + encodeURIComponent(peKey));
+      if (!data[ceKey] || !data[peKey] ||
+          typeof data[ceKey] !== 'object' || Array.isArray(data[ceKey]) ||
+          typeof data[peKey] !== 'object' || Array.isArray(data[peKey]))
+        throw new Error('KITE_READONLY_OPTION_PAIR_MISSING');
+      return { CE: data[ceKey], PE: data[peKey] };
     },
     async history(token, interval, from, to) {
       if (!Number.isSafeInteger(token) || token <= 0 ||
