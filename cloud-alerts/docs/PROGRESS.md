@@ -1,5 +1,7 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase26 source-only free-tier preflight (new checkpoint, outside the fixed checklist):** Reviewed official Cloudflare Free Worker + SQLite Durable Object quotas and added an executable `npm run preflight:offline` source check. The strict guard rejects accidentally enabled `wrangler.example.jsonc` services/public bindings and deploy scripts. A deliberately conservative 1,125-alarm market-day model estimates 1,226 DO requests, 7,551 SQL rows read, 6,751 rows written and 4 MB stored, all **forecast only**. Workers 10 ms CPU invocation cap and DO duration remain **unmeasured**; all release/paid/broker actions remain blocked. Original fixed checklist **23/25 = 92%**, real acceptance **0/5**, unchanged. [Phase26 evidence](../../audit/PHASE26_FREE_TIER_PREFLIGHT.md).
+
 **24 October Phase25 exceptional-session/release checkpoint — INCOMPLETE:**
 Confirmed the official NSE F&O Diwali Muhurat Sunday 8 November 2026
 exception, explicitly classified as `SPECIAL` in Python and JS and excluded
@@ -9,7 +11,7 @@ signed current-IST-day token handoff indication. **2027 official F&O annual
 calendar is unverified; all 2027 dates remain blocked.** Owner release,
 real cloud restoration, phone receipt and broker-data checks remain undone,
 so checklist #25 remains **No** and progress **23/25 = 92%**, live **0/5**.
-Current local verification: **Python 778 passed/1 skipped; Cloudflare JS 164 passed;
+Current local verification: **Python 778 passed/1 skipped; Cloudflare JS 168 passed;
 native workerd SQLite 8 passed**. These are offline-only checks.
 [Phase25 checkpoint](../../audit/PHASE25_SPECIAL_SESSIONS_RELEASE_GATE.md).
 
