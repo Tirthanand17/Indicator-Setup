@@ -1,5 +1,16 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase35 native SQLite capacity baseline (offline only):**
+Added `npm run bench:offline` to run up to 256 deterministic scheduler-only
+callbacks in disposable Miniflare/workerd SQLite, measure **local wall time**
+and disk size, verify every durable claim through restart and reject unexpected
+outbound requests. A 64-callback exercise recovered **64/64** with no network
+activity. Real Cloudflare CPU, billable SQL rows, DO duration and quota remain
+**unmeasured**, so neither p95 local wall time nor forecast approves release.
+**211/211 JS and 18/18 native tests passed; disabled-template preflight safe.**
+No deployment, alerts, Kite orders or spending. [Phase35 evidence](../../audit/PHASE35_OFFLINE_NATIVE_CAPACITY_BASELINE.md).
+Fixed offline engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+
 **24 October Phase34 disabled Telegram sender source checkpoint:**
 Added a private numeric-recipient-only Bot API HTTPS sender, bounded JSON
 responses and timeout, sanitized 200/429/4xx settlement, and fail-closed
