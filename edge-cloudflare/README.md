@@ -2,6 +2,20 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase33 isolated observed-paper Telegram journal rehearsal (disabled):**
+`readonly-delivery.mjs` makes the read-only Kite-paper outbox durable
+alongside a **separate** claim/reconcile cursor. When the new optional
+`OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED` flag and every preceding
+market/paper flag are explicitly enabled, the option-tick/EOD paper writes
+also audit and provision that journal atomically. A missing journal with
+historical alerts is blocked rather than replayed. Owner-only
+`GET /internal/readonly-delivery` shows non-secret counters and ambiguity
+status; claim, settle and suppression operations are tested **only** in
+the local harness. No Telegram HTTP sender, phone receipt or production
+send route exists, and no independent cloud service is deployed.
+**206 JS + 13 native SQLite tests pass.**
+[Phase33 audit](../audit/PHASE33_READONLY_TELEGRAM_RECONCILIATION_OFFLINE.md).
+
 **Phase32 separate Kite-observed paper dashboard (disabled):**
 `readonly-dashboard.mjs` adds audited, account-separated observed-source
 paper reports to the existing HMAC-cookie private `/paper/dashboard`.

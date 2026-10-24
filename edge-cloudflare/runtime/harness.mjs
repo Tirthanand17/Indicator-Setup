@@ -7,6 +7,7 @@ import { validatePairEvidence } from '../option-readonly.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
+import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from '../readonly-delivery.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -77,11 +78,19 @@ export class TestSession extends MarketSession {
     if(path==='/test/read-only-paper/turn'&&request.method==='POST') {
       const input=await request.json();
       return Response.json(await this.storage.transaction(async txn=>{
-        const [oldBridge,oldLedger]=await Promise.all([
-          txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY)]);
+        const [oldBridge,oldLedger,oldDelivery]=await Promise.all([
+          txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
+          this.readonlyDeliveryRehearsalEnabled?
+            txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined)]);
         const bridge=oldBridge??newReadOnlyBridge();
         const ledger=oldLedger??newPaperLedger(input.observedAtMs);
         const result=advanceReadOnlyPaperTurn(bridge,ledger,input);
+        if(this.readonlyDeliveryRehearsalEnabled) {
+          const nextDelivery=reconcileReadOnlyDeliveryJournal(oldDelivery,oldLedger,
+            result.ledger,input.observedAtMs);
+          if(nextDelivery!==oldDelivery)
+            await txn.put(READONLY_PAPER_DELIVERY_KEY,nextDelivery);
+        }
         if(result.state!==oldBridge) await txn.put(READONLY_PAPER_BRIDGE_KEY,result.state);
         if(result.ledger!==oldLedger) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
         return result.result;
@@ -97,6 +106,19 @@ export class TestSession extends MarketSession {
     if(path==='/test/read-only-paper/eod'&&request.method==='POST') {
       const {nowMs}=await request.json();
       return Response.json(await this.finalizeReadOnlyPaperDay(nowMs));
+    }
+    if(path==='/test/read-only-delivery/claim'&&request.method==='POST') {
+      const {nowMs}=await request.json();
+      return Response.json(await this.claimReadOnlyPaperDeliveryRehearsal(nowMs));
+    }
+    if(path==='/test/read-only-delivery/settle'&&request.method==='POST') {
+      return Response.json(await this.settleReadOnlyPaperDeliveryRehearsal(await request.json()));
+    }
+    if(path==='/test/read-only-delivery/suppress'&&request.method==='POST') {
+      return Response.json(await this.suppressReadOnlyPaperDeliveryRehearsal(await request.json()));
+    }
+    if(path==='/test/read-only-delivery/state') {
+      return Response.json((await this.storage.get(READONLY_PAPER_DELIVERY_KEY))??null);
     }
     // These methods exist only in this LOCAL test harness; production has no
     // HTTP write route for simulated trades or alert dispatch.
