@@ -1,5 +1,20 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase31 disabled read-only market-to-paper bridge checkpoint:**
+Added a separate, transactional dual ₹50k/₹100k hypothetical portfolio
+pipeline behind five opt-in flags, including new
+`OFFLINE_PAPER_BRIDGE_ENABLED=false`. Phase28 completed-candle review may
+create a one-next-slot CE/PE candidate; Phase30 fresh paired option quote
+may enter/exit **only** paper positions with durable duplicate and quote
+identity protection. Open exits are marked unverifiable at 15:26 IST even
+if Kite is unavailable, never marked as sold without BID evidence.
+Authenticated `/internal/readonly-paper` status is read-only; the real
+private mobile dashboard and real Telegram sender are still unconnected.
+**Not deployed, no live Kite data, no messages, no real orders or costs.**
+**198/198 JS, 11/11 native SQLite and disabled-template preflight pass.**
+[Phase31 audit](../../audit/PHASE31_READONLY_TO_PAPER_BRIDGE_OFFLINE.md).
+Offline engineering **23/25 = 92%**, live acceptance **0/5**, unchanged.
+
 **24 October Phase30 disabled durable option snapshot checkpoint (outside fixed checklist):**
 Added an optional Worker/SQLite DO option-only alarm path alongside existing
 read-only futures sampling, with quote requests reserved transactionally

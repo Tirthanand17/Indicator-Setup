@@ -7,10 +7,122 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Miniflare } from 'miniflare';
 import { createHmac, randomBytes } from 'node:crypto';
+import { reviewReadOnlyMarket } from '../market-review.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const key='SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const headers={authorization:'Bearer '+key};
+
+test('native separate ₹50k/₹100k read-only paper bridge survives restart without broker access',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-readonly-paper-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('No real brokerage, Telegram or cloud requests');}};
+  const fs=JSON.parse(readFileSync(path.join(root,'decision-parity-fixtures.json'),'utf8'));
+  const c=fs.cases.find(x=>x.name==='uptrend_mirrored_qualifying_review');
+  const nowMs=c.nowMs;
+  const asKite=candle=>[new Date(candle.startMs+330*60_000).toISOString().replace('.000Z','+0530'),
+    candle.open,candle.high,candle.low,candle.close,candle.volume];
+  const futures={symbol:'NFO:NIFTY26OCTFUT',instrumentToken:12345,
+    exchangeAtMs:nowMs-1000,lastPrice:c.candles.at(-1).close};
+  const review=reviewReadOnlyMarket({tickId:'2026-10-23:271',observedAtMs:nowMs,
+    futures,candles5:c.candles.map(asKite),candles15:c.confirm15m.map(asKite),
+    strategyConfig:{adxMin:c.adxMin,atrBuffer:c.atrBuffer}});
+  assert.equal(review.status,'REVIEW_CE');
+  const leg=(kind,at,bid=100,ask=100.5)=>({contract:{
+    symbol:`NIFTY26O2922050${kind}`,kind,expiry:'2026-10-29',strike:22050,
+    token:kind==='CE'?30101:30102,lotSize:65},
+    bid,ask,bidQuantity:195,askQuantity:195,updatedAtMs:at-2000});
+  const evidence=(at,bid=100,ask=100.5)=>({source:'READONLY_OPTION_EVIDENCE_ONLY',
+    paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false,
+    CE:leg('CE',at,bid,ask),PE:leg('PE',at,bid,ask)});
+  let mf=new Miniflare(options);
+  const stub=async()=>{const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));};
+  const post=(s,route,body)=>s.fetch('https://unit.invalid/test/read-only-paper/'+route,
+    {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  try {
+    let s=await stub();
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/readonly-paper')).status,404);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/readonly-paper',{headers})).status,200);
+    const staged=await (await post(s,'review',{tickId:'2026-10-23:271',
+      observedAtMs:nowMs,review,futures})).json();
+    assert.equal(staged.staged,true);
+    const filled=await (await post(s,'turn',{tickId:'2026-10-23:272',
+      observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)})).json();
+    assert.equal(filled.entered,2);
+    assert.equal(filled.realOrdersEnabled,false);
+    const before=await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json();
+    assert.equal(before.accountBalances.length,2);
+    assert.equal(before.pendingOutboxCount,2);
+    await mf.dispose();mf=new Miniflare(options);
+    s=await stub();
+    const after=await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json();
+    assert.deepEqual(after.accountBalances,before.accountBalances);
+    assert.equal(after.totalPaperPositions,2);
+    const duplicate=await (await post(s,'turn',{tickId:'2026-10-23:272',
+      observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)})).json();
+    assert.equal(duplicate.status,'DUPLICATE_OPTION_TICK');
+    const closed=await (await post(s,'turn',{tickId:'2026-10-23:275',
+      observedAtMs:nowMs+80_000,evidence:evidence(nowMs+80_000,170,171)})).json();
+    assert.equal(closed.exited,2);
+    const final=await (await mf.dispatchFetch('https://unit.invalid/internal/readonly-paper',{headers})).json();
+    assert.equal(final.status,'READY');
+    assert.equal(final.pendingOutboxCount,4);
+    assert.equal(final.realOrdersEnabled,false);
+  } finally {await mf.dispose();}
+});
+
+test('native 15:26 close marks missing-quote exits unverifiable instead of booking profit',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-paper-unverifiable-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',
+      OFFLINE_READONLY_REVIEW_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('Outbound network forbidden');}};
+  const opening=Date.parse('2026-10-23T10:45:20+05:30');
+  const bar=Date.parse('2026-10-23T10:40:00+05:30');
+  const futures={symbol:'NFO:NIFTY26OCTFUT',instrumentToken:12345,
+    exchangeAtMs:opening-1000,lastPrice:22046};
+  const review={source:'READONLY_FUTURES_REVIEW_ONLY',status:'REVIEW_CE',
+    paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false,
+    fiveMinuteCandleAtMs:bar};
+  const eTime=opening+20_000;
+  const evidence={source:'READONLY_OPTION_EVIDENCE_ONLY',
+    paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false,
+    ...Object.fromEntries(['CE','PE'].map((kind,i)=>[kind,{contract:{
+      symbol:`NIFTY26O2922050${kind}`,kind,expiry:'2026-10-29',strike:22050,
+      token:40101+i,lotSize:65},bid:100,ask:100.5,bidQuantity:195,
+      askQuantity:195,updatedAtMs:eTime-2000}]))};
+  let mf=new Miniflare(options);
+  try {
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    const stub=ns.get(ns.idFromName('nifty-paper-session-v1'));
+    const post=(path,data)=>stub.fetch('https://unit.invalid/test/read-only-paper/'+path,
+      {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+    await post('review',{tickId:'2026-10-23:271',observedAtMs:opening,review,futures});
+    const opened=await (await post('turn',{tickId:'2026-10-23:272',
+      observedAtMs:eTime,evidence})).json();
+    assert.equal(opened.entered,2);
+    const closeAt=Date.parse('2026-10-23T15:26:00+05:30');
+    assert.equal((await (await post('eod',{nowMs:closeAt})).json()).marked,2);
+    assert.equal((await (await post('eod',{nowMs:closeAt+20_000})).json()).marked,0);
+    const state=await (await stub.fetch('https://unit.invalid/test/paper/state')).json();
+    assert.equal(state,null); // synthetic ledger is a completely different account store
+    const readonly=await (await stub.fetch('https://unit.invalid/test/read-only-paper/state')).json();
+    assert.equal(readonly.pendingOutboxCount,4);
+    assert.equal(readonly.totalPaperPositions,2);
+    assert.equal(readonly.accountBalances.every(x=>x.cashPaise<x.initialPaise),true);
+  } finally {await mf.dispose();}
+});
 
 test('native SQLite read-only option master, durable quote cadence and evidence survive restart',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-option-native-do-'));

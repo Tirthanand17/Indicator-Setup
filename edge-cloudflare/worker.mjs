@@ -12,6 +12,9 @@ import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   claimMasterFetch, commitMasterPair,
   noteMasterFailure, claimOptionSnapshot, finishOptionSnapshot, noteOptionFailure,
   optionStatus, validateOptionRuntime } from './option-runtime.mjs';
+import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
+  newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
+  readOnlyBridgeSummary } from './readonly-paper-bridge.mjs';
 import { PAPER_LEDGER_KEY, newPaperLedger, auditPaperLedger,
   enterPaperBasket, exitPaperPosition, markPaperUnverifiable,
   paperLedgerSummary } from './paper-ledger.mjs';
@@ -79,6 +82,7 @@ export default {
           (path === '/internal/scheduler' && request.method === 'GET') ||
           (path === '/internal/release-readiness' && request.method === 'GET') ||
           (path === '/internal/paper-ledger' && request.method === 'GET') ||
+          (path === '/internal/readonly-paper' && request.method === 'GET') ||
           (path === '/internal/synthetic-session' && request.method === 'GET')) ||
         !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
     if (env.OFFLINE_SCHEDULER_ENABLED !== 'true' || !env.MARKET_SESSION) {
@@ -95,6 +99,14 @@ export class MarketSession {
   constructor(ctx, env) {
     this.storage = ctx.storage;
     this.env = env;
+  }
+
+  get readonlyPaperEnabled() {
+    return this.env.OFFLINE_PAPER_BRIDGE_ENABLED==='true' &&
+      this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true' &&
+      this.env.OFFLINE_READONLY_REVIEW_ENABLED==='true' &&
+      this.env.READONLY_MARKET_RUNTIME_ENABLED==='true' &&
+      this.env.OFFLINE_SCHEDULER_ENABLED==='true';
   }
 
   async fetch(request) {
@@ -149,6 +161,17 @@ export class MarketSession {
         if (stored === undefined) return reply({ status: 'NOT_INITIALIZED', paperOnly: true });
         try { return reply({ status: 'READY', ...paperLedgerSummary(stored) }); }
         catch { return reply({ status: 'BLOCKED_CORRUPT_PAPER_LEDGER', paperOnly: true }, 503); }
+      }
+      if(path==='/internal/readonly-paper'&&request.method==='GET') {
+        if(!this.readonlyPaperEnabled)
+          return reply({status:'DISABLED',paperOnly:true},503);
+        const [bridge,ledger]=await Promise.all([
+          this.storage.get(READONLY_PAPER_BRIDGE_KEY),
+          this.storage.get(READONLY_PAPER_LEDGER_KEY)]);
+        if(bridge===undefined||ledger===undefined)
+          return reply({status:'NOT_INITIALIZED',paperOnly:true});
+        try {return reply({status:'READY',...readOnlyBridgeSummary(bridge,ledger)});}
+        catch {return reply({status:'BLOCKED_CORRUPT_READONLY_PAPER',paperOnly:true},503);}
       }
       if (path === '/internal/synthetic-session' && request.method === 'GET') {
         if (this.env.OFFLINE_SYNTHETIC_SESSION_ENABLED !== 'true' ||
@@ -434,6 +457,13 @@ export class MarketSession {
       await txn.put(STATE_KEY, state);
       return decision;
     });
+    // At/after 15:26 IST an unresolved paper exit must stay unresolved even
+    // if Kite is down or option sampling never returns. No invented BID fill.
+    if(decision.shouldPoll&&this.readonlyPaperEnabled) {
+      const local=new Date(now+330*60_000);
+      if(local.getUTCHours()*60+local.getUTCMinutes()>=15*60+26)
+        await this.finalizeReadOnlyPaperDay(now).catch(()=>{});
+    }
     if (decision.shouldPoll && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true') {
       const optionEnabled=this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true';
       // Every third 20-second slot is assigned exclusively to a two-leg option
@@ -513,6 +543,18 @@ export class MarketSession {
             futures: { symbol: `NFO:${symbol}`, instrumentToken,
               exchangeAtMs: parsedTimestamp, lastPrice: quote.last_price },
             candles5: m5, candles15: m15 });
+          if(this.readonlyPaperEnabled) {
+            // The only production source of pending paper signals: reviewed
+            // completed Kite candles. A review alone NEVER mutates balances.
+            await this.storage.transaction(async txn=>{
+              const stored=await txn.get(READONLY_PAPER_BRIDGE_KEY);
+              const next=stageReadOnlyReview(stored??newReadOnlyBridge(),{
+                tickId,observedAtMs:nowMs,review:report.review,
+                futures:{symbol:`NFO:${symbol}`,instrumentToken,
+                  exchangeAtMs:parsedTimestamp,lastPrice:quote.last_price}});
+              await txn.put(READONLY_PAPER_BRIDGE_KEY,next);
+            });
+          }
         }
       }
     } catch {
@@ -531,6 +573,19 @@ export class MarketSession {
       const result=reserveQuoteRequest(prior,{tickId,observedAtMs,kind});
       if(result.allowed) await txn.put(READONLY_QUOTE_PACE_KEY,result.state);
       return {allowed:result.allowed,reason:result.reason};
+    });
+  }
+
+  async finalizeReadOnlyPaperDay(nowMs) {
+    if(!this.readonlyPaperEnabled) throw Error('READONLY_PAPER_DISABLED');
+    return this.storage.transaction(async txn=>{
+      const old=await txn.get(READONLY_PAPER_LEDGER_KEY);
+      if(!old) return {marked:0};
+      auditPaperLedger(old);
+      if(!old.positions.some(p=>p.status==='OPEN')) return {marked:0};
+      const result=markPaperUnverifiable(old,nowMs);
+      if(result.marked.length) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
+      return {marked:result.marked.length};
     });
   }
 
@@ -604,6 +659,20 @@ export class MarketSession {
         await this.storage.transaction(async txn=>{
           const old=await txn.get(READONLY_OPTION_STATE_KEY);
           await txn.put(READONLY_OPTION_STATE_KEY,finishOptionSnapshot(old,{tickId,evidence}));
+          if(this.readonlyPaperEnabled) {
+            // Atomic double-entry paper debits, exits and pending outbox;
+            // never use the separate synthetic test portfolio state.
+            const [oldBridge,oldLedger]=await Promise.all([
+              txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY)]);
+            const currentBridge=oldBridge??newReadOnlyBridge();
+            const currentLedger=oldLedger??newPaperLedger(nowMs);
+            const advanced=advanceReadOnlyPaperTurn(currentBridge,currentLedger,{
+              tickId,observedAtMs:Date.now(),evidence});
+            if(advanced.state!==oldBridge)
+              await txn.put(READONLY_PAPER_BRIDGE_KEY,advanced.state);
+            if(advanced.ledger!==oldLedger)
+              await txn.put(READONLY_PAPER_LEDGER_KEY,advanced.ledger);
+          }
         });
         report.status='OPTION_OBSERVED';
       }
