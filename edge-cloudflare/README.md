@@ -2,6 +2,18 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase29 read-only NIFTY option pair evidence (not connected or active):**
+`option-readonly.mjs` parses same-day, official-shaped Kite NFO CSV to select
+matching non-expiry-day ATM CE/PE contracts, then normalizes only fresh
+instrument-matched top-of-book BID/ASK/depth quotes. `market-readonly.mjs`
+allows one GET with exactly one CE and one PE, a 1,100ms same-client quote
+call throttle, secret-free HTTP 403/429 classifications and a bounded CSV.
+This produces **evidence only**, never paper entries, Telegram alerts or real
+orders. Scheduling the option snapshot, shared rate limiting, persisted quote
+evidence and fully approved real broker testing remain undone. **186 JS**
+unit tests pass; template remains disabled and undeployed.
+[Phase29 audit](../audit/PHASE29_NIFTY_OPTION_READONLY_OFFLINE.md).
+
 **Phase28 disabled read-only futures review:** `market-review.mjs` can now
 transform strictly validated Kite 5m/15m candles into a `WAIT_DATA`,
 `NO_TRADE`, `REVIEW_CE` or `REVIEW_PE` futures-only diagnostic. The official
