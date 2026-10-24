@@ -1,6 +1,18 @@
-# Canonical engineering progress — 23 October 2026
+# Canonical engineering progress — 24 October 2026
 
-**24 October Phase23 checkpoint — NOT YET COMPLETE:** Implemented offline HMAC-signed account/marks/session archive creation, authenticity check, empty-target transactional restore, and record-capacity alerts; a 512-position/1,024-outbox stress test produced a668,356-byte signed archive without deleting records. Production has **no remotely reachable archive/export/restore route**, no private backup destination or real cloud quota observations. This private-data boundary still needs explicit owner approval; checklist #23 **remains No**, therefore the canonical engineering score **stays22/25=88%**. [Checkpoint](../../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md).
+**24 October Phase24 offline delivery reliability COMPLETE:** Added a
+transactional, restart-safe paper alert delivery journal and state machine for
+claim-before-send, non-retriable ambiguous outcomes, Telegram Bot API
+`retry_after` cooldown, bounded three-attempt retry, expiration and
+owner-acknowledged suppression. A compact last-128 terminal receipt tail
+cannot replay an already processed outbox event. A missing delivery cursor
+blocks historical alert replay after restore. This is **offline only**:
+there is no Bot API network sender, no real Telegram notification or phone
+receipt, and no deployment. Checklist #24 is complete for its **offline
+engineering deliverable**, making **23/25 = 92%**; live acceptance **0/5**.
+[Phase24 evidence](../../audit/PHASE24_OFFLINE_DELIVERY_RECONCILIATION.md).
+
+**24 October Phase23 checkpoint — NOT YET COMPLETE:** Implemented offline HMAC-signed account/marks/session archive creation, authenticity check, empty-target transactional restore, and record-capacity alerts; a 512-position/1,024-outbox stress test produced a668,356-byte signed archive without deleting records. Production has **no remotely reachable archive/export/restore route**, no private backup destination or real cloud quota observations. This private-data boundary still needs explicit owner approval; checklist #23 **remains No**. [Checkpoint](../../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md).
 
 **Phase22 offline synthetic capital/MTM completion:** A dedicated portfolio module now records only freshly validated synthetic open-position option BID marks in the same SQLite transaction as the paired ledgers and strategy journal, then calculates an explicitly *indicative* fee/slippage-adjusted exit value. Read-only private `/paper/api/portfolio` shows cash, committed paper capital, daily risk/trade room, unavailable/stale/unverifiable status, hypothetical equity and health. A full native synthetic SQLite restart/stale/rollback test and unit fee-depth-contract tests pass. **No live quotes, live returns or deployed service.** [Evidence](../../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md).
 
@@ -21,10 +33,10 @@
 
 **IN DEVELOPMENT / PAPER ONLY. Not deployed. Live acceptance 0/5.**
 
-Engineering checklist v1: **22/25 completed = 88%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
+Engineering checklist v1: **23/25 completed = 92%**. Each item has equal4% weight and is binary; no partial credit. This replaces the historical53% expanded/80% alerts/43% paper estimates for current reporting. It is a rebaseline, not a measured seven-point productivity gain. Keep these25 items stable across future rounds; any scope change must version the checklist. Completion means the stated offline deliverable exists with evidence, not that the full product is finished.
 
 ```text
-Offline engineering [######################---] 88% (22/25)
+Offline engineering [#######################--] 92% (23/25)
 Live acceptance     [-----]                      0/5
 ```
 
@@ -53,10 +65,10 @@ Live acceptance     [-----]                      0/5
 |21|Dependency remediation, reproducible lock/type baseline|Yes|Linux Python3.12 hashed wheel lock previously verified; full mypy49 files pass with pinned stubs; WebSocket intentionally disabled|
 |22|Complete portfolio MTM, capital and health views|Yes|Synthetic indicative exit-BID MTM, capital/risk and health API; no live quote. Phase22 evidence|
 |23|Cloud retention, export/restore and capacity measurements|No|Offline signed archive/restore and synthetic sizing built; private hosted export, independent restore and cloud quota proof still require approval. Phase23 checkpoint|
-|24|Telegram ambiguous delivery/retry_after/retention handling|No|A15 open|
+|24|Telegram ambiguous delivery/retry_after/retention handling|Yes|Offline transactional claim/cursor, ambiguous no-resend, 429 retry_after, bounded receipt tail, native SQLite restart; no real Telegram sender. Phase24 evidence|
 |25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
 
-Latest verified offline evidence: **Python 777 passed,1 skipped,1 third-party warning (rerun Phase23 checkpoint);183 combined Node tests passed (144 edge+39 extension); full configured mypy49 files previously passed; pip check clean (prior round)**. **6 native local workerd tests passed**. The previous advisory scan is historical and was not rerun in this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include real market-data-to-engine integration, cloud capacity, delivery ambiguity and **live** portfolio MTM. See [Phase23 checkpoint](../../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md), [Phase22 evidence](../../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md), [Phase20 evidence](../../audit/PHASE20_PRIVATE_CLOUD_DASHBOARD.md), [Phase19 evidence](../../audit/PHASE19_SYNTHETIC_SESSION_E2E.md), [Phase18 evidence](../../audit/PHASE18_EDGE_DUAL_LEDGER.md), [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
+Latest verified offline evidence: **Python 777 passed,1 skipped,1 third-party warning; 199 combined Node tests passed (160 edge + 39 extension); 7 native local workerd SQLite tests passed (including delivery restart); full configured mypy49 files previously passed; pip check clean (prior round)**. Prior advisory scan is historical and was not rerun in this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include real market-data-to-engine integration, cloud capacity, actual Telegram delivery, and **live** portfolio MTM. See [Phase24 report](../../audit/PHASE24_OFFLINE_DELIVERY_RECONCILIATION.md), [Phase23 checkpoint](../../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md), [Phase22 evidence](../../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md), [Phase20 evidence](../../audit/PHASE20_PRIVATE_CLOUD_DASHBOARD.md), [Phase19 evidence](../../audit/PHASE19_SYNTHETIC_SESSION_E2E.md), [Phase18 evidence](../../audit/PHASE18_EDGE_DUAL_LEDGER.md), [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
 Five live gates are individually unverified: cloud Kite data, phone Telegram receipt, real session scheduling, dashboard/ledger recovery, laptop-off continuation. No broker orders, live credentials, phone messages, cloud resources or billing changes in this round.
 

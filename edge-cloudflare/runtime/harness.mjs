@@ -1,5 +1,6 @@
 // LOCAL TEST ENTRYPOINT ONLY. Never referenced by deployment configuration.
 import worker, { MarketSession } from '../worker.mjs';
+import { newPaperLedger } from '../paper-ledger.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -35,6 +36,31 @@ export class TestSession extends MarketSession {
     if (path === '/test/paper/finish' && request.method === 'POST') {
       const { nowMs } = await request.json();
       return Response.json(await this.markPaperUnverifiable(nowMs));
+    }
+    if (path === '/test/delivery/init' && request.method === 'POST') {
+      const { nowMs } = await request.json();
+      await this.storage.transaction(async txn => {
+        if (await txn.get('paper-ledger-v1') === undefined) {
+          await txn.put('paper-ledger-v1', newPaperLedger(nowMs));
+        }
+      });
+      return Response.json(await this.claimPaperDeliveryRehearsal(nowMs));
+    }
+    if (path === '/test/delivery/claim' && request.method === 'POST') {
+      const { nowMs } = await request.json();
+      return Response.json(await this.claimPaperDeliveryRehearsal(nowMs));
+    }
+    if (path === '/test/delivery/settle' && request.method === 'POST') {
+      return Response.json(await this.settlePaperDeliveryRehearsal(await request.json()));
+    }
+    if (path === '/test/delivery/suppress' && request.method === 'POST') {
+      return Response.json(await this.suppressPaperDeliveryRehearsal(await request.json()));
+    }
+    if (path === '/test/delivery/summary') {
+      return Response.json(await this.paperDeliveryRehearsalSummary());
+    }
+    if (path === '/test/delivery/state') {
+      return Response.json((await this.storage.get('paper-delivery-v1')) ?? null);
     }
     if (path === '/test/paper/rollback') {
       const before = await this.storage.get('paper-ledger-v1');

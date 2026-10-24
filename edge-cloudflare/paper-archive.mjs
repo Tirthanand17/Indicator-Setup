@@ -130,7 +130,7 @@ export async function restorePaperArchiveToEmpty(storage, bundle, secret) {
   return storage.transaction(async txn => {
     // Even a valid older archive cannot replace an already-running account.
     const guardedKeys = [PAPER_LEDGER_KEY, SYNTHETIC_SESSION_KEY, PORTFOLIO_MARKS_KEY,
-      'scheduler-v1', 'daily-token-v1', 'market-observation-v1'];
+      'scheduler-v1', 'daily-token-v1', 'market-observation-v1', 'paper-delivery-v1'];
     const present = await Promise.all(guardedKeys.map(key => txn.get(key)));
     if (present.some(record => record !== undefined)) fail('TARGET_NOT_EMPTY');
     await txn.put(PAPER_LEDGER_KEY, verified.ledger);

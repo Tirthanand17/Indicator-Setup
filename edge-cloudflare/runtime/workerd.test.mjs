@@ -140,6 +140,77 @@ test('native local workerd commits two-account paper debits/outbox atomically an
   } finally {await mf.dispose();}
 });
 
+test('native SQLite delivery journal blocks crash-replay, honors 429 and retains verified tombstones',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-delivery-native-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PAPER_LEDGER_ENABLED:'true',OFFLINE_DELIVERY_REHEARSAL_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('Real Telegram traffic forbidden by local test');}};
+  const at=Date.parse('2026-10-23T04:30:00Z');
+  const quote={contract:{symbol:'NIFTY26OCT23000CE',kind:'CE',expiry:'2026-10-29',
+    token:12345,lotSize:65},bid:100,ask:100.5,
+    bidQuantity:600,askQuantity:600,updatedAtMs:at-1000};
+  let mf=new Miniflare(options);
+  const stubFor=async()=>{
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));
+  };
+  const post=async(stub,endpoint,payload)=> {
+    const response=await stub.fetch('https://unit.invalid/test/delivery/'+endpoint,
+      {method:'POST',body:JSON.stringify(payload)});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  try {
+    let stub=await stubFor();
+    assert.equal((await post(stub,'init',{nowMs:at})).status,'NO_ELIGIBLE_ALERT');
+    const entered=await stub.fetch('https://unit.invalid/test/paper/enter',
+      {method:'POST',body:JSON.stringify({
+        signalId:'telegram-rehearsal-001',nowMs:at,quote})});
+    assert.equal((await entered.json()).results.PAPER_50K.status,'OPEN');
+    const first=await post(stub,'claim',{nowMs:at+1000});
+    assert.equal(first.status,'SIMULATED_ATTEMPT_CLAIM');
+    assert.equal(first.sent,false);
+    assert.equal((await post(stub,'claim',{nowMs:at+1500})).status,
+      'AMBIGUOUS_ACK_REQUIRED');
+    await mf.dispose();mf=new Miniflare(options);stub=await stubFor();
+    assert.equal((await post(stub,'claim',{nowMs:at+2000})).status,
+      'AMBIGUOUS_ACK_REQUIRED');
+    const suppressed=await post(stub,'suppress',{eventId:first.eventId,
+      nowMs:at+3000,
+      decision:'OWNER_SUPPRESS_RESEND_ACKNOWLEDGING_UNKNOWN_DELIVERY'});
+    assert.equal(suppressed.status,'SUPPRESSED_UNCERTAIN');
+    const second=await post(stub,'claim',{nowMs:at+4000});
+    assert.equal(second.attempt,1);
+    const wait=await post(stub,'settle',{eventId:second.eventId,
+      attempt:second.attempt,nowMs:at+5000,httpStatus:429,
+      botResponse:{ok:false,error_code:429,parameters:{retry_after:3}}});
+    assert.equal(wait.status,'RATE_LIMIT_WAIT');
+    assert.equal((await post(stub,'claim',{nowMs:at+7999})).status,'RATE_LIMIT_WAIT');
+    const retried=await post(stub,'claim',{nowMs:at+8000});
+    assert.equal(retried.attempt,2);
+    assert.equal((await post(stub,'settle',{eventId:retried.eventId,
+      attempt:retried.attempt,nowMs:at+9000,httpStatus:200,
+      botResponse:{ok:true,result:{message_id:271}}})).status,'ACCEPTED_API_ONLY');
+    const summary=await (await stub.fetch('https://unit.invalid/test/delivery/summary')).json();
+    assert.equal(summary.cursor,2);
+    assert.equal(summary.attempted,3);
+    assert.equal(summary.acceptedByBotApi,1);
+    assert.equal(summary.suppressedUnknown,1);
+    assert.equal(summary.phoneDeliveredVerified,false);
+    assert.equal(JSON.stringify(summary).includes('SIMULATED ONLY'),false);
+    assert.equal((await post(stub,'claim',{nowMs:at+10000})).status,'NO_ELIGIBLE_ALERT');
+    const persisted=await (await stub.fetch('https://unit.invalid/test/delivery/state')).json();
+    assert.equal(persisted.recent.length,2);
+    assert.equal(persisted.recent[0].status,'SUPPRESSED_UNCERTAIN');
+    assert.equal(persisted.recent[1].status,'ACCEPTED_API_ONLY');
+    assert.equal(JSON.stringify(persisted).includes('SIMULATED ONLY'),false);
+  } finally {await mf.dispose();}
+});
+
 test('native synthetic pipeline commits 5m/15m signal, two accounts, exits and journal across restart',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-session-native-do-'));
   const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),

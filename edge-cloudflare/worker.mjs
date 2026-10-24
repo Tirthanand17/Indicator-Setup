@@ -13,6 +13,9 @@ import { SYNTHETIC_SESSION_KEY, newSyntheticSession, auditSyntheticSession,
 import { isPrivateDashboardPath, handlePrivateDashboard } from './private-dashboard.mjs';
 import { PORTFOLIO_MARKS_KEY, auditPortfolioMarks,
   captureSyntheticPortfolioMarks } from './portfolio-valuation.mjs';
+import { PAPER_DELIVERY_KEY, newPaperDeliveryJournal,
+  claimPaperDelivery, settlePaperDelivery, suppressAmbiguousDelivery,
+  paperDeliverySummary } from './paper-delivery.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -228,6 +231,61 @@ export class MarketSession {
 
   markPaperUnverifiable(nowMs) {
     return this.withPaperLedger(state => markPaperUnverifiable(state, nowMs), nowMs);
+  }
+
+  /** OFFLINE rehearsal only: durable claim/settle/suppress transitions share a
+   * transaction with a read of the source paper ledger. No Bot API request
+   * is made here, and no production HTTP route invokes these methods.
+   * A CLAIMED_UNCONFIRMED attempt remains ambiguous after restart.
+   */
+  async withPaperDelivery(operation, nowMs) {
+    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true' ||
+        this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true' ||
+        this.env.OFFLINE_DELIVERY_REHEARSAL_ENABLED !== 'true') {
+      throw new Error('PAPER_DELIVERY_REHEARSAL_DISABLED');
+    }
+    return this.storage.transaction(async txn => {
+      const ledger = await txn.get(PAPER_LEDGER_KEY);
+      if (ledger === undefined) throw new Error('PAPER_DELIVERY_MISSING_LEDGER');
+      const stored = await txn.get(PAPER_DELIVERY_KEY);
+      // Missing delivery cursor alongside pre-existing alerts may mean a
+      // partial restore. Never replay that historical outbox as new alerts.
+      if (stored === undefined && ledger.outbox.length !== 0) {
+        throw new Error('PAPER_DELIVERY_MISSING_REPLAY_WATERMARK');
+      }
+      const current = stored === undefined ? newPaperDeliveryJournal(nowMs) : stored;
+      const outcome = operation(current, ledger);
+      if (outcome.journal !== stored) await txn.put(PAPER_DELIVERY_KEY, outcome.journal);
+      return { ...outcome.result };
+    });
+  }
+
+  claimPaperDeliveryRehearsal(nowMs) {
+    return this.withPaperDelivery((journal, ledger) =>
+      claimPaperDelivery(journal, ledger, nowMs), nowMs);
+  }
+
+  settlePaperDeliveryRehearsal(input) {
+    return this.withPaperDelivery((journal, ledger) =>
+      settlePaperDelivery(journal, ledger, input), input?.nowMs);
+  }
+
+  suppressPaperDeliveryRehearsal(input) {
+    return this.withPaperDelivery((journal, ledger) =>
+      suppressAmbiguousDelivery(journal, ledger, input), input?.nowMs);
+  }
+
+  async paperDeliveryRehearsalSummary() {
+    if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true' ||
+        this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true' ||
+        this.env.OFFLINE_DELIVERY_REHEARSAL_ENABLED !== 'true') {
+      throw new Error('PAPER_DELIVERY_REHEARSAL_DISABLED');
+    }
+    const [ledger, stored] = await Promise.all([
+      this.storage.get(PAPER_LEDGER_KEY), this.storage.get(PAPER_DELIVERY_KEY),
+    ]);
+    if (!ledger || !stored) throw new Error('PAPER_DELIVERY_NOT_INITIALIZED');
+    return paperDeliverySummary(stored, ledger);
   }
 
   /** Test-only provenance is mandatory. Production provides no HTTP POST

@@ -1,6 +1,6 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
-**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist22/25 (88%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
+**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
 `worker.mjs` exports a Worker and `MarketSession` Durable Object. Authenticated POST `/internal/bootstrap` with empty body and GET `/internal/scheduler` use `SCHEDULER_ADMIN_KEY` (32–256 chars, at least8 distinct), with authentication at both Worker and object. `OFFLINE_SCHEDULER_ENABLED` must explicitly be `true`. The example disables scheduling, market access, workers.dev and preview URLs.
 
@@ -52,6 +52,29 @@ These marks are **never live NSE prices, guaranteed executable depth, actual fil
 
 **Checklist #23 is still OPEN** because no private off-host destination, production export endpoint, hosted restore drill, retention job or genuine capacity telemetry has been authorized or verified. Production `/internal/paper-archive`, `/internal/paper-capacity`, and `/internal/paper-restore` routes remain absent. No backup data, credentials or messages were sent to GitHub. [Phase23 checkpoint and approval boundary](../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md).
 
+## Phase24: durable offline Telegram delivery-result reconciliation (NOT sending)
+
+`paper-delivery.mjs` now implements an independent transactional `paper-delivery-v1`
+claim/cursor journal against the immutable pending paper outbox. A claim is
+persisted *before* a future send and remains uncertain after restart until a
+definitive Bot API response is committed; timeout, malformed acceptance and
+5xx become `AMBIGUOUS` and can **never automatically resend**. A valid 429
+`parameters.retry_after` imposes a strict cooldown, at most three attempts,
+and a 180-second entry / 600-second exit expiry. A clear 200 + `ok:true`
+with positive `message_id` means only **Telegram API acceptance**, not
+phone delivery. Owner-acknowledged suppression records uncertainty honestly.
+
+The last 128 terminal receipts are retained, while a monotonic cursor prevents
+replaying compacted events; the complete fixed-cap paper outbox remains
+unchanged. Missing delivery state alongside a populated ledger **blocks
+initialization**, protecting Phase23 archive restores from resending historical
+events. Only `MarketSession` internal methods support a synthetic rehearsal,
+guarded by `OFFLINE_DELIVERY_REHEARSAL_ENABLED=false` in the example. The
+production Worker exposes **no** send, claim, settle or suppression API, and
+contains **no network Telegram client**. Native SQLite restart and synthetic
+response tests pass. No token, real message or cloud action occurred.
+[Phase24 report](../audit/PHASE24_OFFLINE_DELIVERY_RECONCILIATION.md).
+
 ## Offline verification
 
 ```sh
@@ -61,7 +84,7 @@ npm ci --ignore-scripts
 npm run test:runtime
 ```
 
-144 edge tests pass (including 7 offline archive/capacity safeguards), plus 39 extension tests and 6 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, synthetic indicative MTM freshness/expiry, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling or real Kite reachability. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
+160 edge tests pass (including 16 offline Phase24 delivery safeguards), plus 39 extension tests and 7 native local workerd SQLite tests. `runtime/harness.mjs` is LOCAL TEST ONLY with synthetic clock/test endpoints and outbound traffic rejected. Never deploy it. Native tests verify synthetic decision/entry/exit accounting, atomic paper account/outbox persistence, delivery claim and restart ambiguity, synthetic indicative MTM freshness/expiry, concurrent duplicate suppression, abort rollback, private dashboard session/restart, scheduler restart and signed/encrypted token persistence, **not** hosted scheduling, real Kite reachability or phone Telegram delivery. `generate_parity.py`, `generate_decision_parity.py`, and `generate_exit_parity.py` regenerate Python reference fixtures; review changes explicitly.
 
 ## Remaining migration
 

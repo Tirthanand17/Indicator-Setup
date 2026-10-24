@@ -97,7 +97,8 @@ test('restore to empty transactional storage is one-time, no broker vault or sch
 test('empty ledger backup does not overwrite a scheduler-only, token-only or market-only target',async()=>{
   const bundle=await make(newPaperLedger(AT));
   for(const key of ['scheduler-v1','daily-token-v1','market-observation-v1',
-    'paper-ledger-v1','synthetic-session-v1','synthetic-portfolio-marks-v1']) {
+    'paper-ledger-v1','synthetic-session-v1','synthetic-portfolio-marks-v1',
+    'paper-delivery-v1']) {
     const store=emptyStore();store.rows.set(key,{existing:true});
     await assert.rejects(()=>restorePaperArchiveToEmpty(store,bundle,SECRET),/TARGET_NOT_EMPTY/);
     assert.deepEqual(store.rows.get(key),{existing:true});
