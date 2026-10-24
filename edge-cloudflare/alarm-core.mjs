@@ -6,6 +6,16 @@
 export const NSE_FO_CALENDAR_VERSION = 'NSE-FO-2026-FAOP71777-FAOP72262';
 export const ALARM_INTERVAL_MS = 20_000;
 const IST_OFFSET_MS = 330 * 60_000;
+/** Official NSE/FAOP/76940 dated 19 Oct 2026: Diwali Muhurat F&O
+ * continuous session 14:20–15:40 IST on Sunday 08 Nov. This strategy is
+ * validated only for the REGULAR session; an exceptional session is NEVER
+ * auto-promoted to a paper-trading day.
+ */
+export const NSE_FO_SPECIAL_2026 = Object.freeze({
+  '2026-11-08': Object.freeze({ circular: 'NSE/FAOP/76940',
+    continuousOpenIst: '14:20', continuousCloseIst: '15:40',
+    automatedPaperSessionEligible: false }),
+});
 const CLOSED_2026 = new Set([
   '2026-01-15', '2026-01-26', '2026-03-03', '2026-03-26',
   '2026-03-31', '2026-04-03', '2026-04-14', '2026-05-01',
@@ -25,6 +35,7 @@ export function sessionStatus(istDate) {
   const date = new Date(`${istDate}T00:00:00Z`);
   if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== istDate ||
       date.getUTCFullYear() !== 2026) return null;
+  if (Object.hasOwn(NSE_FO_SPECIAL_2026, istDate)) return 'SPECIAL';
   if ([0, 6].includes(date.getUTCDay())) return 'WEEKEND';
   return CLOSED_2026.has(istDate) ? 'HOLIDAY' : 'REGULAR';
 }
@@ -34,7 +45,7 @@ export function validClaimedTickId(value) {
   const [date, slot] = value.split(':');
   const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === date &&
-    Number(slot) < 1125 && !CLOSED_2026.has(date) && ![0, 6].includes(parsed.getUTCDay());
+    Number(slot) < 1125 && sessionStatus(date) === 'REGULAR';
 }
 
 // Re-arm across nights, weekends and known 2026 F&O holidays.
@@ -46,9 +57,7 @@ function nextMarketOpenAfter(observedAtMs) {
       local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + daysAhead,
     ));
     if (localDay.getUTCFullYear() !== 2026) return null;
-    const day = localDay.getUTCDay();
-    if (day === 0 || day === 6 ||
-        CLOSED_2026.has(localDay.toISOString().slice(0, 10))) continue;
+    if (sessionStatus(localDay.toISOString().slice(0, 10)) !== 'REGULAR') continue;
     const openingAt = localDay.getTime() + 9 * 60 * 60_000 +
       15 * 60_000 - IST_OFFSET_MS;
     if (openingAt > observedAtMs) return openingAt;
@@ -79,8 +88,11 @@ export function assessAlarm({
   if (!Number.isFinite(local.valueOf())) return result('BLOCKED_INVALID_CLOCK');
   if (local.getUTCFullYear() !== 2026) return result('BLOCKED_UNSUPPORTED_YEAR');
   const date = local.toISOString().slice(0, 10);
-  const weekday = local.getUTCDay();
-  if (weekday === 0 || weekday === 6 || CLOSED_2026.has(date)) {
+  const calendarStatus = sessionStatus(date);
+  if (calendarStatus === 'SPECIAL') {
+    return result('CLOSED_SPECIAL_SESSION', nextMarketOpenAfter(observedAtMs));
+  }
+  if (calendarStatus !== 'REGULAR') {
     return result('CLOSED_NSE_SESSION', nextMarketOpenAfter(observedAtMs));
   }
   const y = local.getUTCFullYear(), m = local.getUTCMonth(), d = local.getUTCDate();

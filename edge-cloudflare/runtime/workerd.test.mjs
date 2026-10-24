@@ -41,6 +41,52 @@ test('real local workerd SQLite transactions, duplicate alarms and persisted res
   } finally { await mf.dispose(); }
 });
 
+test('owner emergency halt cancels alarm, is idempotent and survives restart/bootstrap',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-halt-native-do-'));
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('No network allowed in halt test');}};
+  let mf=new Miniflare(options);
+  const halt=options=>mf.dispatchFetch('https://unit.invalid/internal/emergency-halt',
+    {method:'POST',...options});
+  const state=async()=> (await mf.dispatchFetch('https://unit.invalid/internal/scheduler',
+    {headers})).json();
+  try {
+    assert.equal((await halt()).status,404);
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/release-readiness')).status,404);
+    assert.equal((await halt({headers,body:'surprise'})).status,400);
+    const preHalt=await halt({headers});
+    assert.equal(preHalt.status,200);
+    assert.equal((await preHalt.json()).status,'OWNER_EMERGENCY_HALT');
+    assert.equal((await state()).events.length,1);
+    assert.equal((await halt({headers})).status,200);
+    assert.equal((await state()).events.length,1);
+    const boot=await mf.dispatchFetch('https://unit.invalid/internal/bootstrap',
+      {method:'POST',headers});
+    assert.equal((await boot.json()).status,'OWNER_EMERGENCY_HALT');
+    const before=await state();
+    assert.equal(before.halted,true);
+    assert.equal(before.scheduledAtMs,null);
+    assert.equal(before.totalClaims,0);
+    assert.equal(before.realOrdersEnabled,false);
+    const readiness=await (await mf.dispatchFetch('https://unit.invalid/internal/release-readiness',
+      {headers})).json();
+    assert.equal(readiness.status,'BLOCKED_PRE_RELEASE');
+    assert.ok(readiness.blockers.includes('SCHEDULER_HALTED'));
+    assert.equal(readiness.automatedReleaseAuthorized,false);
+    await mf.dispose();mf=new Miniflare(options);
+    const after=await state();
+    assert.deepEqual(after.events,before.events);
+    assert.equal(after.status,'OWNER_EMERGENCY_HALT');
+    assert.equal(after.scheduledAtMs,null);
+    assert.equal((await (await mf.dispatchFetch('https://unit.invalid/internal/bootstrap',
+      {method:'POST',headers})).json()).status,'OWNER_EMERGENCY_HALT');
+  } finally {await mf.dispose();}
+});
+
 test('native local workerd verifies HMAC, encrypts token, persists it across restart',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-token-offline-do-'));
   const relay='offline-relay-hmac-secret-0123456789-never-live';
@@ -67,6 +113,12 @@ test('native local workerd verifies HMAC, encrypts token, persists it across res
     const post=()=>mf.dispatchFetch('https://unit.invalid/internal/token',{method:'POST',headers,body});
     assert.equal((await post()).status,200);
     assert.equal((await post()).status,409);
+    const status=await (await mf.dispatchFetch('https://unit.invalid/internal/release-readiness',
+      {headers:{authorization:'Bearer '+key}})).json();
+    assert.equal(status.dailyTokenHandoffAcknowledged,true);
+    assert.ok(status.blockers.includes('OWNER_CLOUD_APPROVAL_REQUIRED'));
+    assert.equal(JSON.stringify(status).includes('SYNTHETIC-ACCESS-TOKEN'),false);
+    assert.equal(JSON.stringify(status).includes('ciphertext'),false);
     assert.deepEqual(await (await stub.fetch('https://unit.invalid/test/token-sealed')).json(),
       {present:true,encrypted:true,containsPlainToken:false});
     await mf.dispose();mf=new Miniflare(options);

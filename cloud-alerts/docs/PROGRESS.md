@@ -1,5 +1,18 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase25 exceptional-session/release checkpoint — INCOMPLETE:**
+Confirmed the official NSE F&O Diwali Muhurat Sunday 8 November 2026
+exception, explicitly classified as `SPECIAL` in Python and JS and excluded
+from ordinary automated paper claims. Added persistent authenticated
+emergency halt, authenticated secret-free release-readiness checks, and
+signed current-IST-day token handoff indication. **2027 official F&O annual
+calendar is unverified; all 2027 dates remain blocked.** Owner release,
+real cloud restoration, phone receipt and broker-data checks remain undone,
+so checklist #25 remains **No** and progress **23/25 = 92%**, live **0/5**.
+Current local verification: **Python 778 passed/1 skipped; Cloudflare JS 164 passed;
+native workerd SQLite 8 passed**. These are offline-only checks.
+[Phase25 checkpoint](../../audit/PHASE25_SPECIAL_SESSIONS_RELEASE_GATE.md).
+
 **24 October Phase24 offline delivery reliability COMPLETE:** Added a
 transactional, restart-safe paper alert delivery journal and state machine for
 claim-before-send, non-retriable ambiguous outcomes, Telegram Bot API
@@ -66,7 +79,7 @@ Live acceptance     [-----]                      0/5
 |22|Complete portfolio MTM, capital and health views|Yes|Synthetic indicative exit-BID MTM, capital/risk and health API; no live quote. Phase22 evidence|
 |23|Cloud retention, export/restore and capacity measurements|No|Offline signed archive/restore and synthetic sizing built; private hosted export, independent restore and cloud quota proof still require approval. Phase23 checkpoint|
 |24|Telegram ambiguous delivery/retry_after/retention handling|Yes|Offline transactional claim/cursor, ambiguous no-resend, 429 retry_after, bounded receipt tail, native SQLite restart; no real Telegram sender. Phase24 evidence|
-|25|Annual/exceptional-session and operational release controls|No|A16 open;2027 fail closed|
+|25|Annual/exceptional-session and operational release controls|No|2026 exceptional Muhurat excluded; persistent emergency stop and owner-only release blockers added offline. Actual 2027 circular and owner-approved rollout/acceptance unverified; A16 still open. Phase25 checkpoint|
 
 Latest verified offline evidence: **Python 777 passed,1 skipped,1 third-party warning; 199 combined Node tests passed (160 edge + 39 extension); 7 native local workerd SQLite tests passed (including delivery restart); full configured mypy49 files previously passed; pip check clean (prior round)**. Prior advisory scan is historical and was not rerun in this round. npm audit previously reported0 known vulnerabilities after overrides. Open audit items still include real market-data-to-engine integration, cloud capacity, actual Telegram delivery, and **live** portfolio MTM. See [Phase24 report](../../audit/PHASE24_OFFLINE_DELIVERY_RECONCILIATION.md), [Phase23 checkpoint](../../audit/PHASE23_OFFLINE_ARCHIVE_CAPACITY.md), [Phase22 evidence](../../audit/PHASE22_SYNTHETIC_PORTFOLIO_MTM.md), [Phase20 evidence](../../audit/PHASE20_PRIVATE_CLOUD_DASHBOARD.md), [Phase19 evidence](../../audit/PHASE19_SYNTHETIC_SESSION_E2E.md), [Phase18 evidence](../../audit/PHASE18_EDGE_DUAL_LEDGER.md), [verification](../../audit/FIX_VERIFICATION_MATRIX.md), [findings](../../audit/ISSUE_REGISTER.md) and [full audit](../../audit/FULL_PROJECT_AUDIT_2026-10-23.md).
 
