@@ -2,6 +2,21 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase32 separate Kite-observed paper dashboard (disabled):**
+`readonly-dashboard.mjs` adds audited, account-separated observed-source
+paper reports to the existing HMAC-cookie private `/paper/dashboard`.
+With **all** existing scheduler, dashboard, futures/option, and paper-bridge
+gates explicitly enabled, `GET /paper/api/readonly` displays independently
+modeled ₹50k/₹100k balances, closed paper P&L, day reports, filtered trade
+history and last option evidence age. It never mixes the `paper-ledger-v1`
+synthetic data with `readonly-paper-ledger-v1` observed-source paper data.
+Unrealized P&L and marked equity remain unavailable absent a fresh verified
+mark; cash is not equity. No broker order, token, raw quote or Telegram
+message is exposed. **202 JS + 12 native SQLite tests pass offline.**
+No cloud UI was deployed, no flags were enabled, and no phone delivery or
+live market performance has been verified.
+[Phase32 evidence](../audit/PHASE32_PRIVATE_READONLY_PAPER_DASHBOARD.md).
+
 **Phase31 separate Kite-observation paper rehearsal (disabled):**
 `readonly-paper-bridge.mjs` closes the offline integration gap between
 read-only completed-candle CE/PE diagnostics and a verified next-slot option

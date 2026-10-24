@@ -639,3 +639,53 @@ test('native private mobile dashboard login, read-only API, fail closed and SQLi
     assert.equal(after.accounts[1].openCount,1);
   } finally {await mf.dispose();}
 });
+
+test('native private read-only paper dashboard remains distinct from synthetic ledger across restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-readonly-private-native-'));
+  const viewKey='private-readonly-view-0123456789-AbCdEfGh';
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      OFFLINE_PRIVATE_DASHBOARD_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+      OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',PAPER_DASHBOARD_VIEW_KEY:viewKey},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    durableObjectsPersist:persist,
+    outboundService:()=>{throw Error('External requests forbidden by local test');}};
+  let mf=new Miniflare(options);
+  const request=(route,init)=>mf.dispatchFetch(`https://unit.invalid${route}`,init);
+  try {
+    assert.equal((await request('/paper/api/readonly')).status,404);
+    const login=await request('/paper/login',{method:'POST',redirect:'manual',
+      headers:{'content-type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({key:viewKey}).toString()});
+    assert.equal(login.status,303);
+    const cookie=login.headers.get('set-cookie').split(';')[0];
+    const before=await request('/paper/api/readonly',{headers:{cookie}});
+    assert.equal(before.status,503);
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    const stub=ns.get(ns.idFromName('nifty-paper-session-v1'));
+    const at=Date.parse('2026-10-23T10:30:40+05:30');
+    const q=kind=>({contract:{symbol:`NIFTY26O2922050${kind}`,kind,
+      expiry:'2026-10-29',strike:22050,token:kind==='CE'?15101:15102,lotSize:65},
+      bid:100,ask:100.5,bidQuantity:650,askQuantity:650,updatedAtMs:at-1000});
+    const turn=await stub.fetch('https://unit.invalid/test/read-only-paper/turn',{
+      method:'POST',body:JSON.stringify({tickId:'2026-10-23:227',observedAtMs:at,
+        evidence:{source:'READONLY_OPTION_EVIDENCE_ONLY',paperEntryAuthorized:false,
+          telegramAuthorized:false,realOrdersEnabled:false,CE:q('CE'),PE:q('PE')}})});
+    assert.equal((await turn.json()).status,'READONLY_PAPER_TICK');
+    const result=await (await request('/paper/api/readonly?date=2026-10-23',{headers:{cookie}})).json();
+    assert.equal(result.status,'READY');
+    assert.equal(result.source,'READONLY_KITE_EVIDENCE_PAPER_ONLY');
+    assert.equal(result.totalOptionTicks,1);
+    assert.equal(result.accounts.length,2);
+    assert.equal(result.totalTrades,0);
+    assert.equal(result.telegramDelivered,false);
+    assert.equal((await request('/paper/api/summary',{headers:{cookie}})).status,503);
+    await mf.dispose();mf=new Miniflare(options);
+    const recovered=await (await request('/paper/api/readonly?date=2026-10-23',{headers:{cookie}})).json();
+    assert.equal(recovered.totalOptionTicks,1);
+    assert.equal(recovered.totalTrades,0);
+    assert.equal(recovered.accounts[0].cashRupees,50000);
+  } finally {await mf.dispose();}
+});
