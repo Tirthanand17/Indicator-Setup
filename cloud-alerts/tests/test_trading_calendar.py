@@ -41,10 +41,20 @@ def test_nse_fo_2026_holidays(holiday):
 
 def test_nontrading_and_special_session_handling():
     assert session_status(date(2026,10,18)) == 'WEEKEND'
-    assert session_status(date(2026,11,8)) == 'WEEKEND'  # Muhurat isn't a regular session.
+    assert session_status(date(2026,11,8)) == 'SPECIAL'  # Muhurat isn't a regular session.
+    assert not regular_session(date(2026,11,8))
     assert session_status(date(2026,10,19)) == 'REGULAR'
     assert session_status(OPEN) == 'REGULAR'
     assert '2026' in CALENDAR_VERSION
+
+
+def test_special_session_never_claims_regular_poll_slot():
+    special = date(2026, 11, 8)
+    scheduler = CandlePollScheduler()
+    assert not scheduler.claim(at(special, 14, 20, 0))
+    assert not scheduler.claim(at(special, 15, 0, 0))
+    assert boundary_for(at(special, 14, 20, 0)) is None
+    assert boundary_for(at(special, 15, 0, 0)) is None
 
 
 @pytest.mark.parametrize('invalid',[date(2025,10,20),date(2027,1,4),date(2028,10,20)])

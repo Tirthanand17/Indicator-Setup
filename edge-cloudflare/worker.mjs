@@ -16,6 +16,7 @@ import { PORTFOLIO_MARKS_KEY, auditPortfolioMarks,
 import { PAPER_DELIVERY_KEY, newPaperDeliveryJournal,
   claimPaperDelivery, settlePaperDelivery, suppressAmbiguousDelivery,
   paperDeliverySummary } from './paper-delivery.mjs';
+import { assessOfflineRelease } from './release-readiness.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -67,7 +68,9 @@ export default {
       env.OFFLINE_PAPER_LEDGER_ENABLED === 'true';
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
     if (!tokenRoute && !dashboardRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
+          (path === '/internal/emergency-halt' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
+          (path === '/internal/release-readiness' && request.method === 'GET') ||
           (path === '/internal/paper-ledger' && request.method === 'GET') ||
           (path === '/internal/synthetic-session' && request.method === 'GET')) ||
         !await authorized(request, env))) return reply({ error: 'Not found' }, 404);
@@ -108,6 +111,20 @@ export class MarketSession {
           marketRuntimeEnabled: this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true',
           market: market && validMarketObservation(market) ? market : null, realOrdersEnabled: false });
       }
+      if (path === '/internal/release-readiness' && request.method === 'GET') {
+        const [scheduler, token] = await Promise.all([
+          this.storage.get(STATE_KEY), this.storage.get(TOKEN_KEY),
+        ]);
+        if (scheduler !== undefined && !validState(scheduler))
+          return reply({ status: 'BLOCKED_CORRUPT_STATE', paperOnly: true }, 503);
+        const now = Date.now();
+        const istDay = ms => new Date(ms + 330 * 60_000).toISOString().slice(0, 10);
+        const validHandoff = validTokenRecord(token) && now < token.expiresAtMs &&
+          token.signedAt * 1000 <= now && istDay(token.signedAt * 1000) === istDay(now);
+        return reply(assessOfflineRelease({ nowMs: now, schedulerState: scheduler ?? null,
+          dailyTokenHandoffAcknowledged: validHandoff,
+          readonlyMarketRuntimeEnabled: this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true' }));
+      }
       if (path === '/internal/paper-ledger' && request.method === 'GET') {
         if (this.env.OFFLINE_PAPER_LEDGER_ENABLED !== 'true')
           return reply({ status: 'DISABLED', paperOnly: true }, 503);
@@ -129,7 +146,9 @@ export class MarketSession {
         try { return reply({ status: 'READY', ...syntheticSessionSummary(stored, ledger) }); }
         catch { return reply({ status: 'BLOCKED_CORRUPT_SYNTHETIC_SESSION' }, 503); }
       }
-      if (path !== '/internal/bootstrap' || request.method !== 'POST') return reply({ error: 'Not found' }, 404);
+      const isBootstrap = path === '/internal/bootstrap' && request.method === 'POST';
+      const isEmergencyHalt = path === '/internal/emergency-halt' && request.method === 'POST';
+      if (!isBootstrap && !isEmergencyHalt) return reply({ error: 'Not found' }, 404);
       // No input or token upload is accepted by this scheduler-only endpoint.
       // workerd represents even an empty forwarded POST with a body stream.
       // Inspect at most the first chunk, never buffer arbitrary upload content.
@@ -144,6 +163,36 @@ export class MarketSession {
         } finally { reader.releaseLock(); }
       }
       const now = Date.now();
+      if (isEmergencyHalt) {
+        const outcome = await this.storage.transaction(async txn => {
+          const existing = await txn.get(STATE_KEY);
+          // Stop a pending callback even if state cannot safely be interpreted.
+          await txn.deleteAlarm();
+          if (existing !== undefined && !validState(existing)) return 'BLOCKED_CORRUPT_STATE';
+          if (existing?.halted && existing.status === 'OWNER_EMERGENCY_HALT')
+            return 'OWNER_EMERGENCY_HALT'; // Repeat is idempotent; preserve evidence.
+          const state = existing ?? {
+            schema: 1, calendarVersion: NSE_FO_CALENDAR_VERSION,
+            scheduledAtMs: null, lastObservedAtMs: now, lastClaimedTickId: null,
+            status: 'OWNER_EMERGENCY_HALT', halted: true,
+            usageDay: new Date(now).toISOString().slice(0, 10), callbacks: 0,
+            totalClaims: 0, events: [],
+          };
+          const priorAlarm = state.scheduledAtMs;
+          state.events.push({ status: 'OWNER_EMERGENCY_HALT',
+            scheduledAtMs: priorAlarm ?? now, observedAtMs: now, tickId: null });
+          state.events = state.events.slice(-RETAINED_EVENTS);
+          state.lastObservedAtMs = Math.max(state.lastObservedAtMs, now);
+          state.scheduledAtMs = null;
+          state.halted = true;
+          state.status = 'OWNER_EMERGENCY_HALT';
+          await txn.put(STATE_KEY, state);
+          return 'OWNER_EMERGENCY_HALT';
+        });
+        return reply({ status: outcome, paperOnly: true,
+          scheduledAtMs: null, realOrdersEnabled: false },
+        outcome === 'BLOCKED_CORRUPT_STATE' ? 503 : 200);
+      }
       const saved = await this.storage.transaction(async txn => {
         const existing = await txn.get(STATE_KEY);
         if (existing !== undefined) {

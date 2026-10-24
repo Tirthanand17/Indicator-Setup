@@ -14,7 +14,12 @@ CALENDAR_VERSION = 'NSE-FO-2026-FAOP71777-FAOP72262'
 SOURCE_URLS = (
     'https://nsearchives.nseindia.com/content/circulars/FAOP71777.pdf',
     'https://nsearchives.nseindia.com/content/circulars/FAOP72262.pdf',
+    'https://nsearchives.nseindia.com/content/circulars/FAOP76940.pdf',
 )
+
+# NSE/FAOP/76940, 19 Oct 2026: Sunday Muhurat F&O session, 14:20–15:40 IST.
+# This is explicitly NOT a regular 09:15–15:30 automated paper session.
+SPECIAL_2026 = frozenset({date(2026, 11, 8)})
 
 _CLOSED_2026 = frozenset(date.fromisoformat(s) for s in (
     '2026-01-15', '2026-01-26', '2026-03-03', '2026-03-26',
@@ -28,7 +33,7 @@ class CalendarUnavailable(ValueError):
 
 
 def session_status(day: date) -> str:
-    """REGULAR, HOLIDAY or WEEKEND; never guess for unsupported years.
+    """REGULAR, HOLIDAY, WEEKEND or SPECIAL; never guess unsupported years.
 
     An exchange emergency closure after publication requires a calendar patch.
     """
@@ -36,6 +41,8 @@ def session_status(day: date) -> str:
         raise ValueError('session must be a date, not a datetime or text')
     if day.year != 2026:
         raise CalendarUnavailable('NSE F&O regular-session calendar needs annual refresh')
+    if day in SPECIAL_2026:
+        return 'SPECIAL'
     if day.weekday() >= 5:
         return 'WEEKEND'
     if day in _CLOSED_2026:

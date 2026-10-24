@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessAlarm, ALARM_INTERVAL_MS, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
+import { assessAlarm, ALARM_INTERVAL_MS, NSE_FO_CALENDAR_VERSION,
+  NSE_FO_SPECIAL_2026, sessionStatus } from './alarm-core.mjs';
 
 const ist = (day, time) => Date.parse(`${day}T${time}+05:30`);
 const assess = (observedAtMs, scheduledAtMs, lastClaimedTickId = null, calendarVersion = NSE_FO_CALENDAR_VERSION) =>
@@ -74,6 +75,24 @@ test('unlisted year and unprovided 2027 calendar fail closed', () => {
   const nextYear = assess(ist('2027-01-01', '09:15:00'), due);
   assert.equal(nextYear.status, 'BLOCKED_UNSUPPORTED_YEAR');
   assert.equal(nextYear.shouldPoll, false);
+});
+
+test('published 2026 Diwali Muhurat 14:20–15:40 Sunday is known but remains excluded', () => {
+  const special = NSE_FO_SPECIAL_2026['2026-11-08'];
+  assert.equal(special.circular, 'NSE/FAOP/76940');
+  assert.equal(special.continuousOpenIst, '14:20');
+  assert.equal(special.continuousCloseIst, '15:40');
+  assert.equal(special.automatedPaperSessionEligible, false);
+  assert.equal(sessionStatus('2026-11-08'), 'SPECIAL');
+  for (const time of ['09:15:00','14:20:00','15:00:00','15:39:40','15:40:00']) {
+    const at = ist('2026-11-08', time);
+    const result = assess(at, at);
+    assert.equal(result.status, 'CLOSED_SPECIAL_SESSION');
+    assert.equal(result.shouldPoll, false);
+    assert.equal(result.nextAlarmAtMs, ist('2026-11-09', '09:15:00'));
+  }
+  assert.equal(sessionStatus('2026-11-07'),'WEEKEND');
+  assert.equal(sessionStatus('2027-01-04'),null);
 });
 
 test('invalid data and wrong calendar version block polling', () => {
