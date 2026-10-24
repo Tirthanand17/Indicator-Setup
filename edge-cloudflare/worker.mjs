@@ -27,6 +27,7 @@ import { PAPER_DELIVERY_KEY, newPaperDeliveryJournal,
   claimPaperDelivery, settlePaperDelivery, suppressAmbiguousDelivery,
   paperDeliverySummary } from './paper-delivery.mjs';
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from './readonly-delivery.mjs';
+import { validPrivateTelegramConfig, sendTelegramPaperMessage } from './telegram-sender.mjs';
 import { assessOfflineRelease } from './release-readiness.mjs';
 
 const STATE_KEY = 'scheduler-v1';
@@ -115,6 +116,11 @@ export class MarketSession {
   get readonlyDeliveryRehearsalEnabled() {
     return this.readonlyPaperEnabled &&
       this.env.OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED === 'true';
+  }
+
+  get readonlyTelegramSenderEnabled() {
+    return this.readonlyDeliveryRehearsalEnabled &&
+      this.env.OFFLINE_TELEGRAM_SENDER_ENABLED === 'true';
   }
 
   async fetch(request) {
@@ -440,6 +446,34 @@ export class MarketSession {
       suppressAmbiguousDelivery(journal,ledger,input),input?.nowMs);
   }
 
+  /** Only the alarm can call this in production. Claim is committed first;
+   * a failed/missing Bot API acknowledgement is ambiguous and never
+   * automatically resent. A test-only injected sender is available to the
+   * local harness; no production HTTP trigger or public send endpoint exists.
+   */
+  async dispatchReadOnlyTelegram(sendFn=sendTelegramPaperMessage) {
+    if(!this.readonlyTelegramSenderEnabled)
+      return {status:'SENDER_DISABLED',phoneDelivered:false};
+    const token=this.env.TELEGRAM_BOT_TOKEN;
+    const chatId=this.env.TELEGRAM_PRIVATE_CHAT_ID;
+    if(!validPrivateTelegramConfig({token,chatId}))
+      return {status:'BLOCKED_PRIVATE_TELEGRAM_CONFIG',phoneDelivered:false};
+    let claim;
+    try {claim=await this.claimReadOnlyPaperDeliveryRehearsal(Date.now());}
+    catch {return {status:'BLOCKED_DELIVERY_CLAIM',phoneDelivered:false};}
+    if(claim.status!=='SIMULATED_ATTEMPT_CLAIM')
+      return {status:claim.status,phoneDelivered:false};
+    let response;
+    try {response=await sendFn({token,chatId,message:claim.message});}
+    catch {response={httpStatus:null,botResponse:null};}
+    try {
+      const result=await this.settleReadOnlyPaperDeliveryRehearsal({
+        eventId:claim.eventId,attempt:claim.attempt,nowMs:Date.now(),
+        httpStatus:response?.httpStatus,botResponse:response?.botResponse});
+      return {status:result.status,phoneDelivered:false};
+    } catch {return {status:'BLOCKED_DELIVERY_SETTLEMENT',phoneDelivered:false};}
+  }
+
   /** Test-only provenance is mandatory. Production provides no HTTP POST
    * endpoint to feed this method, nor any automatic bridge from Kite polling.
    */
@@ -471,8 +505,9 @@ export class MarketSession {
   }
 
   async alarm() {
-    // An exception before commit is retried by Cloudflare. No external effects
-    // happen inside the transaction or after it, so replay cannot create fills.
+    // Scheduler decisions are committed before side effects. Read-only Kite
+    // polling cannot place trades. Optional Telegram delivery below claims
+    // an event durably before HTTP and never blindly retries uncertainty.
     const now = Date.now();
     const decision = await this.storage.transaction(async txn => {
       const state = await txn.get(STATE_KEY);
@@ -527,7 +562,9 @@ export class MarketSession {
       const optionSlot=optionEnabled&&Number(decision.tickId.split(':')[1])%3===2;
       const market=optionSlot?await this.pollReadOnlyOptions(decision.tickId,now):
         await this.pollReadOnlyMarket(decision.tickId,now);
-      return { ...decision, marketStatus: market.status };
+      const telegram=this.readonlyTelegramSenderEnabled?
+        await this.dispatchReadOnlyTelegram():{status:'SENDER_DISABLED'};
+      return { ...decision,marketStatus:market.status,telegramStatus:telegram.status };
     }
     return decision;
   }

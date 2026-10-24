@@ -1,5 +1,17 @@
 # Canonical engineering progress — 24 October 2026
 
+**24 October Phase34 disabled Telegram sender source checkpoint:**
+Added a private numeric-recipient-only Bot API HTTPS sender, bounded JSON
+responses and timeout, sanitized 200/429/4xx settlement, and fail-closed
+uncertain outcomes. The observed-source paper alarm now claims its isolated
+SQLite notification journal **before** any optional Bot API request; an
+ambiguous attempt is never replayed even after restart. New independent
+`OFFLINE_TELEGRAM_SENDER_ENABLED=false` gate remains disabled along with
+all previous gates. Mock HTTP unit/native SQLite suites **211/211 and
+14/14 pass**; no actual Telegram message, Kite order, deployment, live
+benchmark, or expenditure. [Phase34 evidence](../../audit/PHASE34_TELEGRAM_SENDER_DISABLED.md).
+Fixed offline engineering **23/25 = 92%**, live acceptance **0/5** unchanged.
+
 **24 October Phase33 isolated observed-paper Telegram rehearsal checkpoint:**
 New opt-in `OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED=false` connects
 `readonly-paper-ledger-v1` to its **own** SQLite delivery journal with

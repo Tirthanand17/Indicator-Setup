@@ -2,6 +2,18 @@
 
 **IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
 
+**Phase34 Telegram HTTPS sender wired, still disabled:**
+`telegram-sender.mjs` offers a fixed-host `sendMessage` POST to one pinned
+numeric private chat, a four-second timeout, bounded JSON parsing, strict
+success chat/message identity checks and sanitized 429/definite-4xx results.
+The read-only paper alarm claims its separate SQLite outbox **before** the
+optional request; ambiguous or interrupted attempts cannot resend after
+restart. `OFFLINE_TELEGRAM_SENDER_ENABLED=false` is a new required opt-in
+*in addition* to every Phase33 gate; real bot token/chat secrets are absent.
+**211 JS + 14 native SQLite tests pass with fake HTTP and no external send.**
+No phone notification, cloud deployment, broker transaction or cost has
+occurred. [Phase34 evidence](../audit/PHASE34_TELEGRAM_SENDER_DISABLED.md).
+
 **Phase33 isolated observed-paper Telegram journal rehearsal (disabled):**
 `readonly-delivery.mjs` makes the read-only Kite-paper outbox durable
 alongside a **separate** claim/reconcile cursor. When the new optional
