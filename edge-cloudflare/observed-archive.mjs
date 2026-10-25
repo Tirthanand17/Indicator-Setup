@@ -7,6 +7,7 @@ import {validateOptionRuntime,validateQuotePace} from './option-runtime.mjs';
 import {auditCatalogState} from './instrument-catalog.mjs';
 import {validState,validMarketObservation} from './runtime-state.mjs';
 import {NSE_FO_CALENDAR_VERSION} from './alarm-core.mjs';
+import {OBSERVED_LIFECYCLE_KEY,auditObservedLifecycle} from './observed-lifecycle.mjs';
 
 export const OBSERVED_RECOVERY_KEY='readonly-recovery-quarantine-v1';
 export const OBSERVED_ARCHIVE_KEYS=Object.freeze({
@@ -14,7 +15,7 @@ export const OBSERVED_ARCHIVE_KEYS=Object.freeze({
   delivery:'readonly-paper-delivery-v1',metrics:'readonly-portfolio-metrics-v1',
   scheduler:'scheduler-v1',market:'market-observation-v1',
   options:'readonly-option-state-v1',pacing:'readonly-quote-pace-v1',
-  catalogue:'readonly-instrument-catalog-v1',recovery:OBSERVED_RECOVERY_KEY,
+  catalogue:'readonly-instrument-catalog-v1',recovery:OBSERVED_RECOVERY_KEY,lifecycle:OBSERVED_LIFECYCLE_KEY,
 });
 export const MAX_OBSERVED_CLEAR_BYTES=4_000_000;
 export const MAX_OBSERVED_SEALED_BYTES=5_350_000;
@@ -77,6 +78,8 @@ export function auditObservedArchiveState(state,createdAtMs) {
   if(!exact(state,Object.keys(OBSERVED_ARCHIVE_KEYS))||!time(createdAtMs)||encode(state).length>MAX_OBSERVED_CLEAR_BYTES)
     fail('INCOMPLETE_OR_OVERSIZED_STATE');
   noCredentials(state);
+  auditObservedLifecycle(state.lifecycle);
+  if(state.lifecycle?.migratedAtMs>createdAtMs)fail('LIFECYCLE_CLOCK');
   auditPaperLedger(state.ledger);auditReadOnlyBridge(state.bridge);
   if(createdAtMs<state.ledger.lastMutationAtMs||
     (state.bridge.lastOptionAtMs!==null&&createdAtMs<state.bridge.lastOptionAtMs)||
@@ -101,19 +104,24 @@ export function auditObservedArchiveState(state,createdAtMs) {
 
 /** Read all named documents in ONE transaction; do cryptography after release. */
 export async function snapshotObservedState(storage,createdAtMs) {
-  return storage.transaction(async txn=>{
+  return storage.transaction(txn=>readObservedStateInTransaction(storage,txn,createdAtMs));
+}
+export async function readObservedStateInTransaction(storage,txn,createdAtMs) {
     noApplicationSQL(storage);
     const known=new Set([...Object.values(OBSERVED_ARCHIVE_KEYS),...EXCLUDED_KEYS]);
     if([...(await txn.list({limit:known.size+1})).keys()].some(key=>!known.has(key)))fail('UNKNOWN_SOURCE_RECORD');
-    const entries=await Promise.all(Object.entries(OBSERVED_ARCHIVE_KEYS).map(async([name,key])=>[name,(await txn.get(key))??null]));
+    const entries=await Promise.all(Object.entries(OBSERVED_ARCHIVE_KEYS).map(async([name,key])=>{
+      const value=await txn.get(key);
+      if(name==='lifecycle'&&value===null)fail('CORRUPT_STORED_LIFECYCLE');
+      return [name,value??null];
+    }));
     const state=structuredClone(Object.fromEntries(entries));
     auditObservedArchiveState(state,createdAtMs);return state;
-  });
 }
 
 export async function sealObservedArchive({state,createdAtMs,...secrets}={}) {
   const snapshot=structuredClone(state);auditObservedArchiveState(snapshot,createdAtMs);
-  const payload={format:DOMAIN,schema:1,scope:SCOPE,createdAtMs,state:snapshot};
+  const payload={format:DOMAIN,schema:2,scope:SCOPE,createdAtMs,state:snapshot};
   const encoded=encode(payload);if(encoded.length>MAX_OBSERVED_CLEAR_BYTES)fail('SIZE_LIMIT');
   const k=await keys(secrets);
   const tag=b64(new Uint8Array(await crypto.subtle.sign('HMAC',k.sign,encoded)));
@@ -133,17 +141,22 @@ export async function openObservedArchive({sealedArchive,...secrets}={}) {
   try {signed=JSON.parse(decoder.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad},k.encrypt,cipher)));}
   catch {fail('AUTHENTICATION_FAILED');}
   if(!exact(signed,['payload','tag'])||!exact(signed.payload,['format','schema','scope','createdAtMs','state'])||
-    signed.payload.format!==DOMAIN||signed.payload.schema!==1||signed.payload.scope!==SCOPE)fail('INVALID_PAYLOAD');
+    signed.payload.format!==DOMAIN||![1,2].includes(signed.payload.schema)||signed.payload.scope!==SCOPE)fail('INVALID_PAYLOAD');
   const encoded=encode(signed.payload),tag=unb64(signed.tag,32);
   if(encoded.length>MAX_OBSERVED_CLEAR_BYTES||tag.length!==32||
     !await crypto.subtle.verify('HMAC',k.sign,tag,encoded))fail('SIGNATURE_MISMATCH');
-  auditObservedArchiveState(signed.payload.state,signed.payload.createdAtMs);
-  return {...structuredClone(signed.payload),archiveId:hex(await crypto.subtle.digest('SHA-256',encoded))};
+  const original=signed.payload.state;
+  if(signed.payload.schema===1&&!exact(original,Object.keys(OBSERVED_ARCHIVE_KEYS).filter(k=>k!=='lifecycle')))fail('INVALID_V1_STATE');
+  const state=signed.payload.schema===1?{...structuredClone(original),lifecycle:null}:structuredClone(original);
+  auditObservedArchiveState(state,signed.payload.createdAtMs);
+  return {...structuredClone(signed.payload),state,sourcePayloadSchema:signed.payload.schema,
+    archiveId:hex(await crypto.subtle.digest('SHA-256',encoded))};
 }
 
 export function observedArchiveSummary(verified) {
   const {state,createdAtMs,archiveId}=verified;
   return {status:'VERIFIED_OBSERVED_PAPER_ARCHIVE',archiveId,createdAtMs,paperOnly:true,
+    sourcePayloadSchema:verified.sourcePayloadSchema,
     positions:state.ledger.positions.length,outbox:state.ledger.outbox.length,
     deliveryWatermark:state.delivery?.nextIndex??null,
     deliveryReplaySafety:state.delivery?'PRESERVED_CURSOR_AND_UNCERTAINTY':

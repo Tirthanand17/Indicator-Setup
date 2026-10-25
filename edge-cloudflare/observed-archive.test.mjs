@@ -127,14 +127,16 @@ test('operator CLI verifies before exclusive encrypted write and before any rest
     write:async(...args)=>writes.push(args),fetchImpl:async(url,init)=>{
       calls++;assert.equal(init.redirect,'manual');assert.equal(init.credentials,'omit');
       assert.equal(init.headers.authorization,'Bearer '+admin);
-      assert.ok(url.startsWith('https://unit.invalid/internal/observed-archive'));
-      return Response.json(init.method==='GET'?archive:{status:'RESTORED_OBSERVED_PAPER_QUARANTINED',archiveId:verified.archiveId,automaticResume:false});}};
+      assert.ok(url.startsWith('https://unit.invalid/internal/observed-'));
+      return Response.json(url.endsWith('/observed-lifecycle')?{status:'LIFECYCLE_MIGRATED_HALTED',baselineArchiveId:verified.archiveId}:
+        init.method==='GET'?archive:{status:'RESTORED_OBSERVED_PAPER_QUARANTINED',archiveId:verified.archiveId,automaticResume:false});}};
   assert.equal(await runObservedArchiveCLI([],deps),0);assert.equal(calls,0);
   assert.equal(await runObservedArchiveCLI(['verify','fixture.enc'],deps),0);assert.equal(calls,0);
   assert.equal(await runObservedArchiveCLI(['export','https://unit.invalid','fixture.enc'],deps),0);
   assert.equal(writes[0][2].flag,'wx');assert.equal(writes[0][2].mode,0o600);
   assert.deepEqual(JSON.parse(writes[0][1]),archive);
   assert.equal(await runObservedArchiveCLI(['restore','https://unit.invalid','fixture.enc','--empty-quarantined'],deps),0);
+  assert.equal(await runObservedArchiveCLI(['migrate','https://unit.invalid','fixture.enc','--halted-source'],deps),0);
   const previous=calls;
   assert.equal(await runObservedArchiveCLI(['restore','https://unit.invalid','fixture.enc'],deps),1);
   assert.equal(await runObservedArchiveCLI(['restore','https://unit.invalid','fixture.enc','--empty-quarantined'],

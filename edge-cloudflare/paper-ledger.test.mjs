@@ -16,6 +16,18 @@ const entry = (state, nowMs = start, signalId = 'signal-001', q = quote(nowMs)) 
   enterPaperBasket(state, { nowMs, signalId, quote: q });
 const trade = (state, accountId) => state.positions.find(p => p.accountId === accountId);
 
+test('full rejection journal blocks new entries while verified protective exits remain writable',()=>{
+  let ledger=entry(newPaperLedger(start)).ledger;
+  ledger.rejections=Array.from({length:1024},(_,i)=>({accountId:i%2?'PAPER_50K':'PAPER_100K',
+    signalId:'retention-rejection-'+String(i).padStart(4,'0'),atMs:start,reason:'TEST_RISK_REJECTION'}));
+  assert.equal(auditPaperLedger(ledger),true);
+  for(const p of ledger.positions)ledger=exitPaperPosition(ledger,{tradeId:p.tradeId,nowMs:start+20000,
+    quote:quote(start+20000,{bid:170,ask:170.5})}).ledger;
+  assert.equal(ledger.positions.every(p=>p.status==='CLOSED'),true);
+  assert.equal(ledger.outbox.length,4);assert.equal(ledger.rejections.length,1024);
+  assert.throws(()=>entry(ledger,start+40000,'retention-new-entry-001',quote(start+40000)),/RECORD_CAPACITY/);
+});
+
 test('two independently capitalized accounts and atomic modeled fee cash conservation', () => {
   const first = entry(newPaperLedger(start));
   assert.equal(first.results.PAPER_50K.status, 'OPEN');

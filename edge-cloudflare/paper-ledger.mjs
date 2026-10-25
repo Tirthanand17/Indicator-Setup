@@ -235,6 +235,10 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
       results[accountId] = { status: 'REJECTED', reason }; continue;
     }
     requireRoom(next, 'positions', MAX_TRADES);
+    requireRoom(next, 'rejections', MAX_REJECTIONS);
+    // Every active position needs one terminal outbox event, even at capacity.
+    const outstanding=next.positions.filter(p=>p.status!=='CLOSED').length;
+    if(next.outbox.length+outstanding+2>MAX_OUTBOX)fail('RESERVED_EXIT_CAPACITY');
     const tradeId = `${accountId}:${signalId}`;
     next.accounts[accountId].cashPaise -= selected.debit;
     next.positions.push({ tradeId, accountId, signalId, symbol: c.symbol, kind: c.kind,

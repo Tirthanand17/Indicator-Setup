@@ -1,5 +1,11 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Journal lifecycle:** financial records use a preserve-at-cap policy with
+reserved terminal-event capacity; diagnostics retain bounded rings. A gated
+capacity report and archive-backed, halted-source metadata migration enforce
+explicit schema compatibility. Rollback uses an isolated quarantined target.
+[Operator procedure and limitations](../audit/OBSERVED_JOURNAL_LIFECYCLE.md).
+
 **Observed-state recovery:** separately gated encrypted export and empty-target
 restore now preserve both observed accounts, delivery watermarks, portfolio
 metrics and market-selection/scheduler state. The operator client verifies

@@ -55,6 +55,27 @@ test('real parity-derived five-indicator CE review opens two independent paper a
   assert.equal(summary.totalPaperPositions,2);
 });
 
+test('capacity-blocked re-entry cannot roll back verified exits from the same observed tick',()=>{
+  const {review,futures}=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,review,futures});
+  const entered=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20000,evidence:evidence(nowMs+20000)});
+  const ledger=structuredClone(entered.ledger);
+  ledger.rejections=Array.from({length:1024},(_,i)=>({accountId:i%2?'PAPER_50K':'PAPER_100K',
+    signalId:'capacity-rejection-'+i,atMs:nowMs+20000,reason:'TEST_RISK_REJECTION'}));
+  const nextAt=nowMs+300000;
+  const pending=stageReadOnlyReview(entered.state,{tickId:tick(286),observedAtMs:nextAt,
+    review:{...review,fiveMinuteCandleAtMs:review.fiveMinuteCandleAtMs+300000},
+    futures:{...futures,exchangeAtMs:nextAt-1000}});
+  const result=advanceReadOnlyPaperTurn(pending,ledger,{tickId:tick(287),observedAtMs:nextAt+20000,
+    evidence:evidence(nextAt+20000,170,171)});
+  assert.equal(result.result.exited,2);assert.equal(result.result.entered,0);
+  assert.equal(result.result.entryStatus,'PAPER_ENTRY_CAPACITY_BLOCKED');
+  assert.equal(result.ledger.positions.every(p=>p.status==='CLOSED'),true);
+  assert.equal(result.ledger.outbox.length,4);assert.equal(result.ledger.rejections.length,1024);
+  assert.equal(result.state.pending,null);assert.equal(auditPaperLedger(result.ledger),true);
+});
+
 test('fresh BID exit closes two paper accounts once; replay cannot double credit',()=>{
   const {review,futures}=reviewFrom('uptrend_mirrored_qualifying_review');
   const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),

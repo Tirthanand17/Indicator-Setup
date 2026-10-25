@@ -7,6 +7,7 @@ import { makePaperArchive, verifyPaperArchive, paperArchiveCapacity,
   restorePaperArchiveToEmpty, MAX_ARCHIVE_BYTES } from './paper-archive.mjs';
 import { sessionStatus } from './alarm-core.mjs';
 import worker from './worker.mjs';
+import {observedRetentionReport} from './observed-lifecycle.mjs';
 
 const SECRET = 'offline-paper-archive-signing-Key-0123456789-ABCDEF';
 const AT = Date.parse('2026-10-23T04:30:00Z');
@@ -146,6 +147,12 @@ test('real entry/exit transitions reach 512 preserved positions and 1024 pending
       if(!ledger)ledger=newPaperLedger(at);
       const signalId=`capacity-signal-${String(signals).padStart(4,'0')}`;
       ledger=enterPaperBasket(ledger,{signalId,nowMs:at,quote:quote(at)}).ledger;
+      if(signals===255) {
+        const r=observedRetentionReport({ledger,lifecycle:null});
+        assert.equal(r.reservedTerminalEvents,2);assert.equal(r.exitEventRoomAvailable,true);
+        assert.equal(r.rows.find(r=>r.kind==='outbox').remaining,2);
+        assert.equal(r.entryEventRoom,0);
+      }
       for(const accountId of ['PAPER_50K','PAPER_100K']) {
         const id=`${accountId}:${signalId}`;
         ledger=exitPaperPosition(ledger,{tradeId:id,nowMs:at+120000,

@@ -21,6 +21,7 @@ archive. One read transaction captures these current records:
 | Quote pacing | Request budget, completion cooldown and sticky authentication block |
 | Instrument catalogue | Daily contracts, selection inputs and fetch-attempt state |
 | Recovery marker | Prior restore identity and documentary source scheduler, if present |
+| Lifecycle manifest (payload schema 2) | Supported writer/reader versions, retention policy and baseline archive identity |
 
 This is all retained observed application state, not an unlimited historical
 event log. Existing last-128 rings remain last-128 rings. Raw broker responses,
@@ -79,7 +80,10 @@ established by POSIX mode bits. Verify before relying on a saved artifact and
 copy the encrypted file to an approved private off-host destination. A failed
 write can leave an incomplete file; verification will reject it.
 
-Payloads have a distinct format/domain/scope and schema 1. The whole signed
+Envelopes retain format/domain version 1; new payloads use schema 2 and the
+reader still authenticates original schema 1 archives before adding a null
+legacy lifecycle field. [Migration and rollback policy](OBSERVED_JOURNAL_LIFECYCLE.md).
+The whole signed
 payload is encrypted with AES-256-GCM using a fresh random 96-bit nonce and
 domain-bound additional authenticated data. Decryption/authentication and an
 independent HMAC-SHA256 verification precede document validation. The archive ID

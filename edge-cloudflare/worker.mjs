@@ -1,4 +1,6 @@
 import {validState,validMarketObservation} from './runtime-state.mjs';
+import {assertObservedWriter,observedRetentionReport} from './observed-lifecycle.mjs';
+import {migrateObservedLifecycle} from './observed-lifecycle-ops.mjs';
 import {OBSERVED_RECOVERY_KEY,snapshotObservedState,sealObservedArchive,
   restoreObservedArchiveToEmpty,readObservedArchiveJSON} from './observed-archive.mjs';
 /** Undeployed paper-only scheduler and optional read-only Kite market sampler.
@@ -46,6 +48,13 @@ const reply = (data, status = 200) => Response.json(data, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
 });
 
+function observedArchiveSecrets(env) {
+  const signingSecret=env.OBSERVED_ARCHIVE_HMAC_KEY,encryptionKeyBase64=env.OBSERVED_ARCHIVE_AES_KEY;
+  if(['SCHEDULER_ADMIN_KEY','TOKEN_RELAY_HMAC_KEY','TOKEN_VAULT_AES_KEY','TELEGRAM_BOT_TOKEN',
+    'PAPER_DASHBOARD_VIEW_KEY','KITE_API_KEY'].some(k=>env[k]!==undefined&&[signingSecret,encryptionKeyBase64].includes(env[k])))
+    throw Error('ARCHIVE_KEY_SEPARATION');
+  return {signingSecret,encryptionKeyBase64};
+}
 async function authorized(request, env) {
   const key = env.SCHEDULER_ADMIN_KEY;
   const candidate = request.headers.get('authorization')?.replace(/^Bearer /, '');
@@ -72,6 +81,7 @@ export default {
     const archiveRoute=new URL(request.url).protocol==='https:'&&
       new URL(request.url).search===''&&env.OFFLINE_OBSERVED_ARCHIVE_ENABLED==='true'&&
       ((path==='/internal/observed-archive'&&request.method==='GET')||
+       (path==='/internal/observed-lifecycle'&&(request.method==='GET'||request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'))||
        (path==='/internal/observed-archive/restore'&&request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'));
     if (!tokenRoute && !dashboardRoute && (!(archiveRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/emergency-halt' && request.method === 'POST') ||
@@ -103,6 +113,7 @@ export class MarketSession {
   // transaction so a concurrent halt conflicts with, or precedes, the write.
   // The local latch also closes the gap immediately before an external send.
   async assertNotHalted(storage = this.storage) {
+    await assertObservedWriter(storage);
     const [state,recovery] = await Promise.all([storage.get(STATE_KEY),storage.get(OBSERVED_RECOVERY_KEY)]);
     if (recovery!==undefined||this.haltRequested || (state !== undefined &&
         (!validState(state) || state.halted))) throw Error('SCHEDULER_HALTED');
@@ -138,18 +149,23 @@ export class MarketSession {
     if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true') return reply({ status: 'DISABLED' }, 503);
     try {
       if(request.method!=='GET'&&await this.storage.get(OBSERVED_RECOVERY_KEY)!==undefined&&
-        path!=='/internal/observed-archive/restore')return reply({status:'ARCHIVE_RESTORED_QUARANTINED',paperOnly:true},503);
+        !['/internal/observed-archive/restore','/internal/observed-lifecycle'].includes(path))return reply({status:'ARCHIVE_RESTORED_QUARANTINED',paperOnly:true},503);
+      if(path==='/internal/observed-lifecycle') {
+        if(new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||this.env.OFFLINE_OBSERVED_ARCHIVE_ENABLED!=='true')
+          return reply({error:'Not found'},404);
+        if(request.method==='GET')return reply(observedRetentionReport(await snapshotObservedState(this.storage,Date.now())));
+        if(request.method!=='POST'||this.env.OFFLINE_OBSERVED_RESTORE_ENABLED!=='true')return reply({error:'Not found'},404);
+        if(request.headers.get('content-type')!=='application/json')return reply({error:'JSON required'},400);
+        return reply(await migrateObservedLifecycle(this.storage,{sealedArchive:await readObservedArchiveJSON(request.body),
+          ...observedArchiveSecrets(this.env),nowMs:Date.now()}));
+      }
       if(path==='/internal/observed-archive'||path==='/internal/observed-archive/restore') {
         if(new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||
           this.env.OFFLINE_OBSERVED_ARCHIVE_ENABLED!=='true'||
           !((path==='/internal/observed-archive'&&request.method==='GET')||
           (path==='/internal/observed-archive/restore'&&request.method==='POST'&&this.env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true')))
           return reply({error:'Not found'},404);
-        const signingSecret=this.env.OBSERVED_ARCHIVE_HMAC_KEY,encryptionKeyBase64=this.env.OBSERVED_ARCHIVE_AES_KEY;
-        const reserved=['SCHEDULER_ADMIN_KEY','TOKEN_RELAY_HMAC_KEY','TOKEN_VAULT_AES_KEY',
-          'TELEGRAM_BOT_TOKEN','PAPER_DASHBOARD_VIEW_KEY','KITE_API_KEY'];
-        if(reserved.some(k=>this.env[k]!==undefined&&[signingSecret,encryptionKeyBase64].includes(this.env[k])))
-          throw Error('ARCHIVE_KEY_SEPARATION');
+        const {signingSecret,encryptionKeyBase64}=observedArchiveSecrets(this.env);
         if(path==='/internal/observed-archive') {
           const createdAtMs=Date.now(),state=await snapshotObservedState(this.storage,createdAtMs);
           const sealed=await sealObservedArchive({state,createdAtMs,signingSecret,encryptionKeyBase64});
@@ -288,6 +304,7 @@ export class MarketSession {
         outcome === 'BLOCKED_CORRUPT_STATE' ? 503 : 200);
       }
       const saved = await this.storage.transaction(async txn => {
+        await assertObservedWriter(txn);
         if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined)throw Error('RECOVERY_QUARANTINED');
         const existing = await txn.get(STATE_KEY);
         if (existing !== undefined) {
@@ -321,6 +338,7 @@ export class MarketSession {
     } catch { return reply({ error: 'Token handoff rejected' }, 401); }
     try {
       const result = await this.storage.transaction(async txn => {
+        await assertObservedWriter(txn);
         if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined)throw Error('RECOVERY_QUARANTINED');
         const previous = await txn.get(TOKEN_KEY);
         if (previous !== undefined && !validTokenRecord(previous)) return 'CORRUPT';
@@ -448,6 +466,7 @@ export class MarketSession {
     if(!this.readonlyDeliveryRehearsalEnabled)
       throw Error('READONLY_DELIVERY_REHEARSAL_DISABLED');
     return this.storage.transaction(async txn=>{
+      await assertObservedWriter(txn);
       if(requireRunning) await this.assertNotHalted(txn);
       const [ledger,stored]=await Promise.all([
         txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
@@ -545,6 +564,9 @@ export class MarketSession {
     // an event durably before HTTP and never blindly retries uncertainty.
     const now = Date.now();
     const decision = await this.storage.transaction(async txn => {
+      try {await assertObservedWriter(txn);}catch {
+        await txn.deleteAlarm();return {status:'BLOCKED_INCOMPATIBLE_SCHEMA',shouldPoll:false,nextAlarmAtMs:null,tickId:null};
+      }
       if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined) {
         await txn.deleteAlarm();return {status:'ARCHIVE_RESTORED_QUARANTINED',shouldPoll:false,nextAlarmAtMs:null,tickId:null};
       }

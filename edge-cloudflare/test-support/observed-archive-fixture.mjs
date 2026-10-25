@@ -36,5 +36,5 @@ export function fixture() {
     scheduledAtMs:AT+40000,halted:false,status:'PAPER_ONLY',usageDay:'2026-11-02',events:[]},
   market:{schema:1,tickId:'2026-11-02:136',observedAtMs:AT+20000,status:'MARKET_BATCH_OBSERVED'},
   options,pacing:reserveQuoteRequest(undefined,{tickId:'2026-11-02:136',observedAtMs:AT+20000,kind:'MARKET_BATCH'}).state,
-  catalogue,recovery:null};
+  catalogue,recovery:null,lifecycle:null};
 }

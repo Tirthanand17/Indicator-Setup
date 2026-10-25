@@ -189,8 +189,12 @@ export function advanceReadOnlyPaperTurn(state,ledger,{
       entered=Object.values(r.results).filter(x=>x?.status==='OPEN').length;
       entryStatus=entered>0?'PAPER_ENTRY':'RISK_OR_DUPLICATE_REJECTED';
     } catch(err) {
-      if(!allowedQuoteFault(err)) throw err;
-      entryStatus='WAIT_VALID_ENTRY_EVIDENCE';
+      if(['PAPER_LEDGER_RECORD_CAPACITY','PAPER_LEDGER_RESERVED_EXIT_CAPACITY'].includes(err?.message))
+        entryStatus='PAPER_ENTRY_CAPACITY_BLOCKED';
+      else {
+        if(!allowedQuoteFault(err)) throw err;
+        entryStatus='WAIT_VALID_ENTRY_EVIDENCE';
+      }
     }
   }
   const next=structuredClone(state);

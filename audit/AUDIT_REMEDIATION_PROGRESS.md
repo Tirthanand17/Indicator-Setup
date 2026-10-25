@@ -13,10 +13,10 @@ phase checklists remain historical records with different denominators.
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-**Remediation tasks completed: 8/19.** Observed-state export and quarantined
-restore (item 8) are implemented and tested. The score remains 24/41 because
-the recovery acceptance atoms also require retention/lifecycle or operator
-reconciliation, which remain pending. Cloud acceptance remains unchanged.
+**Remediation tasks completed: 9/19.** Observed retention policy, versioned
+metadata migration and isolated rollback (item 9) are implemented and tested.
+The score remains conservatively 24/41 while operator reconciliation and
+operational recovery remain incomplete. Cloud acceptance remains unchanged.
 
 The audit baseline was 19/41. Five newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
@@ -95,7 +95,15 @@ additional point. This score measures evidence, not hours of work remaining.
    destination, live export or deployment is claimed.
    [Scope, commands, recovery drill and remaining work](OBSERVED_STATE_RECOVERY.md).
 
-Validation: **307 JavaScript/extension/quality-runner tests, 24 native
+9. **Journal lifecycle:** explicit preservation-at-cap retention with terminal
+   event headroom; authenticated capacity report and metadata-only migration
+   against a matching halted-source archive; version guards; previous-exporter
+   golden archive compatibility; native restart/rollback drill. Financial
+   prefixes are never automatically pruned or reset. Unlimited rollover and
+   operational resume are not claimed.
+   [Policy, migration commands and limits](OBSERVED_JOURNAL_LIFECYCLE.md).
+
+Validation: **315 JavaScript/extension/quality-runner tests, 26 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -117,8 +125,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 6 | Complete observed portfolio records and metrics | Completed with accounting/native/UI regression evidence |
 | 7 | Dashboard delivery status | Completed; broader dashboard still incomplete |
 | 8 | Complete observed-state backup/export/restore | Implemented; local native recovery drill verified; hosted backup pending |
-| 9 | Journal retention and schema/rollback lifecycle | Next |
-| 10 | Authenticated Telegram ambiguity reconciliation | Pending |
+| 9 | Journal retention and schema/rollback lifecycle | Implemented preservation policy, versioned migration and rollback drill |
+| 10 | Authenticated Telegram ambiguity reconciliation | Next |
 | 11 | Token, outage, heartbeat and quota operational alerts | Pending |
 | 12 | Unverifiable-position reconciliation | Pending |
 | 13 | Future calendar and exceptional-session maintenance | Pending |

@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {Miniflare} from 'miniflare';
 import {AT,fixture,secrets} from '../test-support/observed-archive-fixture.mjs';
 import {openObservedArchive,sealObservedArchive} from '../observed-archive.mjs';
+import {stageReadOnlyReview} from '../readonly-paper-bridge.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const admin='synthetic-native-archive-admin-0123456789-AbCd',headers={authorization:'Bearer '+admin};
@@ -80,4 +81,61 @@ test('native restore refuses credential-only, unknown-key and alarm-only targets
       assert.deepEqual(await state(s),before);
     } finally {await mf.dispose();}
   }
+});
+
+test('native lifecycle migration is atomic, idempotent, restart-safe and rejects incompatible writers',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'observed-lifecycle-'));
+  let mf=new Miniflare(options(persist));
+  try {
+    let s=await stub(mf);const book=fixture();
+    book.scheduler={...book.scheduler,halted:true,scheduledAtMs:null,status:'OWNER_EMERGENCY_HALT'};
+    await post(s,'/test/archive/seed',{state:book,nowMs:AT+30000});
+    const baseline=await (await mf.dispatchFetch('https://unit.invalid/internal/observed-archive',{headers})).json();
+    const before=await state(s);
+    const migrate=()=>mf.dispatchFetch('https://unit.invalid/internal/observed-lifecycle',{
+      method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify(baseline)});
+    const result=await migrate();assert.equal(result.status,200);
+    assert.equal((await result.json()).status,'LIFECYCLE_MIGRATED_HALTED');
+    const after=await state(s);
+    for(const name of Object.keys(before.state).filter(k=>k!=='lifecycle'))assert.deepEqual(after.state[name],before.state[name],name);
+    assert.equal((await (await migrate()).json()).status,'LIFECYCLE_ALREADY_MIGRATED');
+    const report=await (await mf.dispatchFetch('https://unit.invalid/internal/observed-lifecycle',{headers})).json();
+    assert.equal(report.status,'CURRENT_SCHEMA');assert.equal(report.automaticDeletion,false);
+    await mf.dispose();mf=new Miniflare(options(persist));s=await stub(mf);
+    assert.deepEqual((await state(s)).state.lifecycle,after.state.lifecycle);
+    const future={...after.state,lifecycle:{...after.state.lifecycle,writerVersion:2}};
+    await post(s,'/test/archive/seed',{state:future,nowMs:AT+40000});
+    assert.equal((await (await s.fetch('https://unit.invalid/test/archive/alarm')).json()).status,'BLOCKED_INCOMPATIBLE_SCHEMA');
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/bootstrap',{method:'POST',headers})).status,503);
+    assert.deepEqual((await state(s)).state.ledger,book.ledger);
+    assert.equal((await state(s)).state.lifecycle.writerVersion,2);
+    await post(s,'/test/archive/seed',{nowMs:AT+40000,extra:{key:'readonly-lifecycle-v1',value:null}});
+    assert.equal((await (await s.fetch('https://unit.invalid/test/archive/alarm')).json()).status,'BLOCKED_INCOMPATIBLE_SCHEMA');
+    assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/observed-archive',{headers})).status,503);
+  } finally {await mf.dispose();}
+});
+
+test('native full-journal re-entry refusal preserves the same-tick protective exit and delivery watermark',async()=>{
+  const mf=new Miniflare(options(await mkdtemp(path.join(os.tmpdir(),'observed-capacity-exit-'))));
+  try {
+    const s=await stub(mf),book=fixture(),reviewAt=AT+320000,exitAt=AT+340000;
+    book.metrics=null;
+    book.ledger.rejections=Array.from({length:1024},(_,i)=>({accountId:i%2?'PAPER_50K':'PAPER_100K',
+      signalId:'native-capacity-rejection-'+i,atMs:AT+20000,reason:'TEST_RISK_REJECTION'}));
+    book.bridge=stageReadOnlyReview(book.bridge,{tickId:'2026-11-02:151',observedAtMs:reviewAt,
+      review:{source:'READONLY_FUTURES_REVIEW_ONLY',status:'REVIEW_CE',paperEntryAuthorized:false,
+        telegramAuthorized:false,realOrdersEnabled:false,fiveMinuteCandleAtMs:AT},
+      futures:{symbol:'NFO:NIFTY26NOVFUT',instrumentToken:55555,exchangeAtMs:reviewAt-1000,lastPrice:23000}});
+    await post(s,'/test/archive/seed',{state:book,nowMs:exitAt});
+    const leg=kind=>({contract:book.options.pair[kind],bid:170,ask:170.5,
+      bidQuantity:650,askQuantity:650,updatedAtMs:exitAt-1000});
+    const turn=await (await post(s,'/test/read-only-paper/turn',{tickId:'2026-11-02:152',observedAtMs:exitAt,
+      evidence:{source:'READONLY_OPTION_EVIDENCE_ONLY',paperEntryAuthorized:false,telegramAuthorized:false,
+        realOrdersEnabled:false,CE:leg('CE'),PE:leg('PE')}})).json();
+    assert.equal(turn.exited,1);assert.equal(turn.entered,0);assert.equal(turn.entryStatus,'PAPER_ENTRY_CAPACITY_BLOCKED');
+    const after=(await state(s)).state;
+    assert.equal(after.ledger.positions.every(p=>p.status==='CLOSED'),true);
+    assert.equal(after.ledger.outbox.length,4);assert.equal(after.ledger.rejections.length,1024);
+    assert.deepEqual(after.delivery,book.delivery);assert.equal(after.bridge.pending,null);
+  } finally {await mf.dispose();}
 });
