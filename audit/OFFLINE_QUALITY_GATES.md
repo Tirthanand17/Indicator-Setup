@@ -1,5 +1,9 @@
 # Offline quality gates
 
+Verified on GitHub: [run 40193418706](https://github.com/Tirthanand17/Indicator-Setup/actions/runs/40193418706)
+passed all installation, quality and advisory steps for commit
+`ad6ff181b2786b635206ea8fab9f3a0780ca8fc5` on 25 October 2026.
+
 The `Offline quality` workflow runs on pull requests to main, pushes to main,
 and manual dispatch. Its single standard `ubuntu-24.04` job is limited to 15
 minutes, uses immutable action references and read-only repository permissions,

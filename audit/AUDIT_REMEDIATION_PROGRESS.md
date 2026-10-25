@@ -6,16 +6,17 @@ phase checklists remain historical records with different denominators.
 
 ## Current verified progress
 
-**21/41 acceptance checks = 51.22%**
+**22/41 acceptance checks = 53.66%**
 
-`[█████░░░░░] 51%`
+`[█████░░░░░] 54%`
 
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-The audit baseline was 19/41. Two newly satisfied checks are the current
+The audit baseline was 19/41. Three newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
-the tested in-flight market/dispatch boundaries. The dashboard correction is
+the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
+verified in a successful GitHub Actions run. The dashboard correction is
 useful work within a still-incomplete implementation check and earns no
 additional point. This score measures evidence, not hours of work remaining.
 
@@ -23,7 +24,7 @@ additional point. This score measures evidence, not hours of work remaining.
 |---|---|---|
 | Architecture | 4/5 | 4/5 |
 | Implementation | 6/10 | 6/10 |
-| Automated tests | 4/6 | 4/6 |
+| Automated tests | 4/6 | 5/6 |
 | Security | 3/6 | 4/6 |
 | Cloud deployment | 0/4 | 0/4 |
 | Cloud acceptance | 0/5 | 0/5 |
@@ -48,7 +49,17 @@ additional point. This score measures evidence, not hours of work remaining.
    never an invented unsent count. Retained source-outbox rows remain visible
    as a distinct count. API acceptance never implies phone receipt.
 
-Validation: **223 JavaScript tests and 19 native workerd/SQLite tests pass**;
+4. **Automated quality gates:** pinned ESLint/Ruff, credential-isolated runner,
+   mypy, regressions, disabled-template preflight and advisory scans now run on
+   pull requests, main pushes and manual dispatch. Immutable actions use a
+   standard public-repository Linux runner with read-only permissions.
+   [GitHub run 40193418706 passed](https://github.com/Tirthanand17/Indicator-Setup/actions/runs/40193418706)
+   for implementation commit `ad6ff181b2786b635206ea8fab9f3a0780ca8fc5`.
+   [Commands, scope and remaining limitations](OFFLINE_QUALITY_GATES.md).
+
+Validation: **265 JavaScript/extension/quality-runner tests, 19 native
+workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
+Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
 New regressions cover late quote completion after halt, no dispatch after halt,
 durable rejection of claims after restart, settlement of already-started sends,
@@ -62,8 +73,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 |---|---|---|
 | 1 | Emergency-halt race | Completed with regression evidence |
 | 2 | Vulnerable JavaScript tooling | Completed against current advisories |
-| 3 | Automated lint, regression/type/security quality gates | Next |
-| 4 | Futures rollover and dynamic entry-option selection | Pending |
+| 3 | Automated lint, regression/type/security quality gates | Completed; local and GitHub CI verified |
+| 4 | Futures rollover and dynamic entry-option selection | Next |
 | 5 | Option monitoring cadence and exit responsiveness | Pending |
 | 6 | Complete observed portfolio records and metrics | Pending |
 | 7 | Dashboard delivery status | Completed; broader dashboard still incomplete |

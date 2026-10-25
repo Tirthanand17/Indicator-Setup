@@ -1,8 +1,14 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
 **IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
-acceptance score **21/41 (51%)**, live acceptance **0/5**.
+acceptance score **22/41 (54%)**, live acceptance **0/5**.
 [Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
+
+**Automated quality gates:** `npm run quality:js` runs lint, edge/extension/gate
+tests, disabled preflight, native SQLite regressions and npm advisories.
+`npm run quality:all` includes Python lint/types/tests/advisories using a Linux
+Python 3.12 QA environment. [Setup and CI evidence](../audit/OFFLINE_QUALITY_GATES.md).
+**265 JS/extension/gate, 19 native and 778 Python tests pass; one Python skip.**
 
 The 25 October fixes fence owner halt across asynchronous market/paper/delivery
 boundaries, patch Undici to 7.30.1, and derive observed dashboard delivery counts

@@ -1,10 +1,17 @@
 # Canonical engineering progress — 25 October 2026
 
+**25 October automated quality gates:** pinned ESLint/Ruff, credential-isolated
+runner, full regressions/type checks and dependency scans now run in GitHub CI.
+[Run 40193418706 passed](https://github.com/Tirthanand17/Indicator-Setup/actions/runs/40193418706).
+**265 JS/extension/runner, 19 native SQLite and 778 Python tests pass** (one
+Python skip); both advisory scans are clean. Current independent audit score
+**22/41 = 54%**, live acceptance **0/5**. [Gate scope and commands](../../audit/OFFLINE_QUALITY_GATES.md).
+
 **25 October independent-audit remediation:** emergency-halt race fenced,
 Undici tooling patched to 7.30.1, and observed dashboard delivery counts
 corrected. **223 JS + 19 native SQLite tests pass**, disabled-template
 preflight passes, current npm audit reports zero known vulnerabilities.
-Independent audit acceptance score **21/41 = 51%**, live acceptance **0/5**.
+At that checkpoint the independent audit score was **21/41 = 51%**, live acceptance **0/5**.
 This broader score replaces the old offline checklist for current overall
 reporting; the historical 23/25 statements below use a different denominator.
 [Current remediation tracker and remaining sequence](../../audit/AUDIT_REMEDIATION_PROGRESS.md).
