@@ -1,0 +1,9 @@
+# Never commit Cloudflare credentials or local emulator state.
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+.wrangler/
+node_modules/
+*.pem
+*.key
