@@ -10,6 +10,7 @@ import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from '../readonly-delivery.mjs';
 import { sendTelegramPaperMessage } from '../telegram-sender.mjs';
+import {OBSERVED_ARCHIVE_KEYS,restoreObservedArchiveToEmpty} from '../observed-archive.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -19,6 +20,33 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/test/archive/alarm')return Response.json(await this.alarm());
+    if(path==='/test/archive/seed'&&request.method==='POST') {
+      const input=await request.json();clock=input.nowMs;
+      if(input.sqlTable)this.storage.sql.exec('CREATE TABLE archive_recovery_guard (value TEXT)');
+      await this.storage.transaction(async txn=>{
+        for(const [name,key] of Object.entries(OBSERVED_ARCHIVE_KEYS))
+          if(input.state?.[name]!==null&&input.state?.[name]!==undefined)await txn.put(key,input.state[name]);
+        if(input.extra)await txn.put(input.extra.key,input.extra.value);
+        if(input.alarm)await txn.setAlarm(input.alarm);
+      });return Response.json({seeded:true});
+    }
+    if(path==='/test/archive/state')return Response.json({
+      state:Object.fromEntries(await Promise.all(Object.entries(OBSERVED_ARCHIVE_KEYS)
+        .map(async([name,key])=>[name,(await this.storage.get(key))??null]))),
+      alarm:await this.storage.getAlarm(),vaultPresent:await this.storage.get('daily-token-v1')!==undefined,
+      keys:[...(await this.storage.list()).keys()],
+      tables:Array.from(this.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table'")).map(r=>r.name),
+    });
+    if(path==='/test/archive/rollback'&&request.method==='POST') {
+      const sealedArchive=await request.json();
+      try {await restoreObservedArchiveToEmpty({transaction:callback=>this.storage.transaction(async txn=>{
+        await callback(txn);throw Error('SYNTHETIC_ARCHIVE_ABORT');
+      })},{sealedArchive,signingSecret:this.env.OBSERVED_ARCHIVE_HMAC_KEY,
+        encryptionKeyBase64:this.env.OBSERVED_ARCHIVE_AES_KEY,nowMs:clock});}
+      catch(error){return Response.json({rolledBack:error.message==='SYNTHETIC_ARCHIVE_ABORT'});}
+      throw Error('Rollback expected');
+    }
     if(path==='/test/transport/telegram'&&request.method==='POST')
       return Response.json(await sendTelegramPaperMessage({token:this.env.TELEGRAM_BOT_TOKEN,
         chatId:this.env.TELEGRAM_PRIVATE_CHAT_ID,message:'SYNTHETIC LOCAL TRANSPORT TEST ONLY'}));

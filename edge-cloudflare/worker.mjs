@@ -1,8 +1,11 @@
+import {validState,validMarketObservation} from './runtime-state.mjs';
+import {OBSERVED_RECOVERY_KEY,snapshotObservedState,sealObservedArchive,
+  restoreObservedArchiveToEmpty,readObservedArchiveJSON} from './observed-archive.mjs';
 /** Undeployed paper-only scheduler and optional read-only Kite market sampler.
  * SQLite-backed DO storage uses transactional KV. No order endpoint, Telegram,
  * broker SDK, filesystem or constructor alarm scheduling. Runtime is opt-in.
  */
-import { assessAlarm, validClaimedTickId, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
+import { assessAlarm, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
 import { verifyDailyRelay, sealDailyToken, openDailyToken, expiryForSignedSecond } from './daily-token.mjs';
 import { createReadOnlyKite } from './market-readonly.mjs';
 import { reviewReadOnlyMarket } from './market-review.mjs';
@@ -57,23 +60,6 @@ async function authorized(request, env) {
   return difference === 0;
 }
 
-function validState(s) {
-  return s && Object.keys(s).sort().join(',') ===
-    'calendarVersion,callbacks,events,halted,lastClaimedTickId,lastObservedAtMs,scheduledAtMs,schema,status,totalClaims,usageDay' &&
-    s.schema === 1 && s.calendarVersion === NSE_FO_CALENDAR_VERSION &&
-    Number.isSafeInteger(s.lastObservedAtMs) && s.lastObservedAtMs > 0 &&
-    (s.scheduledAtMs === null || (Number.isSafeInteger(s.scheduledAtMs) && s.scheduledAtMs > 0)) &&
-    (s.lastClaimedTickId === null || validClaimedTickId(s.lastClaimedTickId)) &&
-    ((s.totalClaims === 0) === (s.lastClaimedTickId === null)) &&
-    typeof s.halted === 'boolean' && typeof s.status === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(s.usageDay) &&
-    Number.isSafeInteger(s.callbacks) && s.callbacks >= 0 && s.callbacks <= MAX_DAILY_CALLBACKS &&
-    Number.isSafeInteger(s.totalClaims) && s.totalClaims >= 0 &&
-    Array.isArray(s.events) && s.events.length <= RETAINED_EVENTS &&
-    s.events.every(e => e && typeof e.status === 'string' &&
-      Number.isSafeInteger(e.scheduledAtMs) && Number.isSafeInteger(e.observedAtMs) &&
-      (e.tickId === null || typeof e.tickId === 'string'));
-}
 
 export default {
   async fetch(request, env) {
@@ -83,7 +69,11 @@ export default {
       (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
        env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
-    if (!tokenRoute && !dashboardRoute && (!((path === '/internal/bootstrap' && request.method === 'POST') ||
+    const archiveRoute=new URL(request.url).protocol==='https:'&&
+      new URL(request.url).search===''&&env.OFFLINE_OBSERVED_ARCHIVE_ENABLED==='true'&&
+      ((path==='/internal/observed-archive'&&request.method==='GET')||
+       (path==='/internal/observed-archive/restore'&&request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'));
+    if (!tokenRoute && !dashboardRoute && (!(archiveRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/emergency-halt' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
           (path === '/internal/release-readiness' && request.method === 'GET') ||
@@ -113,8 +103,8 @@ export class MarketSession {
   // transaction so a concurrent halt conflicts with, or precedes, the write.
   // The local latch also closes the gap immediately before an external send.
   async assertNotHalted(storage = this.storage) {
-    const state = await storage.get(STATE_KEY);
-    if (this.haltRequested || (state !== undefined &&
+    const [state,recovery] = await Promise.all([storage.get(STATE_KEY),storage.get(OBSERVED_RECOVERY_KEY)]);
+    if (recovery!==undefined||this.haltRequested || (state !== undefined &&
         (!validState(state) || state.halted))) throw Error('SCHEDULER_HALTED');
   }
 
@@ -147,6 +137,29 @@ export class MarketSession {
     if (!tokenRoute && !await authorized(request, this.env)) return reply({ error: 'Not found' }, 404);
     if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true') return reply({ status: 'DISABLED' }, 503);
     try {
+      if(request.method!=='GET'&&await this.storage.get(OBSERVED_RECOVERY_KEY)!==undefined&&
+        path!=='/internal/observed-archive/restore')return reply({status:'ARCHIVE_RESTORED_QUARANTINED',paperOnly:true},503);
+      if(path==='/internal/observed-archive'||path==='/internal/observed-archive/restore') {
+        if(new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||
+          this.env.OFFLINE_OBSERVED_ARCHIVE_ENABLED!=='true'||
+          !((path==='/internal/observed-archive'&&request.method==='GET')||
+          (path==='/internal/observed-archive/restore'&&request.method==='POST'&&this.env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true')))
+          return reply({error:'Not found'},404);
+        const signingSecret=this.env.OBSERVED_ARCHIVE_HMAC_KEY,encryptionKeyBase64=this.env.OBSERVED_ARCHIVE_AES_KEY;
+        const reserved=['SCHEDULER_ADMIN_KEY','TOKEN_RELAY_HMAC_KEY','TOKEN_VAULT_AES_KEY',
+          'TELEGRAM_BOT_TOKEN','PAPER_DASHBOARD_VIEW_KEY','KITE_API_KEY'];
+        if(reserved.some(k=>this.env[k]!==undefined&&[signingSecret,encryptionKeyBase64].includes(this.env[k])))
+          throw Error('ARCHIVE_KEY_SEPARATION');
+        if(path==='/internal/observed-archive') {
+          const createdAtMs=Date.now(),state=await snapshotObservedState(this.storage,createdAtMs);
+          const sealed=await sealObservedArchive({state,createdAtMs,signingSecret,encryptionKeyBase64});
+          const response=reply(sealed);response.headers.set('Content-Disposition','attachment; filename="snapshot.observed-paper.enc"');
+          return response;
+        }
+        if(request.headers.get('content-type')!=='application/json')return reply({error:'JSON required'},400);
+        const sealedArchive=await readObservedArchiveJSON(request.body);
+        return reply(await restoreObservedArchiveToEmpty(this.storage,{sealedArchive,signingSecret,encryptionKeyBase64,nowMs:Date.now()}));
+      }
       if (tokenRoute) return await this.acceptSignedToken(request);
       if (path === '/internal/scheduler' && request.method === 'GET') {
         const saved = await this.storage.get(STATE_KEY);
@@ -275,6 +288,7 @@ export class MarketSession {
         outcome === 'BLOCKED_CORRUPT_STATE' ? 503 : 200);
       }
       const saved = await this.storage.transaction(async txn => {
+        if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined)throw Error('RECOVERY_QUARANTINED');
         const existing = await txn.get(STATE_KEY);
         if (existing !== undefined) {
           if (!validState(existing)) throw new Error('invalid state');
@@ -307,6 +321,7 @@ export class MarketSession {
     } catch { return reply({ error: 'Token handoff rejected' }, 401); }
     try {
       const result = await this.storage.transaction(async txn => {
+        if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined)throw Error('RECOVERY_QUARANTINED');
         const previous = await txn.get(TOKEN_KEY);
         if (previous !== undefined && !validTokenRecord(previous)) return 'CORRUPT';
         const validPrevious = validTokenRecord(previous) && Date.now() < previous.expiresAtMs;
@@ -530,6 +545,9 @@ export class MarketSession {
     // an event durably before HTTP and never blindly retries uncertainty.
     const now = Date.now();
     const decision = await this.storage.transaction(async txn => {
+      if(await txn.get(OBSERVED_RECOVERY_KEY)!==undefined) {
+        await txn.deleteAlarm();return {status:'ARCHIVE_RESTORED_QUARANTINED',shouldPoll:false,nextAlarmAtMs:null,tickId:null};
+      }
       const state = await txn.get(STATE_KEY);
       if (!validState(state)) {
         await txn.deleteAlarm();
@@ -937,13 +955,4 @@ function validTokenRecord(record) {
     record.nonces.length <= RETAINED_NONCES &&
     record.nonces.every(v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) &&
     typeof record.iv === 'string' && typeof record.ciphertext === 'string';
-}
-
-function validMarketObservation(value) {
-  return value && value.schema === 1 && typeof value.tickId === 'string' &&
-    Number.isSafeInteger(value.observedAtMs) &&
-    ['BLOCKED_MARKET_DATA', 'BLOCKED_OBSERVATION_STORAGE',
-      'QUOTE_OBSERVED', 'HISTORY_OBSERVED','OPTION_OBSERVED',
-      'OPTION_BLOCKED','OPTION_NO_MASTER','OPTION_ENTRY_UNAVAILABLE',
-      'MARKET_BATCH_OBSERVED','MARKET_BATCH_PARTIAL','MARKET_BATCH_BLOCKED'].includes(value.status);
 }

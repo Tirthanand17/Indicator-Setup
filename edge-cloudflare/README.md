@@ -1,5 +1,13 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Observed-state recovery:** separately gated encrypted export and empty-target
+restore now preserve both observed accounts, delivery watermarks, portfolio
+metrics and market-selection/scheduler state. The operator client verifies
+before saving or restoring; recovered copies remain durably quarantined.
+No hosted backup, destination or live restore is established.
+[Snapshot scope, commands and native drill](../audit/OBSERVED_STATE_RECOVERY.md).
+The historical archive checkpoints below describe the separate synthetic archive.
+
 **IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
 acceptance score **23/41 (56%)**, live acceptance **0/5**.
 [Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).

@@ -13,8 +13,10 @@ phase checklists remain historical records with different denominators.
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-**Remediation tasks completed: 7/19.** Observed portfolio metrics (item 6)
-adds one implementation acceptance check. Cloud acceptance remains unchanged.
+**Remediation tasks completed: 8/19.** Observed-state export and quarantined
+restore (item 8) are implemented and tested. The score remains 24/41 because
+the recovery acceptance atoms also require retention/lifecycle or operator
+reconciliation, which remain pending. Cloud acceptance remains unchanged.
 
 The audit baseline was 19/41. Five newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
@@ -84,7 +86,16 @@ additional point. This score measures evidence, not hours of work remaining.
    bounded recent samples and explicit stale/failure states.
    [Accounting definitions, worked example and limits](OBSERVED_PORTFOLIO_METRICS.md).
 
-Validation: **300 JavaScript/extension/quality-runner tests, 22 native
+8. **Observed-state recovery:** authenticated, separately gated encrypted
+   export; bounded operator export/verify/restore client; ten-record consistent
+   snapshots including delivery watermarks and portfolio metrics; atomic
+   empty-target restore with durable quarantine. Native drills preserve open/
+   closed balances and uncertain delivery state across restart, verify rollback,
+   and reject existing keys, credentials, SQL tables or alarms. No actual backup
+   destination, live export or deployment is claimed.
+   [Scope, commands, recovery drill and remaining work](OBSERVED_STATE_RECOVERY.md).
+
+Validation: **307 JavaScript/extension/quality-runner tests, 24 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -105,8 +116,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 5 | Option monitoring cadence and exit responsiveness | Completed with offline/native evidence; live timing unverified |
 | 6 | Complete observed portfolio records and metrics | Completed with accounting/native/UI regression evidence |
 | 7 | Dashboard delivery status | Completed; broader dashboard still incomplete |
-| 8 | Complete observed-state backup/export/restore | Next |
-| 9 | Journal retention and schema/rollback lifecycle | Pending |
+| 8 | Complete observed-state backup/export/restore | Implemented; local native recovery drill verified; hosted backup pending |
+| 9 | Journal retention and schema/rollback lifecycle | Next |
 | 10 | Authenticated Telegram ambiguity reconciliation | Pending |
 | 11 | Token, outage, heartbeat and quota operational alerts | Pending |
 | 12 | Unverifiable-position reconciliation | Pending |

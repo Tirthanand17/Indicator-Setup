@@ -34,6 +34,8 @@ test('unexpected deployment bindings, enabled feature, public route and scripts 
     mutate(c=>{c.workers_dev=true;}),
     mutate(c=>{c.preview_urls=true;}),
     mutate(c=>{c.vars.OFFLINE_SCHEDULER_ENABLED='true';}),
+    mutate(c=>{c.vars.OFFLINE_OBSERVED_ARCHIVE_ENABLED='true';}),
+    mutate(c=>{c.vars.OFFLINE_OBSERVED_RESTORE_ENABLED='true';}),
     mutate(c=>{c.vars.SCHEDULER_ADMIN_KEY='secret-accidentally-in-public-config';}),
     mutate(c=>{c.routes=['https://domain.invalid/*'];}),
     mutate(c=>{c.triggers={crons:['* * * * *']};}),
@@ -56,8 +58,8 @@ test('1125 regular slots are within selected arithmetic limits, not release appr
   assert.equal(report.alarms,1125);
   assert.equal(report.marketStatus,'REGULAR');
   assert.equal(report.estimated.durableRequestsPerDay,1226);
-  assert.equal(report.estimated.durableRowsWrittenPerDay,20251);
-  assert.equal(report.estimated.durableRowsReadPerDay,45801);
+  assert.equal(report.estimated.durableRowsWrittenPerDay,22501);
+  assert.equal(report.estimated.durableRowsReadPerDay,68301);
   assert.equal(report.marketTraffic.maximumQuoteRequests,1125);
   assert.equal(report.marketTraffic.maximumInstrumentsPerQuote,5);
   assert.equal(report.marketTraffic.cloudTimingVerified,false);

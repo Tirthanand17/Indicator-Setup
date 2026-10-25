@@ -27,6 +27,7 @@ const SAFE_VARS = Object.freeze([
   'OFFLINE_TELEGRAM_SENDER_ENABLED',
   'OFFLINE_PAPER_LEDGER_ENABLED', 'OFFLINE_SYNTHETIC_SESSION_ENABLED',
   'OFFLINE_DELIVERY_REHEARSAL_ENABLED', 'OFFLINE_PRIVATE_DASHBOARD_ENABLED',
+  'OFFLINE_OBSERVED_ARCHIVE_ENABLED','OFFLINE_OBSERVED_RESTORE_ENABLED',
 ]);
 const sorted = values => [...values].sort().join(',');
 const exactKeys = (object, keys) => object && !Array.isArray(object) &&
@@ -73,9 +74,9 @@ export function validateDisabledCloudTemplate(config, packageManifest) {
  * correct billing, exchange data quality, wakeup latency or phone receipt.
  */
 export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
-  // Planning envelope for the shared pipeline (~29 state reads and up to
-  // ~15 writes before retry/index amplification). Not measured billed rows.
-  durableReadsPerAlarm = 40, durableWritesPerAlarm = 18,
+  // Conservative planning allowance including metric/quarantine checks.
+  // Not measured billed rows; manual archive traffic is additional.
+  durableReadsPerAlarm = 60, durableWritesPerAlarm = 20,
   ownerDashboardRequests = 100, dashboardRowsReadPerRequest = 8,
   dailyHandoffRequests = 1, storedBytes = 4_000_000,
   observedWorkerCpuMsPerInvocation = null,
