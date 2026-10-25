@@ -1,5 +1,12 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Operational health/watchdog:** a separately gated read-only endpoint reports
+token, auth, heartbeat, outage and source-budget conditions without provider
+requests. An explicitly run external monitor persists dedupe and optional
+grouped-notification claims, with cooldowns and no uncertain-send retries.
+No monitor, bot or service was activated.
+[Procedure and limits](../audit/OPERATIONAL_HEALTH_AND_ALERTS.md).
+
 **Owner delivery reconciliation:** gated administrator inspection and exact-attempt
 suppression can resolve a halted source's uncertain journal entry without
 resending, asserting phone receipt or resuming processing. A bounded operator

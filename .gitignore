@@ -6,6 +6,9 @@
 .dev.vars.*
 *.enc
 *.reconciliation.json
+*.ops-monitor.json
+*.ops-monitor.json.lock/
+*.ops-monitor.json.*.tmp
 *.sqlite
 *.sqlite3
 *.sqlite3-*

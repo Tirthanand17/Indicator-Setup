@@ -37,6 +37,7 @@ test('unexpected deployment bindings, enabled feature, public route and scripts 
     mutate(c=>{c.vars.OFFLINE_OBSERVED_ARCHIVE_ENABLED='true';}),
     mutate(c=>{c.vars.OFFLINE_OBSERVED_RESTORE_ENABLED='true';}),
     mutate(c=>{c.vars.OFFLINE_DELIVERY_RECONCILIATION_ENABLED='true';}),
+    mutate(c=>{c.vars.OFFLINE_OPERATIONAL_HEALTH_ENABLED='true';}),
     mutate(c=>{c.vars.SCHEDULER_ADMIN_KEY='secret-accidentally-in-public-config';}),
     mutate(c=>{c.routes=['https://domain.invalid/*'];}),
     mutate(c=>{c.triggers={crons:['* * * * *']};}),
@@ -70,6 +71,15 @@ test('1125 regular slots are within selected arithmetic limits, not release appr
   assert.equal(report.measuredActualCloudUse,false);
   assert.ok(report.unresolved.includes('WORKER_CPU_UNMEASURED'));
   assert.equal(FREE_REFERENCE_2026_10_24.durableStoredBytes,5_000_000_000);
+});
+
+test('optional independent watchdog probes add explicit request/read planning overhead',()=>{
+  const baseline=forecastFreeDailyUsage({istDate:'2026-10-26'});
+  const monitored=forecastFreeDailyUsage({istDate:'2026-10-26',healthProbeRequests:1440});
+  assert.equal(monitored.estimated.workerRequestsPerDay,baseline.estimated.workerRequestsPerDay+1440);
+  assert.equal(monitored.estimated.durableRowsReadPerDay,baseline.estimated.durableRowsReadPerDay+1440*12);
+  assert.equal(monitored.measuredActualCloudUse,false);
+  assert.throws(()=>forecastFreeDailyUsage({istDate:'2026-10-26',healthProbeRequests:-1}));
 });
 
 test('quota overages, unknown 2027 year and official special day fail closed',()=>{

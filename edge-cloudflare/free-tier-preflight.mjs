@@ -29,6 +29,7 @@ const SAFE_VARS = Object.freeze([
   'OFFLINE_DELIVERY_REHEARSAL_ENABLED', 'OFFLINE_PRIVATE_DASHBOARD_ENABLED',
   'OFFLINE_OBSERVED_ARCHIVE_ENABLED','OFFLINE_OBSERVED_RESTORE_ENABLED',
   'OFFLINE_DELIVERY_RECONCILIATION_ENABLED',
+  'OFFLINE_OPERATIONAL_HEALTH_ENABLED',
 ]);
 const sorted = values => [...values].sort().join(',');
 const exactKeys = (object, keys) => object && !Array.isArray(object) &&
@@ -79,6 +80,7 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
   // Not measured billed rows; manual archive traffic is additional.
   durableReadsPerAlarm = 60, durableWritesPerAlarm = 20,
   ownerDashboardRequests = 100, dashboardRowsReadPerRequest = 8,
+  healthProbeRequests = 0, healthRowsReadPerRequest = 12,
   dailyHandoffRequests = 1, storedBytes = 4_000_000,
   observedWorkerCpuMsPerInvocation = null,
   observedDurableDurationGbSecondsPerDay = null } = {}) {
@@ -86,7 +88,7 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
   if (marketStatus === null) throw Error('UNVERIFIED_EXCHANGE_YEAR');
   const counts = [alarmsPerRegularDay, durableReadsPerAlarm, durableWritesPerAlarm,
     ownerDashboardRequests, dashboardRowsReadPerRequest,
-    dailyHandoffRequests, storedBytes];
+    dailyHandoffRequests, storedBytes,healthProbeRequests,healthRowsReadPerRequest];
   if (!counts.every(value => integer(value))) throw Error('INVALID_FORECAST_ASSUMPTION');
   if (observedWorkerCpuMsPerInvocation !== null &&
       (!Number.isFinite(observedWorkerCpuMsPerInvocation) ||
@@ -97,10 +99,10 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
   // Unusual NSE sessions MUST NOT be converted into normal market slots.
   const alarms = marketStatus === 'REGULAR' ? alarmsPerRegularDay : 0;
   const expected = {
-    workerRequestsPerDay: ownerDashboardRequests + dailyHandoffRequests,
-    durableRequestsPerDay: alarms + ownerDashboardRequests + dailyHandoffRequests,
+    workerRequestsPerDay: ownerDashboardRequests + dailyHandoffRequests+healthProbeRequests,
+    durableRequestsPerDay: alarms + ownerDashboardRequests + dailyHandoffRequests+healthProbeRequests,
     durableRowsReadPerDay: alarms * durableReadsPerAlarm +
-      ownerDashboardRequests * dashboardRowsReadPerRequest + dailyHandoffRequests,
+      ownerDashboardRequests * dashboardRowsReadPerRequest + dailyHandoffRequests+healthProbeRequests*healthRowsReadPerRequest,
     durableRowsWrittenPerDay: alarms * durableWritesPerAlarm + dailyHandoffRequests,
     durableStoredBytes: storedBytes,
   };

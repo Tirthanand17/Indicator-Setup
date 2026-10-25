@@ -2,6 +2,7 @@ import {validState,validMarketObservation} from './runtime-state.mjs';
 import {assertObservedWriter,observedRetentionReport} from './observed-lifecycle.mjs';
 import {migrateObservedLifecycle} from './observed-lifecycle-ops.mjs';
 import {deliveryReconciliationView,reconcileUncertainDelivery,readReconciliationJSON} from './delivery-reconciliation.mjs';
+import {operationalHealth} from './operational-health.mjs';
 import {OBSERVED_RECOVERY_KEY,snapshotObservedState,sealObservedArchive,
   restoreObservedArchiveToEmpty,readObservedArchiveJSON} from './observed-archive.mjs';
 /** Undeployed paper-only scheduler and optional read-only Kite market sampler.
@@ -57,7 +58,9 @@ function observedArchiveSecrets(env) {
   return {signingSecret,encryptionKeyBase64};
 }
 async function authorized(request, env) {
-  const key = env.SCHEDULER_ADMIN_KEY;
+  return authorizedWithKey(request,env.SCHEDULER_ADMIN_KEY);
+}
+async function authorizedWithKey(request,key) {
   const candidate = request.headers.get('authorization')?.replace(/^Bearer /, '');
   if (typeof key !== 'string' || key.length < 32 || key.length > 256 ||
       new Set(key).size < 8 || !candidate || candidate.length > 256) return false;
@@ -69,6 +72,13 @@ async function authorized(request, env) {
   for (let i = 0; i < aa.length; i++) difference |= aa[i] ^ bb[i];
   return difference === 0;
 }
+async function authorizedOperations(request,env) {
+  const key=env.OPS_HEALTH_VIEW_KEY;
+  if(['SCHEDULER_ADMIN_KEY','KITE_API_KEY','TOKEN_RELAY_HMAC_KEY','TOKEN_VAULT_AES_KEY',
+    'KITE_API_SECRET','OBSERVED_ARCHIVE_HMAC_KEY','OBSERVED_ARCHIVE_AES_KEY',
+    'TELEGRAM_BOT_TOKEN','PAPER_DASHBOARD_VIEW_KEY'].some(k=>env[k]!==undefined&&env[k]===key))return false;
+  return authorizedWithKey(request,key);
+}
 
 
 export default {
@@ -79,6 +89,14 @@ export default {
       (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
        env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
+    const operationsRoute=path==='/internal/operations'&&request.method==='GET'&&
+      new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&env.OFFLINE_OPERATIONAL_HEALTH_ENABLED==='true';
+    if(operationsRoute) {
+      if(!await authorizedOperations(request,env))return reply({error:'Not found'},404);
+      if(env.OFFLINE_SCHEDULER_ENABLED!=='true'||!env.MARKET_SESSION)return reply({status:'DISABLED'},503);
+      const id=env.MARKET_SESSION.idFromName('nifty-paper-session-v1');
+      return env.MARKET_SESSION.get(id).fetch(request);
+    }
     const reconciliationRoute=path==='/internal/readonly-delivery/reconcile'&&
       new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&
       ['GET','POST'].includes(request.method)&&env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED==='true';
@@ -143,6 +161,13 @@ export class MarketSession {
 
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/internal/operations') {
+      if(request.method!=='GET'||new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||
+        this.env.OFFLINE_OPERATIONAL_HEALTH_ENABLED!=='true'||!await authorizedOperations(request,this.env))return reply({error:'Not found'},404);
+      if(this.env.OFFLINE_SCHEDULER_ENABLED!=='true')return reply({status:'DISABLED'},503);
+      try {return reply(await this.operationalHealthSnapshot());}
+      catch {return reply({status:'OPERATIONS_SNAPSHOT_UNAVAILABLE'},503);}
+    }
     if (isPrivateDashboardPath(path)) {
       return handlePrivateDashboard(request, this.env, this.storage,
         STATE_KEY, PAPER_LEDGER_KEY, SYNTHETIC_SESSION_KEY, PORTFOLIO_MARKS_KEY);
@@ -337,6 +362,31 @@ export class MarketSession {
     } catch {
       return reply({ status: 'BLOCKED_STORAGE_OR_STATE', paperOnly: true }, 503);
     }
+  }
+
+  async operationalHealthSnapshot() {
+    const data=await this.storage.transaction(async txn=>{
+      const [scheduler,market,pacing,ledger,delivery,lifecycle,recovery,token,alarmAtMs]=await Promise.all([
+        txn.get(STATE_KEY),txn.get(MARKET_KEY),txn.get(READONLY_QUOTE_PACE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
+        txn.get(READONLY_PAPER_DELIVERY_KEY),txn.get('readonly-lifecycle-v1'),txn.get(OBSERVED_RECOVERY_KEY),
+        txn.get(TOKEN_KEY),txn.getAlarm()]);
+      return {scheduler,market,pacing,ledger,delivery,lifecycle,recovery,token,alarmAtMs};
+    });
+    const nowMs=Date.now(),record=data.token;let tokenStatus='MISSING';
+    if(record!==undefined) {
+      tokenStatus='INVALID';
+      let structurallyValid=false;
+      try {structurallyValid=validTokenRecord(record);}catch{/* Invalid metadata remains an alert, not a failed health request. */}
+      if(structurallyValid) {
+        const day=t=>new Date(t+330*60000).toISOString().slice(0,10);
+        if(record.signedAt*1000>nowMs)tokenStatus='INVALID';
+        else if(nowMs>=record.expiresAtMs)tokenStatus='EXPIRED';
+        else if(day(record.signedAt*1000)!==day(nowMs))tokenStatus='NOT_TODAY';
+        else {try {if(await openDailyToken(record,this.env,nowMs))tokenStatus='HANDOFF_DECRYPTABLE';}catch{/* metadata only */}}
+      }
+    }
+    return operationalHealth({...data,tokenStatus,tokenExpiresAtMs:record?.expiresAtMs,nowMs,
+      runtimeEnabled:this.env.READONLY_MARKET_RUNTIME_ENABLED==='true'});
   }
 
   async handleDeliveryReconciliation(request) {

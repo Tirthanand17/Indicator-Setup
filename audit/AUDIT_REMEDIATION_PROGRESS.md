@@ -13,8 +13,9 @@ phase checklists remain historical records with different denominators.
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-**Remediation tasks completed: 10/19.** Authenticated owner suppression of
-uncertain Telegram attempts (item 10) is implemented and tested.
+**Remediation tasks completed: 11/19.** Read-only operational health and the
+independent, persistent opt-in notification watchdog (item 11) are implemented
+and tested. No actual monitor or notification service was activated.
 The score remains conservatively 24/41 while operator reconciliation and
 operational recovery remain incomplete. Cloud acceptance remains unchanged.
 
@@ -110,7 +111,14 @@ additional point. This score measures evidence, not hours of work remaining.
     the viewing dashboard exposes suppressed-unknown counts without write access.
     [Procedure, concurrency rules and limits](DELIVERY_AMBIGUITY_RECONCILIATION.md).
 
-Validation: **324 JavaScript/extension/quality-runner tests, 29 native
+11. **Operational alerts:** isolated read-only health key and session-aware token,
+    auth, heartbeat, outage, source-quota and journal conditions. An externally
+    supervised watchdog persists dedupe/claims before optional grouped alerts,
+    remains quiet on stable conditions and never automatically retries uncertain
+    sends. Native inspection/decryption tests preserve source records and secrets.
+    [Setup, persistence rules, traffic and limitations](OPERATIONAL_HEALTH_AND_ALERTS.md).
+
+Validation: **341 JavaScript/extension/quality-runner tests, 31 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -134,8 +142,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 8 | Complete observed-state backup/export/restore | Implemented; local native recovery drill verified; hosted backup pending |
 | 9 | Journal retention and schema/rollback lifecycle | Implemented preservation policy, versioned migration and rollback drill |
 | 10 | Authenticated Telegram ambiguity reconciliation | Implemented; native owner suppression/restart drill verified |
-| 11 | Token, outage, heartbeat and quota operational alerts | Next |
-| 12 | Unverifiable-position reconciliation | Pending |
+| 11 | Token, outage, heartbeat and quota operational alerts | Implemented; read-only health, persistent external watchdog and opt-in notifications tested |
+| 12 | Unverifiable-position reconciliation | Next |
 | 13 | Future calendar and exceptional-session maintenance | Pending |
 | 14 | Public ingress hardening; history/IAM/log verification | Pending |
 | 15 | Inert Free-only cloud identity/deployment verification | Account/deployment evidence required |
