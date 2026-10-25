@@ -4,6 +4,10 @@ import worker, { MarketSession } from './worker.mjs';
 import { assessAlarm, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
 import { createHmac, randomBytes } from 'node:crypto';
 import { claimMasterFetch,commitMasterPair } from './option-runtime.mjs';
+import {compileNiftyCatalog,selectCatalogPair} from './instrument-catalog.mjs';
+import {newPaperLedger,enterPaperBasket} from './paper-ledger.mjs';
+import {newPaperDeliveryJournal} from './paper-delivery.mjs';
+import {readFileSync} from 'node:fs';
 
 const KEY = 'SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const ist = (day, time) => Date.parse(`${day}T${time}+05:30`);
@@ -68,6 +72,130 @@ function configureMarket(s) {
   s.env.KITE_FUTURE_SYMBOL='NIFTY26OCTFUT';
   s.env.KITE_FUTURE_INSTRUMENT_TOKEN='12345';
 }
+
+const masterCsv=()=>['instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange',
+  '12345,1,NIFTY26OCTFUT,NIFTY,0,2026-10-27,0,0.05,65,FUT,NFO-FUT,NFO',
+  ...[22050,22550].flatMap((strike,i)=>['CE','PE'].map((kind,j)=>
+    [30000+i*2+j,1,`NIFTY26O29${strike}${kind}`,'NIFTY',0,'2026-10-29',strike,0.05,65,kind,'NFO-OPT','NFO'].join(',')))].join('\n');
+function enablePaper(s) {
+  Object.assign(s.env,{OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+    OFFLINE_PAPER_BRIDGE_ENABLED:'true',OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true'});
+}
+const rawQuote=(token,bid=100,ask=100.5)=>({instrument_token:token,
+  timestamp:new Date(Date.now()+330*60_000).toISOString().slice(0,19).replace('T',' '),
+  depth:{buy:[{price:bid,quantity:650}],sell:[{price:ask,quantity:650}]}});
+
+test('fresh ATM reselection keeps old-position exits when the new entry pair is unavailable',async t=>{
+  let price=22046,masterCalls=0;const requests=[];
+  const s=setup(t,OPEN-60_000,async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/instruments/NFO') {masterCalls++;return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});}
+    const symbols=u.searchParams.getAll('i');requests.push(symbols);
+    if(symbols[0].endsWith('FUT'))return Response.json({status:'success',data:{
+      [symbols[0]]:{...rawQuote(12345),last_price:price}}});
+    // The new ATM legs are absent, but the actual held contract has a valid exit.
+    return Response.json({status:'success',data:{'NFO:NIFTY26O2922050CE':rawQuote(30000,170,171)}});
+  });
+  configureMarket(s);enablePaper(s);
+  s.env.KITE_FUTURE_SYMBOL='WRONG_CONFIGURED_FUTURE';s.env.KITE_FUTURE_INSTRUMENT_TOKEN='999';
+  await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));
+  const entryAt=ist('2026-10-23','09:30:40');
+  const old=selectCatalogPair(compileNiftyCatalog(masterCsv(),OPEN),entryAt,22046);
+  const ledger=enterPaperBasket(newPaperLedger(entryAt),{signalId:'CATALOG:OLD:POSITIONS',nowMs:entryAt,
+    quote:{contract:old.CE,updatedAtMs:entryAt,bid:100,ask:100.5,bidQuantity:650,askQuantity:650}}).ledger;
+  await s.storage.put('readonly-paper-ledger-v1',ledger);
+  await s.storage.put('readonly-paper-delivery-v1',newPaperDeliveryJournal(entryAt));
+  s.set(ist('2026-10-23','10:00:00'));
+  assert.equal((await s.session.pollReadOnlyMarket('2026-10-23:135',Date.now())).status,'QUOTE_OBSERVED');
+  price=22546;s.set(ist('2026-10-23','10:01:00'));
+  assert.equal((await s.session.pollReadOnlyMarket('2026-10-23:138',Date.now())).status,'QUOTE_OBSERVED');
+  assert.equal((await s.storage.get('readonly-option-state-v1')).pair.CE.strike,22550);
+  assert.equal(masterCalls,1);
+  s.set(ist('2026-10-23','10:01:40'));
+  assert.equal((await s.session.pollReadOnlyOptions('2026-10-23:140',Date.now())).status,'OPTION_ENTRY_UNAVAILABLE');
+  assert.deepEqual(requests.at(-1),['NFO:NIFTY26O2922550CE','NFO:NIFTY26O2922550PE','NFO:NIFTY26O2922050CE']);
+  const closed=await s.storage.get('readonly-paper-ledger-v1');
+  assert.equal(closed.positions.length,2);
+  assert.equal(closed.positions.every(p=>p.status==='CLOSED'&&p.strike===22050&&p.token===30000),true);
+  assert.equal(closed.outbox.length,4);
+  assert.equal((await s.storage.get('readonly-paper-delivery-v1')).nextIndex,0);
+  await s.session.pollReadOnlyOptions('2026-10-23:140',Date.now());
+  assert.deepEqual(await s.storage.get('readonly-paper-ledger-v1'),closed);
+});
+
+test('actual reviewed market pipeline enters the freshly selected strike after a large move',async t=>{
+  const fixture=JSON.parse(readFileSync(new URL('./decision-parity-fixtures.json',import.meta.url),'utf8'))
+    .cases.find(c=>c.name==='uptrend_mirrored_qualifying_review');
+  // Strengthen the last ten synthetic bars so the actual pinned ADX>=25
+  // production configuration qualifies; do not inject parity-only overrides.
+  fixture.candles=fixture.candles.map((c,i)=>{
+    const shift=Math.max(0,i-(fixture.candles.length-10)+1)*2;
+    return {...c,open:c.open+shift,high:c.high+shift,low:c.low+shift,close:c.close+shift};
+  });
+  let price=22046,masterCalls=0;
+  const asKite=c=>[new Date(c.startMs+330*60_000).toISOString().replace('.000Z','+0530'),
+    c.open,c.high,c.low,c.close,c.volume];
+  const s=setup(t,OPEN-60_000,async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/instruments/NFO'){masterCalls++;return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});}
+    if(u.pathname.includes('/historical/'))return Response.json({status:'success',data:{
+      candles:(u.pathname.endsWith('15minute')?fixture.confirm15m:fixture.candles).map(asKite)}});
+    const symbols=u.searchParams.getAll('i');
+    return Response.json({status:'success',data:Object.fromEntries(symbols.map(symbol=>[symbol,
+      symbol.endsWith('FUT')?{...rawQuote(12345),last_price:price}:
+      rawQuote(symbol.endsWith('CE')?30002:30003)]))});
+  });
+  configureMarket(s);enablePaper(s);
+  await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));
+  s.set(OPEN);
+  await s.session.pollReadOnlyMarket('2026-10-23:0',OPEN);
+  assert.equal((await s.storage.get('readonly-option-state-v1')).pair.CE.strike,22050);
+  price=22546;s.set(fixture.nowMs);
+  const review=await s.session.pollReadOnlyMarket('2026-10-23:271',Date.now());
+  assert.equal(review.review.status,'REVIEW_CE');
+  assert.equal((await s.storage.get('readonly-option-state-v1')).pair.CE.strike,22550);
+  s.set(fixture.nowMs+20_000);
+  assert.equal((await s.session.pollReadOnlyOptions('2026-10-23:272',Date.now())).status,'OPTION_OBSERVED');
+  const ledger=await s.storage.get('readonly-paper-ledger-v1');
+  assert.equal(ledger.positions.length,2);
+  assert.equal(ledger.positions.every(p=>p.status==='OPEN'&&p.strike===22550&&p.token===30002),true);
+  assert.equal(masterCalls,1);
+});
+
+test('post-expiry runtime uses the master-selected future for quote and both history requests',async t=>{
+  const calls=[];
+  const nextOpen=ist('2026-10-28','09:15:00');
+  const s=setup(t,nextOpen-60_000,async url=>{
+    calls.push(url);const u=new URL(url);
+    if(u.pathname==='/instruments/NFO')return new Response(masterCsv()+
+      '\n12346,1,NIFTY26NOVFUT,NIFTY,0,2026-11-24,0,0.05,65,FUT,NFO-FUT,NFO',
+      {headers:{'content-type':'text/csv'}});
+    if(u.pathname==='/quote')return Response.json({status:'success',data:{
+      'NFO:NIFTY26NOVFUT':{...rawQuote(12346),last_price:22546}}});
+    return Response.json({status:'success',data:{candles:[]}});
+  });
+  configureMarket(s); // Old October hints must not control an October 28 sample.
+  await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));s.set(nextOpen);
+  const report=await s.session.pollReadOnlyMarket('2026-10-28:0',Date.now());
+  assert.equal(report.status,'HISTORY_OBSERVED');assert.equal(report.instrumentToken,12346);
+  assert.equal(report.symbol,'NIFTY26NOVFUT');
+  assert.equal(calls.filter(url=>url.includes('/historical/12346/')).length,2);
+  assert.equal(calls.some(url=>url.includes('/historical/12345/')||url.includes('NIFTY26OCTFUT')),false);
+});
+
+test('network latency cannot make an old futures quote fresh using the alarm start clock',async t=>{
+  let s;
+  s=setup(t,OPEN-60_000,async url=>{
+    if(new URL(url).pathname==='/instruments/NFO')return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});
+    s.set(OPEN+70_000);
+    return Response.json({status:'success',data:{'NFO:NIFTY26OCTFUT':{
+      instrument_token:12345,last_price:22046,timestamp:'2026-10-23 09:15:00'}}});
+  });
+  configureMarket(s);await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));s.set(OPEN);
+  const result=await s.session.pollReadOnlyMarket('2026-10-23:0',OPEN);
+  assert.equal(result.status,'BLOCKED_MARKET_DATA');
+  assert.equal(await s.storage.get('readonly-paper-bridge-v1'),undefined);
+});
 
 test('halt during an in-flight market poll prevents later dispatch and new claims after restart',async t=>{
   const s=setup(t);configureMarket(s);
@@ -285,9 +413,13 @@ test('synthetic market alarm samples exact allowlisted GET paths; no orders and 
     calls.push({url,init});
     assert.equal(init.method,'GET');
     assert.equal(new URL(url).origin,'https://api.kite.trade');
-    assert.equal(init.redirect,'error');
+    assert.equal(init.redirect,'manual');
+    if(url.endsWith('/instruments/NFO'))return new Response(
+      'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange\n'+
+      '12345,1,NIFTY26OCTFUT,NIFTY,0,2026-10-27,0,0.05,65,FUT,NFO-FUT,NFO\n',
+      {headers:{'content-type':'text/csv'}});
     if(url.includes('/quote'))return Response.json({status:'success',data:{
-      'NFO:NIFTY26OCTFUT':{last_price:123.4,timestamp:'2026-10-23 09:15:00'}}});
+      'NFO:NIFTY26OCTFUT':{instrument_token:12345,last_price:123.4,timestamp:'2026-10-23 09:15:00'}}});
     return Response.json({status:'success',data:{candles:[
       ['2026-10-23T09:15:00+05:30',100,105,97,103,900]]}});
   };
@@ -297,7 +429,7 @@ test('synthetic market alarm samples exact allowlisted GET paths; no orders and 
   s.set(OPEN);
   const first=await s.session.alarm();
   assert.equal(first.marketStatus,'HISTORY_OBSERVED');
-  assert.equal(calls.length,3);
+  assert.equal(calls.length,4);
   assert.ok(calls.every(c=>!c.url.includes('/orders') && c.init.headers.Authorization.includes(fakeToken)));
   const status=await (await s.session.fetch(request('/internal/scheduler',KEY,'GET'))).json();
   assert.equal(status.marketRuntimeEnabled,true);
@@ -306,10 +438,10 @@ test('synthetic market alarm samples exact allowlisted GET paths; no orders and 
   assert.ok(!JSON.stringify(status).includes(fakeToken));
   assert.equal(status.realOrdersEnabled,false);
   assert.equal((await s.session.alarm()).shouldPoll,false);
-  assert.equal(calls.length,3);
+  assert.equal(calls.length,4);
   s.set(OPEN+20_000);
   assert.equal((await s.session.alarm()).marketStatus,'QUOTE_OBSERVED');
-  assert.equal(calls.length,4); // No repeated history within the same 5-minute window.
+  assert.equal(calls.length,5); // Daily master cached; no repeated history in this window.
 });
 
 test('market sampler fails closed for missing/invalid token and HTTP faults without leaking secrets',async t=>{

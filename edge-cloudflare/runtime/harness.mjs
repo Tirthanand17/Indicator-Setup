@@ -18,6 +18,14 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/test/transport/telegram'&&request.method==='POST')
+      return Response.json(await sendTelegramPaperMessage({token:this.env.TELEGRAM_BOT_TOKEN,
+        chatId:this.env.TELEGRAM_PRIVATE_CHAT_ID,message:'SYNTHETIC LOCAL TRANSPORT TEST ONLY'}));
+    if(path==='/test/market/poll'&&request.method==='POST') {
+      const input=await request.json();clock=input.nowMs;
+      return Response.json(input.kind==='OPTION'?
+        await this.pollReadOnlyOptions(input.tickId,clock):await this.pollReadOnlyMarket(input.tickId,clock));
+    }
     if(path==='/test/halt-race/start'&&request.method==='POST') {
       clock=(await this.storage.get('scheduler-v1')).scheduledAtMs;
       this.pollReadOnlyMarket=async()=>{
@@ -147,7 +155,7 @@ export class TestSession extends MarketSession {
         return Response.json({error:'INVALID_TEST_SCENARIO'},{status:400});
       return Response.json(await this.dispatchReadOnlyTelegram(args=>
         sendTelegramPaperMessage({...args,fetchImpl:async(_url,options)=>{
-          if(options.method!=='POST'||options.redirect!=='error')
+          if(options.method!=='POST'||options.redirect!=='manual')
             throw Error('UNSAFE_TEST_REQUEST');
           if(scenario==='ambiguous') throw Error('SIMULATED_NETWORK_OUTAGE');
           if(scenario==='rate') return Response.json({ok:false,error_code:429,

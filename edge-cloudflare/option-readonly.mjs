@@ -15,7 +15,7 @@ const validDay = day => typeof day === 'string' && /^2026-\d\d-\d\d$/.test(day) 
   Number.isFinite(Date.parse(day+'T00:00:00Z')) &&
   new Date(day+'T00:00:00Z').toISOString().slice(0, 10) === day;
 
-function csvRecord(line) {
+export function csvRecord(line) {
   const fields=[]; let value='', quoted=false, closed=false;
   for(let i=0;i<line.length;i++) {
     const c=line[i];

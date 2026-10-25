@@ -117,7 +117,7 @@ export function stageReadOnlyReview(state,{tickId,observedAtMs,review,futures}={
 
 /** Exit-first, then entry; purely paper and atomic with bridge journal. */
 export function advanceReadOnlyPaperTurn(state,ledger,{
-  tickId,observedAtMs,evidence,
+  tickId,observedAtMs,evidence,exitEvidence,
 }={}) {
   auditReadOnlyBridge(state);
   auditPaperLedger(ledger);
@@ -131,22 +131,26 @@ export function advanceReadOnlyPaperTurn(state,ledger,{
   if(evidence?.source!=='READONLY_OPTION_EVIDENCE_ONLY'||
       evidence.paperEntryAuthorized!==false||evidence.telegramAuthorized!==false||
       evidence.realOrdersEnabled!==false||
-      !evidence.CE||!evidence.PE||
-      evidence.CE.contract?.kind!=='CE'||evidence.PE.contract?.kind!=='PE')
+      ((evidence.CE===null&&evidence.PE===null)?!Array.isArray(exitEvidence):
+        (!evidence.CE||!evidence.PE||evidence.CE.contract?.kind!=='CE'||evidence.PE.contract?.kind!=='PE'))||
+      (exitEvidence!==undefined&&(!Array.isArray(exitEvidence)||exitEvidence.length>2||
+        exitEvidence.some(v=>!v||!v.contract))))
     fail('UNTRUSTED_OPTION_EVIDENCE');
+  const entryAvailable=evidence.CE!==null;
   const q={CE:evidence.CE,PE:evidence.PE};
   for(const kind of ['CE','PE']) {
     const leg=q[kind];
+    if(!entryAvailable)continue;
     if(!integer(leg.updatedAtMs)||istDay(leg.updatedAtMs)!==istDay(observedAtMs)||
         observedAtMs-leg.updatedAtMs>15_000||
         leg.updatedAtMs-observedAtMs>3_000)
       fail('STALE_OPTION_EVIDENCE');
   }
-  const ce=checkQuote(q.CE,observedAtMs).c;
-  const pe=checkQuote(q.PE,observedAtMs).c;
-  if(ce.expiry!==pe.expiry||ce.lotSize!==pe.lotSize||
-      ce.strike!==pe.strike||ce.token===pe.token)
-    fail('INCONSISTENT_OPTION_PAIR');
+  if(entryAvailable) {
+    const ce=checkQuote(q.CE,observedAtMs).c,pe=checkQuote(q.PE,observedAtMs).c;
+    if(ce.expiry!==pe.expiry||ce.lotSize!==pe.lotSize||
+        ce.strike!==pe.strike||ce.token===pe.token)fail('INCONSISTENT_OPTION_PAIR');
+  }
   let nextLedger=ledger;
   const exits=[];let entered=0;
   const minute=minuteIst(observedAtMs);
@@ -157,7 +161,9 @@ export function advanceReadOnlyPaperTurn(state,ledger,{
   } else if(minute>=9*60+30) {
     for(const p of nextLedger.positions.filter(x=>x.status==='OPEN')) {
       try {
-        const r=exitPaperPosition(nextLedger,{tradeId:p.tradeId,quote:q[p.kind],
+        const quote=exitEvidence===undefined?q[p.kind]:exitEvidence.find(v=>
+          v.contract?.symbol===p.symbol&&v.contract?.token===p.token);
+        const r=exitPaperPosition(nextLedger,{tradeId:p.tradeId,quote,
           nowMs:observedAtMs});
         nextLedger=r.ledger;
         exits.push({tradeId:p.tradeId,status:r.result.status});
@@ -168,8 +174,8 @@ export function advanceReadOnlyPaperTurn(state,ledger,{
     }
   }
   const pending=state.pending;
-  let entryStatus='NO_FRESH_SIGNAL';
-  if(pending&&minute>=9*60+30&&minute<15*60&&
+  let entryStatus=entryAvailable?'NO_FRESH_SIGNAL':'WAIT_VALID_ENTRY_EVIDENCE';
+  if(entryAvailable&&pending&&minute>=9*60+30&&minute<15*60&&
       idParts(tickId).day===idParts(pending.reviewTickId).day&&
       idParts(tickId).slot===idParts(pending.reviewTickId).slot+1&&
       observedAtMs-pending.reviewAtMs<=25_000&&

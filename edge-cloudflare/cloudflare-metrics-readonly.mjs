@@ -86,7 +86,7 @@ async function execute(payload,apiToken,fetchImpl,timeoutMs){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
   try {
-    const response=await fetchImpl(ENDPOINT,{method:'POST',redirect:'error',
+    const response=await fetchImpl(ENDPOINT,{method:'POST',redirect:'manual',
       signal:ctrl.signal,headers:{Authorization:`Bearer ${apiToken}`,
         Accept:'application/json','Content-Type':'application/json'},
       body:JSON.stringify(payload)});

@@ -58,7 +58,7 @@ export async function sendTelegramPaperMessage({token,chatId,message,
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try {
     const response=await fetchImpl(`https://api.telegram.org/bot${token}/sendMessage`,{
-      method:'POST',redirect:'error',signal:controller.signal,
+      method:'POST',redirect:'manual',signal:controller.signal,
       headers:{'Content-Type':'application/json; charset=utf-8',Accept:'application/json'},
       body:JSON.stringify({chat_id:Number(chatId),text:message,
         disable_notification:false,protect_content:true}),

@@ -1,8 +1,15 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
 **IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
-acceptance score **22/41 (54%)**, live acceptance **0/5**.
+acceptance score **23/41 (56%)**, live acceptance **0/5**.
 [Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
+
+**Current instrument lifecycle:** a bounded daily catalogue selects the front
+NIFTY future and fresh ATM entry pair. One option batch also monitors original
+held contracts after the ATM strike moves; unavailable entry quotes do not hide
+valid exits. New records retain strike, and legacy records require exact
+catalogue identity. **278 JS/extension/gate and 21 native tests pass.**
+[Selection policy, limits and native transport regression](../audit/INSTRUMENT_LIFECYCLE.md).
 
 **Automated quality gates:** `npm run quality:js` runs lint, edge/extension/gate
 tests, disabled preflight, native SQLite regressions and npm advisories.
@@ -145,7 +152,7 @@ Offline **178 JS + 8 native** tests pass. [Phase28 audit](../audit/PHASE28_READO
 
 The Worker additionally implements POST `/internal/token` **only if both** `OFFLINE_SCHEDULER_ENABLED=true` and `READONLY_MARKET_RUNTIME_ENABLED=true`. Its binary-bounded (2KiB) handoff matches the existing Python `token_sender.py` HMAC-SHA256 request (`X-Relay-Timestamp`, `X-Relay-Nonce`, `X-Relay-Signature`), within90s of local clock, with exact API identity check. An atomic Durable Object transaction rejects nonce replay, older signed tokens, equal-second conflicting tokens, and corrupt prior records. An independent32-byte AES-GCM key encrypts bearer credentials at rest, with cryptographically authenticated signed-time/06:00 IST expiry/fingerprint metadata. Credentials, signatures, raw HTTP error bodies and Kite headers do not appear in public diagnostics.
 
-**For a future separately authorized activation only**, the secret bindings would be `TOKEN_RELAY_HMAC_KEY` (same strong HMAC key as the local Python sender), `TOKEN_VAULT_AES_KEY` (fresh32-byte base64 AES key), `KITE_API_KEY`, plus deployment config `KITE_FUTURE_SYMBOL` and `KITE_FUTURE_INSTRUMENT_TOKEN`. Store these as secret bindings and verify the valid monthly NIFTY futures identity before enabling; do **not** commit live values. The current example deliberately contains no credentials or actual instrument identity. Cloud service creation, domain, DNS and token upload require new permission.
+**For a future separately authorized activation only**, secret bindings are `TOKEN_RELAY_HMAC_KEY`, `TOKEN_VAULT_AES_KEY` (fresh 32-byte base64 AES key), and `KITE_API_KEY`. Futures identity is discovered from a validated same-day NFO master; configured `KITE_FUTURE_SYMBOL` and `KITE_FUTURE_INSTRUMENT_TOKEN` are no longer used as fallback hints. Keep real credentials out of code and chats. Cloud activation and daily token transfer require the applicable owner authorization.
 
 Only `market-readonly.mjs` can construct external Kite market requests. Its final URL gate allows GET `https://api.kite.trade/quote?i=NFO:NIFTY…`, approved futures 5m/15m historical GETs and NFO instrument CSV. It rejects other hosts, non-HTTPS, redirects, transaction paths, unexpected types, oversized responses and malformed OHLC. The alarm's opt-in sampler performs a futures quote at an eligible20-second slot, and two historical candle reads at five-minute boundaries, recording bounded **sanitized metadata only**. Missing/stale/mismatched exchange quote timestamps, invalid futures config, expired token, network faults and storage failures fail closed. No fallback to a trading-capable SDK.
 

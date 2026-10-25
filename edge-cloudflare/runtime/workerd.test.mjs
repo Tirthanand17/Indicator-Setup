@@ -13,6 +13,105 @@ const root=fileURLToPath(new URL('..',import.meta.url));
 const key='SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const headers={authorization:'Bearer '+key};
 
+test('native Telegram transport accepts a synthetic response and never follows redirects',async()=>{
+  let redirect=false,calls=0;
+  const mf=new Miniflare({modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),modulesRoot:root,
+    compatibilityDate:'2026-07-30',bindings:{TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrst',
+      TELEGRAM_PRIVATE_CHAT_ID:'123456789'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    outboundService:request=>{
+      calls++;assert.equal(request.method,'POST');assert.equal(new URL(request.url).origin,'https://api.telegram.org');
+      return redirect?new Response(null,{status:302,headers:{location:'https://evil.invalid/'}}):
+        Response.json({ok:true,result:{message_id:9123,chat:{id:123456789}}});
+    }});
+  try {
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');const s=ns.get(ns.idFromName('synthetic-transport'));
+    const send=()=>s.fetch('https://unit.invalid/test/transport/telegram',{method:'POST'});
+    assert.equal((await (await send()).json()).httpStatus,200);
+    redirect=true;
+    assert.deepEqual(await (await send()).json(),{httpStatus:null,botResponse:null});
+    assert.equal(calls,2);
+  } finally {await mf.dispose();}
+});
+
+test('native market pipeline caches the master, reselects ATM and closes original contracts across restart',async()=>{
+  const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-catalog-pipeline-'));
+  const apiKey='SYNTHETIC-KEY',relay='synthetic-relay-hmac-key-native-catalog-0123456789';
+  const token='SYNTHETIC-ACCESS-TOKEN-FOR-CATALOG-NATIVE-0123456789';
+  const header='instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange';
+  const csv=[header,'12345,1,NIFTY26OCTFUT,NIFTY,0,2026-10-27,0,0.05,65,FUT,NFO-FUT,NFO',
+    ...[22050,22550].flatMap((strike,i)=>['CE','PE'].map((kind,j)=>
+      [30000+i*2+j,1,`NIFTY26O29${strike}${kind}`,'NIFTY',0,'2026-10-29',strike,0.05,65,kind,'NFO-OPT','NFO'].join(',')))].join('\n');
+  const at=time=>Date.parse('2026-10-23T'+time+'+05:30');
+  let quoteAt=at('10:00:00'),price=22046,masterCalls=0;const optionRequests=[],outboundPaths=[];
+  const raw=(token,bid=100,ask=100.5)=>({instrument_token:token,
+    timestamp:new Date(quoteAt+330*60_000).toISOString().slice(0,19).replace('T',' '),
+    depth:{buy:[{price:bid,quantity:650}],sell:[{price:ask,quantity:650}]}});
+  const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),modulesRoot:root,
+    compatibilityDate:'2026-07-30',bindings:{KITE_API_KEY:apiKey,TOKEN_RELAY_HMAC_KEY:relay,
+      TOKEN_VAULT_AES_KEY:randomBytes(32).toString('base64'),SCHEDULER_ADMIN_KEY:key,
+      OFFLINE_SCHEDULER_ENABLED:'true',READONLY_MARKET_RUNTIME_ENABLED:'true',
+      OFFLINE_READONLY_REVIEW_ENABLED:'true',OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',
+      OFFLINE_PAPER_BRIDGE_ENABLED:'true',OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},durableObjectsPersist:persist,
+    outboundService:request=>{
+      outboundPaths.push(new URL(request.url).pathname);
+      assert.equal(request.method,'GET');const url=new URL(request.url);
+      assert.equal(url.origin,'https://api.kite.trade');
+      if(url.pathname==='/instruments/NFO'){masterCalls++;return new Response(csv,{headers:{'content-type':'text/csv'}});}
+      assert.equal(url.pathname,'/quote');const symbols=url.searchParams.getAll('i');
+      if(symbols[0].endsWith('FUT'))return Response.json({status:'success',data:{
+        [symbols[0]]:{...raw(12345),last_price:price}}});
+      optionRequests.push(symbols);
+      return Response.json({status:'success',data:{'NFO:NIFTY26O2922050CE':raw(30000,170,171)}});
+    }};
+  let mf=new Miniflare(options);
+  const stub=async()=>{const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    return ns.get(ns.idFromName('nifty-paper-session-v1'));};
+  const post=(s,path,input)=>s.fetch('https://unit.invalid'+path,{method:'POST',body:JSON.stringify(input)});
+  try {
+    let s=await stub();await post(s,'/test/pipeline/clock',{nowMs:quoteAt});
+    const timestamp=String(Math.floor(quoteAt/1000)),nonce=randomBytes(20).toString('hex');
+    const body=JSON.stringify({api_key:apiKey,access_token:token});
+    const signature=createHmac('sha256',relay).update(timestamp+'\n'+nonce+'\n'+body).digest('hex');
+    assert.equal((await s.fetch('https://unit.invalid/internal/token',{method:'POST',body,
+      headers:{'content-type':'application/json','x-relay-timestamp':timestamp,
+        'x-relay-nonce':nonce,'x-relay-signature':signature}})).status,200);
+    const first=await (await post(s,'/test/market/poll',{
+      tickId:'2026-10-23:135',nowMs:quoteAt,kind:'FUTURE'})).json();
+    assert.equal(first.status,'QUOTE_OBSERVED',JSON.stringify({masterCalls,outboundPaths}));
+    const reviewAt=at('10:00:20');
+    await post(s,'/test/read-only-paper/review',{tickId:'2026-10-23:136',observedAtMs:reviewAt,
+      review:{source:'READONLY_FUTURES_REVIEW_ONLY',status:'REVIEW_CE',paperEntryAuthorized:false,
+        telegramAuthorized:false,realOrdersEnabled:false,fiveMinuteCandleAtMs:at('09:55:00')},
+      futures:{symbol:'NFO:NIFTY26OCTFUT',instrumentToken:12345,exchangeAtMs:reviewAt-1000,lastPrice:22046}});
+    const entryAt=at('10:00:40');
+    const leg=kind=>({contract:{symbol:`NIFTY26O2922050${kind}`,kind,expiry:'2026-10-29',
+      token:kind==='CE'?30000:30001,lotSize:65,strike:22050},bid:100,ask:100.5,
+      bidQuantity:650,askQuantity:650,updatedAtMs:entryAt-1000});
+    const filled=await (await post(s,'/test/read-only-paper/turn',{tickId:'2026-10-23:137',observedAtMs:entryAt,
+      evidence:{source:'READONLY_OPTION_EVIDENCE_ONLY',paperEntryAuthorized:false,
+        telegramAuthorized:false,realOrdersEnabled:false,CE:leg('CE'),PE:leg('PE')}})).json();
+    assert.equal(filled.entered,2);
+    quoteAt=at('10:01:00');price=22546;
+    assert.equal((await (await post(s,'/test/market/poll',{
+      tickId:'2026-10-23:138',nowMs:quoteAt,kind:'FUTURE'})).json()).status,'QUOTE_OBSERVED');
+    quoteAt=at('10:01:40');
+    assert.equal((await (await post(s,'/test/market/poll',{
+      tickId:'2026-10-23:140',nowMs:quoteAt,kind:'OPTION'})).json()).status,'OPTION_ENTRY_UNAVAILABLE');
+    assert.deepEqual(optionRequests[0],['NFO:NIFTY26O2922550CE','NFO:NIFTY26O2922550PE','NFO:NIFTY26O2922050CE']);
+    const before=await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json();
+    assert.equal(before.pendingOutboxCount,4);assert.equal(before.totalPaperPositions,2);
+    assert.equal(before.accountBalances.every(a=>a.cashPaise>a.initialPaise),true);
+    await mf.dispose();mf=new Miniflare(options);s=await stub();
+    assert.deepEqual(await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json(),before);
+    quoteAt=at('10:02:00');
+    assert.equal((await (await post(s,'/test/market/poll',{
+      tickId:'2026-10-23:141',nowMs:quoteAt,kind:'FUTURE'})).json()).status,'QUOTE_OBSERVED');
+    assert.equal(masterCalls,1);
+  } finally {await mf.dispose();}
+});
+
 test('native owner halt fences an alarm paused at external I/O', {timeout:30000},async()=>{
   const mf=new Miniflare({modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
     modulesRoot:root,compatibilityDate:'2026-07-30',
@@ -318,9 +417,11 @@ test('native SQLite read-only option master, durable quote cadence and evidence 
   const observed=Date.parse('2026-10-23T09:15:00+05:30');
   const symbolCe='NIFTY26O2925100CE',symbolPe='NIFTY26O2925100PE';
   const header='instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange';
-  const row=(token,symbol,kind)=>[token,token+1,symbol,'NIFTY',0,'2026-10-29',
-    25100,0.05,65,kind,'NFO-OPT','NFO'].join(',');
-  const csv=[header,row(10101,symbolCe,'CE'),row(10102,symbolPe,'PE'),''].join('\n');
+  const row=(token,symbol,kind,strike=25100)=>[token,token+1,symbol,'NIFTY',0,'2026-10-29',
+    strike,0.05,65,kind,'NFO-OPT','NFO'].join(',');
+  const csv=[header,'12345,1,NIFTY26OCTFUT,NIFTY,0,2026-10-27,0,0.05,65,FUT,NFO-FUT,NFO',
+    row(10101,symbolCe,'CE'),row(10102,symbolPe,'PE'),
+    row(10201,'NIFTY26O2925600CE','CE',25600),row(10202,'NIFTY26O2925600PE','PE',25600),''].join('\n');
   let mf=new Miniflare(options);
   const doStub=async()=>{
     const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
@@ -368,6 +469,14 @@ test('native SQLite read-only option master, durable quote cadence and evidence 
     const repeated=await (await jsonPost(stub,'pacing',{tickId:'2026-10-23:2',
       observedAtMs:observed+42_000,kind:'OPTION_PAIR'})).json();
     assert.equal(repeated.allowed,false);
+    await stub.fetch('https://unit.invalid/test/pipeline/clock',{method:'POST',
+      body:JSON.stringify({nowMs:observed+60_000})});
+    const reselected=await (await jsonPost(stub,'master',{tickId:'2026-10-23:3',
+      observedAtMs:observed+60_000,futuresLastPrice:25605,csv:'FAIL_IF_MASTER_IS_FETCHED_AGAIN'})).json();
+    assert.equal(reselected.strike,25600);
+    const afterMove=await (await stub.fetch('https://unit.invalid/test/option/state')).json();
+    assert.equal(afterMove.pace.count,2);
+    assert.equal(afterMove.option.masterAttempts,1);
   } finally {await mf.dispose();}
 });
 

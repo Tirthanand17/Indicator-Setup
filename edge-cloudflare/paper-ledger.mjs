@@ -61,6 +61,7 @@ export function checkQuote(quote, nowMs) {
   if (!c || !['CE', 'PE'].includes(c.kind) ||
     typeof c.symbol !== 'string' || !/^NIFTY[A-Z0-9]+(?:CE|PE)$/.test(c.symbol) ||
     !c.symbol.endsWith(c.kind) || !positive(c.lotSize) || !positive(c.token) ||
+    (c.strike!==undefined&&!positive(c.strike)) ||
     !validDate(c.expiry) || c.expiry < current.day) fail('INVALID_CONTRACT');
   if (!integer(quote.updatedAtMs) || nowMs - quote.updatedAtMs > 15_000 ||
     quote.updatedAtMs - nowMs > 3000 || ist(quote.updatedAtMs).day !== current.day) {
@@ -112,6 +113,7 @@ export function auditPaperLedger(state) {
       !positive(p.entryQuoteAtMs) || p.entryQuoteAtMs - p.entryAtMs > 3000 ||
       p.entryAtMs - p.entryQuoteAtMs > 15000 ||
       !positive(p.token) || !validDate(p.expiry) ||
+      (p.strike!==undefined&&!positive(p.strike)) ||
       !['CE', 'PE'].includes(p.kind) || typeof p.symbol !== 'string' ||
       !/^NIFTY[A-Z0-9]+(?:CE|PE)$/.test(p.symbol) || !p.symbol.endsWith(p.kind) ||
       !positive(p.stopBidPaise) || p.stopBidPaise >= p.entryAskPaise ||
@@ -237,6 +239,7 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
     next.accounts[accountId].cashPaise -= selected.debit;
     next.positions.push({ tradeId, accountId, signalId, symbol: c.symbol, kind: c.kind,
       expiry: c.expiry, token: c.token, lotSize: c.lotSize, lots: selected.lots,
+      ...(c.strike===undefined?{}:{strike:c.strike}),
       entryAtMs: nowMs, entryQuoteAtMs: quote.updatedAtMs, entryAskPaise: ask,
       entryFillPaise: fill, entryDebitPaise: selected.debit, entryFeePaise: selected.entryFee,
       exitFeeAssumedPaise: selected.exitFee, slippageBps, feePolicy: COST_POLICY,
@@ -266,7 +269,8 @@ export function exitPaperPosition(state, { tradeId, quote, nowMs } = {}) {
     status: old.status === 'CLOSED' ? 'DUPLICATE' : 'UNVERIFIABLE', tradeId }, paperOnly: true };
   const { c, bid } = checkQuote(quote, nowMs);
   if (old.symbol !== c.symbol || old.kind !== c.kind || old.expiry !== c.expiry ||
-    old.token !== c.token || old.lotSize !== c.lotSize) fail('CONTRACT_MISMATCH');
+    old.token !== c.token || old.lotSize !== c.lotSize ||
+    (old.strike!==undefined&&old.strike!==c.strike)) fail('CONTRACT_MISMATCH');
   if (nowMs <= old.entryAtMs || quote.updatedAtMs < old.entryQuoteAtMs) fail('NONCAUSAL_EXIT');
   const qty = old.lots * old.lotSize;
   if (quote.bidQuantity < qty) return { ledger: state, result: { status: 'WAIT_DEPTH', tradeId }, paperOnly: true };

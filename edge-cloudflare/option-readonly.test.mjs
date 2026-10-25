@@ -111,9 +111,12 @@ test('allowlist accepts CE+PE pair and blocks bulk, malformed pair and trading r
   const ceKey='NFO:'+ce, peKey='NFO:'+pe;
   assert.equal(permittedMarketUrl(root+encodeURIComponent(ceKey)+
     '&i='+encodeURIComponent(peKey)),true);
+  const basket=root+[ceKey,peKey,'NFO:NIFTY26O2925150CE','NFO:NIFTY26O2925200PE']
+    .map(encodeURIComponent).join('&i=');
+  assert.equal(permittedMarketUrl(basket),true);
+  assert.equal(permittedMarketUrl(basket+'&i=NFO%3ANIFTY26O2925250CE'),false);
   for(const url of [root+encodeURIComponent(ceKey)+'&i='+encodeURIComponent(ceKey),
     root+encodeURIComponent(ceKey)+'&i=NFO%3AOTHER',
-    root+encodeURIComponent(ceKey)+'&i='+encodeURIComponent(peKey)+'&i=NFO%3ANIFTY26O2925150CE',
     root+encodeURIComponent(ceKey)+'&i='+encodeURIComponent(peKey)+'&a=1',
     'https://api.kite.trade/orders',
     'https://api.kite.trade/quote?i=NSE%3AINFY'])
@@ -134,11 +137,29 @@ test('pair GET uses precisely two option instruments and a single quote call per
   assert.equal(result.PE.instrument_token,11_002);
   assert.equal(calls.length,1);
   assert.equal(calls[0].init.method,'GET');
-  assert.equal(calls[0].init.redirect,'error');
+  assert.equal(calls[0].init.redirect,'manual');
   assert.equal(calls[0].init.credentials,'omit');
   await assert.rejects(client.optionPair(ce,pe),/QUOTE_RATE_GUARD/);
   assert.equal(calls.length,1);
   await assert.rejects(client.optionPair(ce,'INFY26O2925100PE'));
+});
+
+test('bounded entry/held-option batch preserves missing legs and rejects unsafe plans before network',async()=>{
+  const symbols=[ce,pe,'NIFTY26O2925150CE','NIFTY26O2925200PE'];
+  let calls=0;
+  const client=createReadOnlyKite({apiKey:'SYNTHETIC-KEY',accessToken:'SYNTHETIC-ACCESS',
+    fetchImpl:async(url,init)=>{
+      calls++;assert.equal(init.method,'GET');assert.equal(init.redirect,'manual');
+      assert.deepEqual(new URL(url).searchParams.getAll('i'),symbols.map(s=>'NFO:'+s));
+      return Response.json({status:'success',data:{['NFO:'+ce]:{instrument_token:123}}});
+    }});
+  for(const invalid of [[ce],[ce,ce],['NIFTY26OCTFUT',pe],symbols.concat('NIFTY26O2925250CE'),
+    [ce,'NIFTY26O2925150CE'],['https://evil.invalid/orders',pe]])
+    await assert.rejects(client.optionContracts(invalid));
+  assert.equal(calls,0);
+  const result=await client.optionContracts(symbols);
+  assert.equal(result['NFO:'+pe],undefined);assert.equal(result['NFO:'+ce].instrument_token,123);
+  assert.equal(calls,1);
 });
 
 test('auth expiry, rate limit, missing leg and injected credentials are not leaked',async()=>{

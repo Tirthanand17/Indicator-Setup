@@ -177,6 +177,26 @@ export function noteMasterFailure(state,{tickId}={}) {
   return {...state,pair:null,evidence:null,status:'MASTER_BLOCKED'};
 }
 
+/** Reselect from a separately cached daily master; never rewrite in-flight evidence. */
+export function reselectOptionPair(state,{tickId,observedAtMs,pair,masterAttempts=1}={}) {
+  const current=optionRuntimeForDay(state,observedAtMs);
+  if(!isTick(tickId,observedAtMs)||!pair||!contractOk(pair.CE,'CE')||!contractOk(pair.PE,'PE')||
+    pair.CE.expiry!==pair.PE.expiry||pair.CE.strike!==pair.PE.strike||
+    pair.CE.lotSize!==pair.PE.lotSize||pair.CE.token===pair.PE.token||pair.CE.expiry<=current.day||
+    !integer(pair.masterFetchedAtMs)||dayIst(pair.masterFetchedAtMs)!==current.day||
+    pair.masterFetchedAtMs>observedAtMs||!integer(masterAttempts)||masterAttempts>3)
+    fail('PAIR_RESELECT_REJECTED');
+  if(current.status==='OPTION_PENDING'||(current.lastOptionTickId&&
+    Number(tickId.split(':')[1])<=Number(current.lastOptionTickId.split(':')[1])))fail('PAIR_RESELECT_IN_FLIGHT');
+  const compact={CE:{...pair.CE},PE:{...pair.PE},masterFetchedAtMs:pair.masterFetchedAtMs};
+  if(JSON.stringify(current.pair)===JSON.stringify(compact))return current;
+  const next={...current,attempts:Math.max(current.attempts,masterAttempts),
+    lastMasterTickId:current.lastMasterTickId??tickId,nextMasterTryAtMs:observedAtMs+MASTER_RETRY_MS,
+    pair:compact,
+    evidence:null,status:'MASTER_READY'};
+  validateOptionRuntime(next);return next;
+}
+
 /** Consume an option tick even on network failure to prevent replay. */
 export function claimOptionSnapshot(state,{tickId,observedAtMs}={}) {
   const current=optionRuntimeForDay(state,observedAtMs);

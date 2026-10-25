@@ -145,3 +145,25 @@ test('15:26 close records unresolved paper exits without inventing sale proceeds
   assert.equal(eod.ledger.outbox.filter(x=>x.kind==='PAPER_UNVERIFIABLE').length,2);
   assert.equal(eod.ledger.positions.every(x=>x.exitCreditPaise===null),true);
 });
+
+test('new ATM evidence cannot replace old exit identity; missing entry quotes still permit valid exits',()=>{
+  const p=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,...p});
+  const entered=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)});
+  const time=nowMs+80_000,newEntry=evidence(time,100,100.5,22550);
+  for(const leg of [newEntry.CE,newEntry.PE])leg.contract.token+=100;
+  const missing=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:newEntry,exitEvidence:[]});
+  assert.equal(missing.result.exited,0);
+  assert.equal(missing.ledger.positions.every(p=>p.status==='OPEN'),true);
+  const closed=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:{...newEntry,CE:null,PE:null},
+    exitEvidence:[quote('CE',time,170,171)]});
+  assert.equal(closed.result.exited,2);assert.equal(closed.result.entered,0);
+  assert.equal(closed.ledger.positions.every(p=>p.strike===22050&&p.status==='CLOSED'),true);
+  const stale=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:newEntry,
+    exitEvidence:[quote('CE',time-20_000,170,171)]});
+  assert.equal(stale.result.exited,0);
+});

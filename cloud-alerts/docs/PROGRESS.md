@@ -1,11 +1,19 @@
 # Canonical engineering progress — 25 October 2026
 
+**25 October instrument lifecycle:** the observed runtime now selects the front
+future from the daily NFO catalogue, reselects ATM entry options after price
+moves and separately monitors original held contracts. Native tests cover
+catalogue/portfolio restart, missing entry quotes with valid exits, and the
+workerd-compatible no-follow redirect handling discovered by the new transport
+test. **278 JS/extension/runner + 21 native tests pass.** Independent audit score
+**23/41 = 56%**, live acceptance **0/5**. [Lifecycle policy and evidence](../../audit/INSTRUMENT_LIFECYCLE.md).
+
 **25 October automated quality gates:** pinned ESLint/Ruff, credential-isolated
 runner, full regressions/type checks and dependency scans now run in GitHub CI.
 [Run 40193418706 passed](https://github.com/Tirthanand17/Indicator-Setup/actions/runs/40193418706).
 **265 JS/extension/runner, 19 native SQLite and 778 Python tests pass** (one
 Python skip); both advisory scans are clean. Current independent audit score
-**22/41 = 54%**, live acceptance **0/5**. [Gate scope and commands](../../audit/OFFLINE_QUALITY_GATES.md).
+at that checkpoint **22/41 = 54%**, live acceptance **0/5**. [Gate scope and commands](../../audit/OFFLINE_QUALITY_GATES.md).
 
 **25 October independent-audit remediation:** emergency-halt race fenced,
 Undici tooling patched to 7.30.1, and observed dashboard delivery counts
