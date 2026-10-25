@@ -18,7 +18,8 @@
     "OFFLINE_DELIVERY_REHEARSAL_ENABLED": "false",
     "OFFLINE_PRIVATE_DASHBOARD_ENABLED": "false",
     "OFFLINE_OBSERVED_ARCHIVE_ENABLED": "false",
-    "OFFLINE_OBSERVED_RESTORE_ENABLED": "false"
+    "OFFLINE_OBSERVED_RESTORE_ENABLED": "false",
+    "OFFLINE_DELIVERY_RECONCILIATION_ENABLED": "false"
   },
   "durable_objects": {
     "bindings": [{ "name": "MARKET_SESSION", "class_name": "MarketSession" }]

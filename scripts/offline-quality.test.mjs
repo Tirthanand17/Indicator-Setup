@@ -8,13 +8,14 @@ test('quality subprocesses cannot inherit application credentials or enabled fla
     CLOUDFLARE_API_TOKEN:'synthetic-secret',PYTHONPATH:'/untrusted/imports',
     NODE_OPTIONS:'--require=/untrusted/script',ALERTS_ENABLED:'true',OFFLINE_TELEGRAM_SENDER_ENABLED:'true',
     OBSERVED_ARCHIVE_HMAC_KEY:'synthetic-secret',OBSERVED_ARCHIVE_AES_KEY:'synthetic-secret',
-    OFFLINE_OBSERVED_ARCHIVE_ENABLED:'true',OFFLINE_OBSERVED_RESTORE_ENABLED:'true'};
+    OFFLINE_OBSERVED_ARCHIVE_ENABLED:'true',OFFLINE_OBSERVED_RESTORE_ENABLED:'true',OFFLINE_DELIVERY_RECONCILIATION_ENABLED:'true'};
   const env=qualityEnvironment(source);
   assert.equal(env.PATH,source.PATH);assert.equal(env.SystemRoot,source.SystemRoot);
   assert.equal(JSON.stringify(env).includes('synthetic-secret'),false);
   assert.equal(env.PYTHONPATH,undefined);assert.equal(env.NODE_OPTIONS,undefined);
   assert.equal(env.ALERTS_ENABLED,'false');assert.equal(env.OFFLINE_TELEGRAM_SENDER_ENABLED,'false');
   assert.equal(env.OFFLINE_OBSERVED_ARCHIVE_ENABLED,'false');assert.equal(env.OFFLINE_OBSERVED_RESTORE_ENABLED,'false');
+  assert.equal(env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED,'false');
 });
 
 test('quality gate stops at the first failure and preserves its exit status',()=>{

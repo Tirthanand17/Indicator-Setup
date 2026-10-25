@@ -1,6 +1,7 @@
 import {validState,validMarketObservation} from './runtime-state.mjs';
 import {assertObservedWriter,observedRetentionReport} from './observed-lifecycle.mjs';
 import {migrateObservedLifecycle} from './observed-lifecycle-ops.mjs';
+import {deliveryReconciliationView,reconcileUncertainDelivery,readReconciliationJSON} from './delivery-reconciliation.mjs';
 import {OBSERVED_RECOVERY_KEY,snapshotObservedState,sealObservedArchive,
   restoreObservedArchiveToEmpty,readObservedArchiveJSON} from './observed-archive.mjs';
 /** Undeployed paper-only scheduler and optional read-only Kite market sampler.
@@ -78,12 +79,15 @@ export default {
       (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
        env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
+    const reconciliationRoute=path==='/internal/readonly-delivery/reconcile'&&
+      new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&
+      ['GET','POST'].includes(request.method)&&env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED==='true';
     const archiveRoute=new URL(request.url).protocol==='https:'&&
       new URL(request.url).search===''&&env.OFFLINE_OBSERVED_ARCHIVE_ENABLED==='true'&&
       ((path==='/internal/observed-archive'&&request.method==='GET')||
        (path==='/internal/observed-lifecycle'&&(request.method==='GET'||request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'))||
        (path==='/internal/observed-archive/restore'&&request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'));
-    if (!tokenRoute && !dashboardRoute && (!(archiveRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
+    if (!tokenRoute && !dashboardRoute && (!(archiveRoute||reconciliationRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/emergency-halt' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
           (path === '/internal/release-readiness' && request.method === 'GET') ||
@@ -150,6 +154,11 @@ export class MarketSession {
     try {
       if(request.method!=='GET'&&await this.storage.get(OBSERVED_RECOVERY_KEY)!==undefined&&
         !['/internal/observed-archive/restore','/internal/observed-lifecycle'].includes(path))return reply({status:'ARCHIVE_RESTORED_QUARANTINED',paperOnly:true},503);
+      if(path==='/internal/readonly-delivery/reconcile') {
+        if(this.env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED!=='true'||new URL(request.url).protocol!=='https:'||
+          new URL(request.url).search!==''||!['GET','POST'].includes(request.method))return reply({error:'Not found'},404);
+        return this.handleDeliveryReconciliation(request);
+      }
       if(path==='/internal/observed-lifecycle') {
         if(new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||this.env.OFFLINE_OBSERVED_ARCHIVE_ENABLED!=='true')
           return reply({error:'Not found'},404);
@@ -327,6 +336,35 @@ export class MarketSession {
         paperOnly: true, marketRuntimeImplemented: true, realOrdersEnabled: false });
     } catch {
       return reply({ status: 'BLOCKED_STORAGE_OR_STATE', paperOnly: true }, 503);
+    }
+  }
+
+  async handleDeliveryReconciliation(request) {
+    try {
+      let input;
+      if(request.method==='POST') {
+        if(request.headers.get('content-type')!=='application/json')return reply({status:'JSON_REQUIRED'},400);
+        input=await readReconciliationJSON(request.body);
+      }
+      return await this.storage.transaction(async txn=>{
+        await assertObservedWriter(txn);
+        const [ledger,journal,scheduler,recovery,alarmAtMs]=await Promise.all([
+          txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY),
+          txn.get(STATE_KEY),txn.get(OBSERVED_RECOVERY_KEY),txn.getAlarm()]);
+        if(ledger===undefined||journal===undefined)return reply({status:'RECONCILIATION_RECORDS_UNAVAILABLE'},503);
+        const context={scheduler,alarmAtMs,quarantined:recovery!==undefined,nowMs:Date.now()};
+        if(request.method==='GET')return reply(deliveryReconciliationView(ledger,journal,context));
+        const outcome=reconcileUncertainDelivery(ledger,journal,context,input);
+        if(outcome.journal!==journal)await txn.put(READONLY_PAPER_DELIVERY_KEY,outcome.journal);
+        return reply(outcome.result);
+      });
+    } catch(error) {
+      const code=error?.message?.replace(/^DELIVERY_RECONCILIATION_/,'');
+      if(['INVALID_REQUEST','BODY_REQUIRED','INVALID_JSON','BODY_TOO_LARGE'].includes(code))
+        return reply({status:'RECONCILIATION_REJECTED',code},code==='BODY_TOO_LARGE'?413:400);
+      if(['HALT_REQUIRED','QUIET_PERIOD_REQUIRED','EVENT_MISMATCH','STALE_OR_INELIGIBLE_ATTEMPT',
+        'QUARANTINED_COPY','TERMINAL_RECEIPT_NOT_RETAINED'].includes(code))return reply({status:'RECONCILIATION_REJECTED',code},409);
+      return reply({status:'BLOCKED_RECONCILIATION_STATE'},503);
     }
   }
 

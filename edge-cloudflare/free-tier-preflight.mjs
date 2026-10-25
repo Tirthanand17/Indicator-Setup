@@ -28,6 +28,7 @@ const SAFE_VARS = Object.freeze([
   'OFFLINE_PAPER_LEDGER_ENABLED', 'OFFLINE_SYNTHETIC_SESSION_ENABLED',
   'OFFLINE_DELIVERY_REHEARSAL_ENABLED', 'OFFLINE_PRIVATE_DASHBOARD_ENABLED',
   'OFFLINE_OBSERVED_ARCHIVE_ENABLED','OFFLINE_OBSERVED_RESTORE_ENABLED',
+  'OFFLINE_DELIVERY_RECONCILIATION_ENABLED',
 ]);
 const sorted = values => [...values].sort().join(',');
 const exactKeys = (object, keys) => object && !Array.isArray(object) &&

@@ -195,7 +195,8 @@ export function settlePaperDelivery(journal, ledger, { eventId, attempt, nowMs,
 }
 
 /** An explicit operator decision can skip the uncertain event, without
- * asserting acceptance or retrying it. No HTTP endpoint exposes this method.
+ * asserting acceptance or retrying it. The observed owner endpoint wraps this
+ * primitive with halt, quiet-period and exact-attempt checks.
  */
 export function suppressAmbiguousDelivery(journal, ledger,
   { eventId, nowMs, decision } = {}) {

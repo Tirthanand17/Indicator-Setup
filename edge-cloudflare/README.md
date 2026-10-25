@@ -1,5 +1,12 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Owner delivery reconciliation:** gated administrator inspection and exact-attempt
+suppression can resolve a halted source's uncertain journal entry without
+resending, asserting phone receipt or resuming processing. A bounded operator
+client requires explicit acknowledgement; duplicate requests and late definitive
+receipts preserve the durable cursor. The feature remains disabled.
+[Procedure and limitations](../audit/DELIVERY_AMBIGUITY_RECONCILIATION.md).
+
 **Journal lifecycle:** financial records use a preserve-at-cap policy with
 reserved terminal-event capacity; diagnostics retain bounded rings. A gated
 capacity report and archive-backed, halted-source metadata migration enforce
