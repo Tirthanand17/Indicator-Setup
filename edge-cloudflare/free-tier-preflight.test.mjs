@@ -56,7 +56,12 @@ test('1125 regular slots are within selected arithmetic limits, not release appr
   assert.equal(report.alarms,1125);
   assert.equal(report.marketStatus,'REGULAR');
   assert.equal(report.estimated.durableRequestsPerDay,1226);
-  assert.equal(report.estimated.durableRowsWrittenPerDay,6751);
+  assert.equal(report.estimated.durableRowsWrittenPerDay,20251);
+  assert.equal(report.estimated.durableRowsReadPerDay,45801);
+  assert.equal(report.marketTraffic.maximumQuoteRequests,1125);
+  assert.equal(report.marketTraffic.maximumInstrumentsPerQuote,5);
+  assert.equal(report.marketTraffic.cloudTimingVerified,false);
+  assert.ok(report.unresolved.includes('SQL_ROW_AMPLIFICATION_UNMEASURED'));
   assert.deepEqual(report.modeledLimitsExceeded,[]);
   assert.equal(report.deploymentAuthorized,false);
   assert.equal(report.measuredActualCloudUse,false);

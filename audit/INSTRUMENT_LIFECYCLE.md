@@ -53,8 +53,9 @@ retain their independent recovery guarantees.
 
 ## Entry and exit evidence remain independent
 
-One option request includes the entry CE/PE pair and up to two distinct held
-contracts: **at most four unique NIFTY options**, with no mixed futures quote.
+One shared market request includes the front future, entry CE/PE pair and up to
+two distinct held contracts: **at most five instruments, including at most four
+unique NIFTY options**.
 The transport still allows only the pinned market-data GET paths; arbitrary
 symbols, duplicate symbols, bulk lists and broker transaction paths are blocked.
 It makes one quote request per reserved alarm slot.
@@ -71,8 +72,10 @@ unverified; another strike's BID cannot be substituted. Account cash, exits and
 delivery reconciliation remain in the same SQLite transaction. Lost delivery
 watermarks still block processing rather than replaying historical messages.
 
-The existing option cadence remains every third 20-second slot (60 seconds).
-Changing/accepting that monitoring cadence is the next remediation item.
+The subsequent [monitoring-cadence checkpoint](OPTION_MONITORING_CADENCE.md)
+replaces the former 60-second option rotation with a shared future/options
+snapshot on each eligible requested 20-second tick. The single quote request
+then contains at most five instruments, retaining the same four-option bound.
 
 ## Native transport compatibility regression
 

@@ -111,8 +111,10 @@ test('stale/missing/wrong-side or mismatched data cannot create a paper fill',()
     tickId:tick(272),observedAtMs:nowMs+20_000,evidence:changed});
   assert.equal(blocked.result.entered,0);
   assert.equal(blocked.ledger.positions.length,0);
-  assert.throws(()=>advanceReadOnlyPaperTurn(staged,ledger,{
-    tickId:tick(273),observedAtMs:nowMs+40_000,evidence:evidence(nowMs+40_000)}));
+  const lateEntry=advanceReadOnlyPaperTurn(staged,ledger,{
+    tickId:tick(273),observedAtMs:nowMs+40_000,evidence:evidence(nowMs+40_000)});
+  assert.equal(lateEntry.result.entered,0);
+  assert.equal(lateEntry.state.pending,null);
   assert.throws(()=>advanceReadOnlyPaperTurn(staged,ledger,{
     tickId:tick(272),observedAtMs:nowMs+45_000,evidence:evidence(nowMs+45_000)}));
   assert.equal(ledger.outbox.length,0);
@@ -166,4 +168,22 @@ test('new ATM evidence cannot replace old exit identity; missing entry quotes st
     tickId:tick(275),observedAtMs:time,evidence:newEntry,
     exitEvidence:[quote('CE',time-20_000,170,171)]});
   assert.equal(stale.result.exited,0);
+});
+
+test('STOP and TARGET close at the adjacent twenty-second slot, and TIME at 15:15:00',()=>{
+  const p=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,...p});
+  const opened=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)});
+  for(const [reason,bid,ask,slot,time] of [
+    ['STOP',70,71,273,nowMs+40_000],['TARGET',150,151,273,nowMs+40_000],
+    ['TIME',100,100.5,1080,Date.parse('2026-10-23T15:15:00+05:30')]]) {
+    const input={tickId:tick(slot),observedAtMs:time,evidence:evidence(time,bid,ask)};
+    const closed=advanceReadOnlyPaperTurn(opened.state,opened.ledger,input);
+    assert.equal(closed.result.exited,2);
+    assert.equal(closed.ledger.positions.every(p=>p.status==='CLOSED'&&p.exitReason===reason&&p.exitAtMs===time),true);
+    const duplicate=advanceReadOnlyPaperTurn(closed.state,closed.ledger,input);
+    assert.equal(duplicate.result.status,'DUPLICATE_OPTION_TICK');
+    assert.strictEqual(duplicate.ledger,closed.ledger);
+  }
 });

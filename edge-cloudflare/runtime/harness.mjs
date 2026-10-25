@@ -23,12 +23,12 @@ export class TestSession extends MarketSession {
         chatId:this.env.TELEGRAM_PRIVATE_CHAT_ID,message:'SYNTHETIC LOCAL TRANSPORT TEST ONLY'}));
     if(path==='/test/market/poll'&&request.method==='POST') {
       const input=await request.json();clock=input.nowMs;
-      return Response.json(input.kind==='OPTION'?
-        await this.pollReadOnlyOptions(input.tickId,clock):await this.pollReadOnlyMarket(input.tickId,clock));
+      return Response.json(input.kind==='SESSION'?await this.pollReadOnlySession(input.tickId,clock):
+        input.kind==='OPTION'?await this.pollReadOnlyOptions(input.tickId,clock):await this.pollReadOnlyMarket(input.tickId,clock));
     }
     if(path==='/test/halt-race/start'&&request.method==='POST') {
       clock=(await this.storage.get('scheduler-v1')).scheduledAtMs;
-      this.pollReadOnlyMarket=async()=>{
+      this.pollReadOnlySession=async()=>{
         this.raceStarted=true;
         await new Promise(resolve=>{this.releaseHaltRace=resolve;});
         return {status:'SYNTHETIC_PAUSED_MARKET'};

@@ -121,7 +121,7 @@ export function advanceReadOnlyPaperTurn(state,ledger,{
 }={}) {
   auditReadOnlyBridge(state);
   auditPaperLedger(ledger);
-  if(!validSlot(tickId,observedAtMs)||idParts(tickId).slot%3!==2)
+  if(!validSlot(tickId,observedAtMs))
     fail('OPTION_SLOT_INVALID');
   if(!nextTick(state.lastOptionTickId,tickId))
     return {state,ledger,result:{status:'DUPLICATE_OPTION_TICK',paperOnly:true}};

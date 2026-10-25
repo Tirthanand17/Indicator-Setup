@@ -22,14 +22,15 @@ export function permittedMarketUrl(value) {
   if (url.pathname === '/quote') {
     const keys = [...url.searchParams.keys()];
     const values = url.searchParams.getAll('i');
-    if (!keys.length || keys.length > 4 || keys.some(k => k !== 'i') ||
+    if (!keys.length || keys.length > 5 || keys.some(k => k !== 'i') ||
         values.length !== keys.length ||
         values.some(k => !/^NFO:NIFTY[A-Z0-9]+$/.test(k))) return false;
     if (keys.length === 1) return true;
-    // Entry pair plus at most two distinct open-position option contracts.
-    // Futures remain single-instrument only; no arbitrary bulk quote surface.
-    return new Set(values).size===values.length &&
-      values.every(k=>OPTION_SYMBOL.test(k.slice(4))) &&
+    // One front future plus entry pair and at most two original held options.
+    const futures=values.filter(k=>/^NFO:NIFTY[A-Z0-9]+FUT$/.test(k));
+    const options=values.filter(k=>OPTION_SYMBOL.test(k.slice(4)));
+    return new Set(values).size===values.length && futures.length<=1 &&
+      options.length>=2&&options.length<=4&&futures.length+options.length===values.length &&
       values.some(k => OPTION_SYMBOL.test(k.slice(4)) && k.endsWith('CE')) &&
       values.some(k => OPTION_SYMBOL.test(k.slice(4)) && k.endsWith('PE'));
   }
@@ -158,6 +159,15 @@ export function createReadOnlyKite({ apiKey, accessToken, fetchImpl = globalThis
         throw Error('Invalid bounded NIFTY quote plan');
       // Missing instruments are returned as missing evidence, never invented.
       return get('/quote?'+symbols.map(s=>'i='+encodeURIComponent('NFO:'+s)).join('&'));
+    },
+    async marketSnapshot(futureSymbol,optionSymbols=[]) {
+      if(typeof futureSymbol!=='string'||!/^NIFTY[A-Z0-9]+FUT$/.test(futureSymbol)||
+        !Array.isArray(optionSymbols)||optionSymbols.length>4||
+        (optionSymbols.length>0&&(optionSymbols.length<2||
+          new Set(optionSymbols).size!==optionSymbols.length||optionSymbols.some(s=>typeof s!=='string'||!OPTION_SYMBOL.test(s))||
+          !optionSymbols.some(s=>s.endsWith('CE'))||!optionSymbols.some(s=>s.endsWith('PE')))))
+        throw Error('Invalid bounded NIFTY market snapshot');
+      return get('/quote?'+[futureSymbol,...optionSymbols].map(s=>'i='+encodeURIComponent('NFO:'+s)).join('&'));
     },
     async history(token, interval, from, to) {
       if (!Number.isSafeInteger(token) || token <= 0 ||

@@ -4,6 +4,13 @@
 acceptance score **23/41 (56%)**, live acceptance **0/5**.
 [Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
 
+**Current monitoring cadence:** each eligible requested 20-second tick uses one
+shared quote for the front future, entry pair and original held contracts (at
+most five instruments). Paper exits commit before candle-history reads. The
+same durable rate/dedupe guards remain; cloud wake-up timing is unverified.
+**288 JS/extension/gate and 22 native tests pass.**
+[Traffic bounds, cold starts and failure behavior](../audit/OPTION_MONITORING_CADENCE.md).
+
 **Current instrument lifecycle:** a bounded daily catalogue selects the front
 NIFTY future and fresh ATM entry pair. One option batch also monitors original
 held contracts after the ATM strike moves; unavailable entry quotes do not hide

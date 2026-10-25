@@ -13,6 +13,9 @@ phase checklists remain historical records with different denominators.
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
+**Remediation tasks completed: 6/19.** Cadence (item 5) is now complete within
+the already-counted adapter/ledger scope; the 41-check score stays 23/41.
+
 The audit baseline was 19/41. Four newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
@@ -66,7 +69,12 @@ additional point. This score measures evidence, not hours of work remaining.
    redirect-error mode; manual mode preserves no-follow behavior.
    [Policy, bounds and regression evidence](INSTRUMENT_LIFECYCLE.md).
 
-Validation: **279 JavaScript/extension/quality-runner tests, 21 native
+6. **Monitoring cadence:** one bounded future/options snapshot per eligible
+   requested 20-second tick, with exits committed before slow candle history,
+   completion pacing and unchanged duplicate/risk protections.
+   [Traffic bounds, failure behavior and native evidence](OPTION_MONITORING_CADENCE.md).
+
+Validation: **288 JavaScript/extension/quality-runner tests, 22 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -84,8 +92,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 2 | Vulnerable JavaScript tooling | Completed against current advisories |
 | 3 | Automated lint, regression/type/security quality gates | Completed; local and GitHub CI verified |
 | 4 | Futures rollover and dynamic entry-option selection | Completed with offline/native evidence |
-| 5 | Option monitoring cadence and exit responsiveness | Next |
-| 6 | Complete observed portfolio records and metrics | Pending |
+| 5 | Option monitoring cadence and exit responsiveness | Completed with offline/native evidence; live timing unverified |
+| 6 | Complete observed portfolio records and metrics | Next |
 | 7 | Dashboard delivery status | Completed; broader dashboard still incomplete |
 | 8 | Complete observed-state backup/export/restore | Pending |
 | 9 | Journal retention and schema/rollback lifecycle | Pending |

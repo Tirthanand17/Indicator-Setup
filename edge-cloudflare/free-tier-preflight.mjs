@@ -3,6 +3,7 @@
  * No secret, cloud API, deploy command, HTTP request or account access here.
  */
 import { sessionStatus } from './alarm-core.mjs';
+import {marketTrafficPlan} from './market-cadence.mjs';
 
 export const FREE_REFERENCE_2026_10_24 = Object.freeze({
   sourceWorkers: 'https://developers.cloudflare.com/workers/platform/pricing/',
@@ -72,7 +73,9 @@ export function validateDisabledCloudTemplate(config, packageManifest) {
  * correct billing, exchange data quality, wakeup latency or phone receipt.
  */
 export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
-  durableReadsPerAlarm = 6, durableWritesPerAlarm = 6,
+  // Planning envelope for the shared pipeline (~29 state reads and up to
+  // ~15 writes before retry/index amplification). Not measured billed rows.
+  durableReadsPerAlarm = 40, durableWritesPerAlarm = 18,
   ownerDashboardRequests = 100, dashboardRowsReadPerRequest = 8,
   dailyHandoffRequests = 1, storedBytes = 4_000_000,
   observedWorkerCpuMsPerInvocation = null,
@@ -112,12 +115,16 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
     exceeded.push('durableDurationGbSecondsPerDay');
   return Object.freeze({ status: 'ESTIMATE_ONLY_NOT_DEPLOYMENT_APPROVAL',
     marketStatus, istDate, alarms, estimated: Object.freeze(expected),
+    marketTraffic:marketTrafficPlan(istDate),
+    storageAssumptions:Object.freeze({durableReadsPerAlarm,durableWritesPerAlarm,
+      source:'SOURCE_OPERATION_ENVELOPE_NOT_MEASURED_SQL_ROWS'}),
     freeReference: FREE_REFERENCE_2026_10_24,
     measuredActualCloudUse: false,
     modeledLimitsExceeded: Object.freeze(exceeded),
     unresolved: Object.freeze([
       'OWNER_APPROVAL_MISSING', 'ACTUAL_CLOUD_QUOTAS_AND_LATENCY_UNMEASURED',
       'INDEPENDENT_PRIVATE_BACKUP_UNVERIFIED',
+      'SQL_ROW_AMPLIFICATION_UNMEASURED','BATCH_PAYLOAD_AND_DO_CPU_UNMEASURED',
       ...(observedWorkerCpuMsPerInvocation === null ? ['WORKER_CPU_UNMEASURED'] : []),
       ...(observedDurableDurationGbSecondsPerDay === null ? ['DO_DURATION_UNMEASURED'] : []),
     ]),

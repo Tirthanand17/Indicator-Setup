@@ -10,7 +10,7 @@ const MIN_QUOTE_INTERVAL_MS=1_100;
 const MASTER_RETRY_MS=30*60_000;
 const MAX_MASTER_ATTEMPTS=3;
 const MAX_DAILY_REQUESTS=1_125;
-const KINDS=['FUTURE','OPTION_PAIR'];
+const KINDS=['FUTURE','OPTION_PAIR','MARKET_BATCH'];
 const fail=code=>{throw new Error('READONLY_OPTION_RUNTIME_'+code);};
 const integer=n=>Number.isSafeInteger(n)&&n>0;
 const dayIst=ms=>new Date(ms+IST_OFFSET).toISOString().slice(0,10);
@@ -61,6 +61,14 @@ export function recordQuoteFailure(state,{tickId,observedAtMs,errorCode}={}) {
   return Object.freeze({...state,authBlocked:state.authBlocked||errorCode==='AUTH_EXPIRED',
     blockedUntilMs:errorCode==='RATE_LIMITED' ?
       Math.max(state.blockedUntilMs,observedAtMs+60_000):state.blockedUntilMs});
+}
+
+/** Pace from response completion too, including failed/slow requests. */
+export function recordQuoteCompletion(state,{tickId,observedAtMs}={}) {
+  validateQuotePace(state);
+  if(!state||state.lastTickId!==tickId||!integer(observedAtMs)||observedAtMs<state.lastReservedAtMs)
+    fail('OUT_OF_ORDER_COMPLETION');
+  return Object.freeze({...state,blockedUntilMs:Math.max(state.blockedUntilMs,observedAtMs+MIN_QUOTE_INTERVAL_MS)});
 }
 
 /** Only a newly authorized token handoff can lift the sticky 403 block. */

@@ -10,7 +10,7 @@ import { validatePairEvidence,normalizeKiteOptionQuote } from './option-readonly
 import { INSTRUMENT_CATALOG_KEY,auditCatalog,compileNiftyCatalog,selectCatalogFuture,
   selectCatalogPair,claimCatalogFetch,settleCatalogFetch,optionQuotePlan } from './instrument-catalog.mjs';
 import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
-  reserveQuoteRequest, recordQuoteFailure, clearQuoteAuthBlock, quotePaceStatus,
+  reserveQuoteRequest, recordQuoteFailure,recordQuoteCompletion,clearQuoteAuthBlock,quotePaceStatus,optionRuntimeForDay,
   reselectOptionPair, claimOptionSnapshot, finishOptionSnapshot, noteOptionFailure,
   optionStatus } from './option-runtime.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
@@ -30,6 +30,7 @@ import { PAPER_DELIVERY_KEY, newPaperDeliveryJournal,
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from './readonly-delivery.mjs';
 import { validPrivateTelegramConfig, sendTelegramPaperMessage } from './telegram-sender.mjs';
 import { assessOfflineRelease } from './release-readiness.mjs';
+import {currentMarketTick,PAPER_OPTION_INTERVAL_MS} from './market-cadence.mjs';
 
 const STATE_KEY = 'scheduler-v1';
 const MAX_DAILY_CALLBACKS = 4096;
@@ -579,10 +580,7 @@ export class MarketSession {
     }
     if (decision.shouldPoll && this.env.READONLY_MARKET_RUNTIME_ENABLED === 'true') {
       const optionEnabled=this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true';
-      // Every third 20-second slot is assigned to a bounded option batch
-      // with entry and original open contracts; no simultaneous futures quote.
-      const optionSlot=optionEnabled&&Number(decision.tickId.split(':')[1])%3===2;
-      const market=optionSlot?await this.pollReadOnlyOptions(decision.tickId,now):
+      const market=optionEnabled?await this.pollReadOnlySession(decision.tickId,now):
         await this.pollReadOnlyMarket(decision.tickId,now);
       try { await this.assertNotHalted(); }
       catch {return {...decision,marketStatus:market.status,telegramStatus:'HALTED'};}
@@ -593,7 +591,59 @@ export class MarketSession {
     return decision;
   }
 
-  async pollReadOnlyMarket(tickId, nowMs) {
+  /** One quote request per tick, with exits committed before slow history reads. */
+  async pollReadOnlySession(tickId,nowMs) {
+    let report={schema:1,tickId,observedAtMs:nowMs,status:'MARKET_BATCH_BLOCKED',
+      requestedOptionIntervalMs:PAPER_OPTION_INTERVAL_MS};
+    try {
+      await this.assertNotHalted();
+      const stored=await this.storage.get(TOKEN_KEY);
+      if(!validTokenRecord(stored))throw Error('INVALID_VAULT');
+      const token=await openDailyToken(stored,this.env,Date.now());
+      if(!token)throw Error('INVALID_TOKEN');
+      const client=createReadOnlyKite({apiKey:this.env.KITE_API_KEY,accessToken:token});
+      const catalog=await this.ensureInstrumentCatalog(tickId,nowMs,client);
+      const future=selectCatalogFuture(catalog,Date.now());
+      const [oldOption,ledger]=await Promise.all([
+        this.storage.get(READONLY_OPTION_STATE_KEY),this.storage.get(READONLY_PAPER_LEDGER_KEY)]);
+      if(ledger!==undefined)auditPaperLedger(ledger);
+      const option=optionRuntimeForDay(oldOption,Date.now());
+      const contracts=option.pair?optionQuotePlan(option.pair,ledger,catalog,Date.now()):[];
+      if(!currentMarketTick(tickId,Date.now()))throw Error('EXPIRED_MARKET_TICK');
+      const reserved=await this.reserveReadOnlyQuote(tickId,Date.now(),'MARKET_BATCH');
+      if(!reserved.allowed||!currentMarketTick(tickId,Date.now()))throw Error('QUOTE_RESERVATION_BLOCKED');
+      let quotes;
+      try {quotes=await client.marketSnapshot(future.symbol,contracts.map(c=>c.symbol));}
+      catch(error){await this.recordReadOnlyQuoteFailure(tickId,Date.now(),error).catch(()=>{});throw error;}
+      finally {
+        await this.storage.transaction(async txn=>{
+          const prior=await txn.get(READONLY_QUOTE_PACE_KEY);
+          await txn.put(READONLY_QUOTE_PACE_KEY,recordQuoteCompletion(prior,{tickId,observedAtMs:Date.now()}));
+        });
+      }
+      const receivedAtMs=Date.now();
+      let options,optionsStarted=false;
+      const snapshot={source:'SHARED_READONLY_MARKET_SNAPSHOT',tickId,client,catalog,quotes,
+        onFutureReady:async({entryAllowed})=>{
+          optionsStarted=true;
+          options=await this.pollReadOnlyOptions(tickId,nowMs,{...snapshot,entryAllowed});
+        }};
+      const market=await this.pollReadOnlyMarket(tickId,nowMs,snapshot);
+      if(!optionsStarted)options=await this.pollReadOnlyOptions(tickId,nowMs,{...snapshot,entryAllowed:false});
+      const futureGood=['QUOTE_OBSERVED','HISTORY_OBSERVED'].includes(market.status);
+      const optionGood=options?.status==='OPTION_OBSERVED';
+      report={...market,requestedOptionIntervalMs:PAPER_OPTION_INTERVAL_MS,
+        quoteReceivedAtMs:receivedAtMs,quoteInstruments:contracts.length+1,
+        status:futureGood&&optionGood?'MARKET_BATCH_OBSERVED':
+          futureGood||optionGood||options?.status==='OPTION_ENTRY_UNAVAILABLE'?'MARKET_BATCH_PARTIAL':'MARKET_BATCH_BLOCKED',
+        futuresStatus:market.status,optionStatus:options?.status??'OPTION_BLOCKED'};
+    } catch { /* No credential or raw market response is exposed. */ }
+    try {await this.storage.put(MARKET_KEY,report);}
+    catch {return {status:'BLOCKED_OBSERVATION_STORAGE'};}
+    return report;
+  }
+
+  async pollReadOnlyMarket(tickId, nowMs,snapshot=null) {
     let report = { schema: 1, tickId, observedAtMs: nowMs, status: 'BLOCKED_MISSING_TOKEN' };
     try {
       await this.assertNotHalted();
@@ -601,21 +651,23 @@ export class MarketSession {
       if (!validTokenRecord(stored)) throw new Error('invalid token state');
       const token = await openDailyToken(stored, this.env, nowMs);
       if (!token) throw new Error('expired or invalid token');
-      const client = createReadOnlyKite({ apiKey: this.env.KITE_API_KEY, accessToken: token });
-      const catalog=await this.ensureInstrumentCatalog(tickId,nowMs,client);
+      const client = snapshot?.client??createReadOnlyKite({ apiKey: this.env.KITE_API_KEY, accessToken: token });
+      const catalog=snapshot?.catalog??await this.ensureInstrumentCatalog(tickId,nowMs,client);
       const {symbol,token:instrumentToken}=selectCatalogFuture(catalog,Date.now());
-      if(this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true') {
+      if(this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true'&&!snapshot) {
         const claimed=await this.reserveReadOnlyQuote(tickId,nowMs,'FUTURE');
         if(!claimed.allowed) throw new Error('QUOTE_RESERVATION_BLOCKED');
       }
       let quote;
-      try { quote=await client.quote(symbol); }
+      try { quote=snapshot?snapshot.quotes['NFO:'+symbol]:await client.quote(symbol); }
       catch(error) {
         if(this.env.OFFLINE_OPTION_SNAPSHOT_ENABLED==='true')
           await this.recordReadOnlyQuoteFailure(tickId,Date.now(),error).catch(()=>{});
         throw error;
       }
       // A plausible price without a recent exchange timestamp is NOT market evidence.
+      if(!quote||typeof quote.last_price!=='number'||!Number.isFinite(quote.last_price)||
+        quote.last_price<=0||quote.last_price>1_000_000)throw Error('INVALID_FUTURES_QUOTE');
       const quoteTimestamp = quote.timestamp;
       const parsedTimestamp = typeof quoteTimestamp !== 'string' ? NaN :
         /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(quoteTimestamp) ?
@@ -635,6 +687,9 @@ export class MarketSession {
         await this.refreshOptionMaster(tickId,receivedAtMs,quote.last_price,client);
       }
       await this.assertNotHalted();
+      // The option turn sees fresh futures/ATM selection, then commits exits
+      // before waiting for completed-candle history or staging the next signal.
+      if(snapshot?.onFutureReady)await snapshot.onFutureReady({entryAllowed:receivedAtMs-parsedTimestamp<=30_000});
       // Review mode waits one 20-second slot for the five-minute candle to
       // close and pass the 8-second source-completeness guard. The old
       // observational-only cadence remains unchanged when review is disabled.
@@ -768,8 +823,8 @@ export class MarketSession {
     return pair;
   }
 
-  /** Option-only alarm; NEVER fed to the synthetic entry/exit pipeline. */
-  async pollReadOnlyOptions(tickId,nowMs) {
+  /** Option turn from a dedicated or shared quote; never uses synthetic accounts. */
+  async pollReadOnlyOptions(tickId,nowMs,snapshot=null) {
     let report={schema:1,tickId,observedAtMs:nowMs,status:'OPTION_BLOCKED'};
     let claimed=false;
     try {
@@ -787,8 +842,10 @@ export class MarketSession {
         if(!validTokenRecord(stored)) throw new Error('missing token');
         const token=await openDailyToken(stored,this.env,nowMs);
         if(!token) throw new Error('expired token');
-        const reservation=await this.reserveReadOnlyQuote(tickId,nowMs,'OPTION_PAIR');
-        if(!reservation.allowed) throw new Error('rate guard blocked');
+        if(!snapshot) {
+          const reservation=await this.reserveReadOnlyQuote(tickId,nowMs,'OPTION_PAIR');
+          if(!reservation.allowed) throw new Error('rate guard blocked');
+        }
         const client=createReadOnlyKite({apiKey:this.env.KITE_API_KEY,accessToken:token});
         const [ledger,cached]=await Promise.all([
           this.storage.get(READONLY_PAPER_LEDGER_KEY),this.storage.get(INSTRUMENT_CATALOG_KEY)]);
@@ -797,14 +854,16 @@ export class MarketSession {
         if(catalog)auditCatalog(catalog,Date.now());
         const contracts=optionQuotePlan(pair,ledger,catalog,Date.now());
         let quotes;
-        try { quotes=await client.optionContracts(contracts.map(c=>c.symbol)); }
+        try { quotes=snapshot?snapshot.quotes:await client.optionContracts(contracts.map(c=>c.symbol)); }
         catch(error) {
           await this.recordReadOnlyQuoteFailure(tickId,Date.now(),error).catch(()=>{});
           throw error;
         }
         const observedAtMs=Date.now();
         let evidence;
-        try {evidence=validatePairEvidence({pair,quotes:{CE:quotes['NFO:'+pair.CE.symbol],
+        try {
+          if(snapshot&&snapshot.entryAllowed!==true)throw Error('FRESH_FUTURES_REQUIRED');
+          evidence=validatePairEvidence({pair,quotes:{CE:quotes['NFO:'+pair.CE.symbol],
           PE:quotes['NFO:'+pair.PE.symbol]},observedAtMs});}
         catch {evidence={CE:null,PE:null,source:'READONLY_OPTION_EVIDENCE_ONLY',
           paperEntryAuthorized:false,telegramAuthorized:false,realOrdersEnabled:false};}
@@ -874,5 +933,6 @@ function validMarketObservation(value) {
     Number.isSafeInteger(value.observedAtMs) &&
     ['BLOCKED_MARKET_DATA', 'BLOCKED_OBSERVATION_STORAGE',
       'QUOTE_OBSERVED', 'HISTORY_OBSERVED','OPTION_OBSERVED',
-      'OPTION_BLOCKED','OPTION_NO_MASTER'].includes(value.status);
+      'OPTION_BLOCKED','OPTION_NO_MASTER','OPTION_ENTRY_UNAVAILABLE',
+      'MARKET_BATCH_OBSERVED','MARKET_BATCH_PARTIAL','MARKET_BATCH_BLOCKED'].includes(value.status);
 }

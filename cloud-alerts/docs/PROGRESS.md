@@ -1,5 +1,13 @@
 # Canonical engineering progress — 25 October 2026
 
+**25 October requested 20-second monitoring:** one bounded shared future/options
+quote per eligible tick replaces the 60-second option rotation. Native tests
+verify adjacent alarms, paper exit commits before blocked history responses,
+restart and dedupe; local full-session coverage verifies 1,125 quote requests.
+**288 JS/extension/runner + 22 native tests pass.** Cadence completes task 5;
+**6/19 remediation tasks** are complete. The original rubric remains **23/41
+(56%)**, live acceptance **0/5**. [Cadence evidence and limitations](../../audit/OPTION_MONITORING_CADENCE.md).
+
 **25 October instrument lifecycle:** the observed runtime now selects the front
 future from the daily NFO catalogue, reselects ATM entry options after price
 moves and separately monitors original held contracts. Native tests cover

@@ -197,6 +197,119 @@ test('network latency cannot make an old futures quote fresh using the alarm sta
   assert.equal(await s.storage.get('readonly-paper-bridge-v1'),undefined);
 });
 
+test('full regular session observes options every tick with one quote request per alarm and no replay',async t=>{
+  let quotes=0,histories=0,masters=0;const quoteTimes=[];
+  const s=setup(t,OPEN-60_000,async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/instruments/NFO'){masters++;return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});}
+    if(u.pathname.includes('/historical/')){histories++;return Response.json({status:'success',data:{candles:[]}});}
+    assert.equal(u.pathname,'/quote');quotes++;quoteTimes.push(Date.now());
+    const symbols=u.searchParams.getAll('i');assert.ok(symbols.length<=5);
+    return Response.json({status:'success',data:Object.fromEntries(symbols.map(symbol=>[symbol,
+      symbol.endsWith('FUT')?{...rawQuote(12345),last_price:22046}:rawQuote(symbol.endsWith('CE')?30000:30001)]))});
+  });
+  configureMarket(s);enablePaper(s);
+  await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));
+  for(let slot=0;slot<1125;slot++) {
+    s.set(OPEN+slot*20_000);
+    const result=await s.session.alarm();
+    assert.equal(result.shouldPoll,true);
+    assert.equal(result.marketStatus,slot===0?'MARKET_BATCH_PARTIAL':'MARKET_BATCH_OBSERVED');
+  }
+  assert.equal(quotes,1125);assert.equal(histories,150);assert.equal(masters,1);
+  assert.equal(quoteTimes.every((time,i)=>i===0||time-quoteTimes[i-1]===20_000),true);
+  assert.equal((await s.storage.get('readonly-quote-pace-v1')).count,1125);
+  const bridge=await s.storage.get('readonly-paper-bridge-v1');
+  assert.equal(bridge.totalOptionTicks,1125);assert.equal(bridge.events.length,128);
+  assert.equal((await s.storage.get('readonly-paper-ledger-v1')).positions.length,0);
+  assert.equal((await s.session.alarm()).shouldPoll,false);assert.equal(quotes,1125);
+  const status=await (await s.session.fetch(request('/internal/scheduler',KEY,'GET'))).json();
+  assert.equal(status.market.status,'MARKET_BATCH_OBSERVED');
+  assert.equal(status.market.requestedOptionIntervalMs,20_000);
+});
+
+test('missing or insufficiently fresh futures block entries without hiding held option exits',async t=>{
+  let includeFuture=false;
+  const s=setup(t,OPEN-60_000,async url=>{
+    const symbols=new URL(url).searchParams.getAll('i');
+    return Response.json({status:'success',data:Object.fromEntries(symbols.filter(x=>includeFuture||!x.endsWith('FUT')).map(symbol=>[
+      symbol,symbol.endsWith('FUT')?{...rawQuote(12345),last_price:22046,
+        timestamp:new Date(Date.now()+330*60_000-45_000).toISOString().slice(0,19).replace('T',' ')}:
+        rawQuote(symbol.endsWith('CE')?30000:30001,170,171)]))});
+  });
+  configureMarket(s);enablePaper(s);
+  await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));
+  // A consistent already-running state: master and held-entry journal exist.
+  const catalog=compileNiftyCatalog(masterCsv(),OPEN);
+  await s.storage.put('readonly-instrument-catalog-v1',{schema:1,day:'2026-10-23',attempts:1,
+    tickId:'2026-10-23:0',retryAtMs:OPEN+30*60_000,status:'READY',catalog});
+  s.set(ist('2026-10-23','10:00:00'));
+  await s.session.refreshOptionMaster('2026-10-23:135',Date.now(),22046,{instrumentsNfoCsv:()=>assert.fail('cached master')});
+  const entryAt=Date.now(),pair=selectCatalogPair(catalog,entryAt,22046);
+  const ledger=enterPaperBasket(newPaperLedger(entryAt),{signalId:'CADENCE:EXISTING:ENTRY',nowMs:entryAt,
+    quote:{contract:pair.CE,updatedAtMs:entryAt,bid:100,ask:100.5,bidQuantity:650,askQuantity:650}}).ledger;
+  for(const [slot,withFuture] of [[136,false],[137,true]]) {
+    includeFuture=withFuture;await s.storage.put('readonly-paper-ledger-v1',ledger);
+    await s.storage.put('readonly-paper-delivery-v1',newPaperDeliveryJournal(entryAt));
+    s.set(OPEN+slot*20_000);
+    const report=await s.session.pollReadOnlySession(`2026-10-23:${slot}`,Date.now());
+    assert.equal(report.optionStatus,'OPTION_ENTRY_UNAVAILABLE');
+    assert.equal((await s.storage.get('readonly-paper-ledger-v1')).positions.every(p=>p.status==='CLOSED'),true);
+  }
+});
+
+test('late catalogue completion skips the old quote slot without backfill',async t=>{
+  let s,quotes=0;
+  s=setup(t,OPEN-60_000,async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/instruments/NFO'){
+      s.set(OPEN+20_000);
+      return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});
+    }
+    if(u.pathname.includes('/historical/'))return Response.json({status:'success',data:{candles:[]}});
+    quotes++;
+    return Response.json({status:'success',data:{'NFO:NIFTY26OCTFUT':{...rawQuote(12345),last_price:22046}}});
+  });
+  configureMarket(s);enablePaper(s);await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));s.set(OPEN);
+  assert.equal((await s.session.pollReadOnlySession('2026-10-23:0',OPEN)).status,'MARKET_BATCH_BLOCKED');
+  assert.equal(quotes,0);assert.equal(await s.storage.get('readonly-quote-pace-v1'),undefined);
+  assert.equal((await s.session.pollReadOnlySession('2026-10-23:1',Date.now())).status,'MARKET_BATCH_PARTIAL');
+  assert.equal(quotes,1);
+});
+
+test('batched 429 is not retried inside the callback or during the next cooldown slots',async t=>{
+  let quotes=0;
+  const s=setup(t,OPEN-60_000,async url=>{
+    if(new URL(url).pathname==='/instruments/NFO')return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});
+    quotes++;return Response.json({status:'error'},{status:429});
+  });
+  configureMarket(s);enablePaper(s);await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));
+  for(let slot=0;slot<4;slot++){
+    s.set(OPEN+slot*20_000);
+    assert.equal((await s.session.pollReadOnlySession(`2026-10-23:${slot}`,Date.now())).status,'MARKET_BATCH_BLOCKED');
+    assert.equal(quotes,slot<3?1:2);
+  }
+  assert.equal((await s.storage.get('readonly-quote-pace-v1')).count,2);
+  assert.equal(await s.storage.get('readonly-paper-ledger-v1'),undefined);
+});
+
+test('halt during the shared network request prevents all subsequent paper mutations',async t=>{
+  let release,started;
+  const gate=new Promise(resolve=>{release=resolve;});const entered=new Promise(resolve=>{started=resolve;});
+  const s=setup(t,OPEN-60_000,async url=>{
+    const u=new URL(url);
+    if(u.pathname==='/instruments/NFO')return new Response(masterCsv(),{headers:{'content-type':'text/csv'}});
+    started();await gate;
+    return Response.json({status:'success',data:{'NFO:NIFTY26OCTFUT':{...rawQuote(12345),last_price:22046}}});
+  });
+  configureMarket(s);enablePaper(s);await s.session.fetch(request());await s.session.fetch(tokenRequest(s.env));s.set(OPEN);
+  const pending=s.session.alarm();await entered;
+  await s.session.fetch(request('/internal/emergency-halt'));release();
+  assert.equal((await pending).telegramStatus,'HALTED');
+  for(const key of ['readonly-paper-ledger-v1','readonly-paper-bridge-v1','readonly-paper-delivery-v1'])
+    assert.equal(await s.storage.get(key),undefined);
+});
+
 test('halt during an in-flight market poll prevents later dispatch and new claims after restart',async t=>{
   const s=setup(t);configureMarket(s);
   Object.assign(s.env,{OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',
@@ -206,7 +319,7 @@ test('halt during an in-flight market poll prevents later dispatch and new claim
   let release,started;
   const blocked=new Promise(resolve=>{release=resolve;});
   const entered=new Promise(resolve=>{started=resolve;});
-  s.session.pollReadOnlyMarket=async()=>{started();await blocked;return {status:'SYNTHETIC'};};
+  s.session.pollReadOnlySession=async()=>{started();await blocked;return {status:'SYNTHETIC'};};
   s.session.dispatchReadOnlyTelegram=()=>assert.fail('dispatch after owner halt');
   const callback=s.session.alarm();await entered;
   assert.equal((await (await s.session.fetch(request('/internal/emergency-halt'))).json()).status,
