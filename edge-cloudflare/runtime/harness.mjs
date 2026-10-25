@@ -18,6 +18,24 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/test/halt-race/start'&&request.method==='POST') {
+      clock=(await this.storage.get('scheduler-v1')).scheduledAtMs;
+      this.pollReadOnlyMarket=async()=>{
+        this.raceStarted=true;
+        await new Promise(resolve=>{this.releaseHaltRace=resolve;});
+        return {status:'SYNTHETIC_PAUSED_MARKET'};
+      };
+      this.dispatchReadOnlyTelegram=async()=>{
+        this.raceDispatches=(this.raceDispatches??0)+1;
+        return {status:'SYNTHETIC_NO_SEND'};
+      };
+      return Response.json(await this.alarm());
+    }
+    if(path==='/test/halt-race/state') return Response.json({
+      started:this.raceStarted??false,dispatches:this.raceDispatches??0});
+    if(path==='/test/halt-race/release'&&request.method==='POST') {
+      this.releaseHaltRace?.();return Response.json({released:true});
+    }
     if (path === '/test/now') return Response.json({ now: Date.now() });
     if (path === '/test/pipeline/clock' && request.method === 'POST') {
       const { nowMs } = await request.json();

@@ -13,6 +13,37 @@ const root=fileURLToPath(new URL('..',import.meta.url));
 const key='SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const headers={authorization:'Bearer '+key};
 
+test('native owner halt fences an alarm paused at external I/O', {timeout:30000},async()=>{
+  const mf=new Miniflare({modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),
+    modulesRoot:root,compatibilityDate:'2026-07-30',
+    bindings:{SCHEDULER_ADMIN_KEY:key,OFFLINE_SCHEDULER_ENABLED:'true',
+      READONLY_MARKET_RUNTIME_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+      OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+      OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true',OFFLINE_TELEGRAM_SENDER_ENABLED:'true'},
+    durableObjects:{MARKET_SESSION:{className:'TestSession',useSQLite:true}},
+    outboundService:()=>{throw Error('Real network forbidden');}});
+  try {
+    const ns=await mf.getDurableObjectNamespace('MARKET_SESSION');
+    const s=ns.get(ns.idFromName('nifty-paper-session-v1'));
+    await s.fetch('https://unit.invalid/test/pipeline/clock',{method:'POST',body:JSON.stringify({
+      nowMs:Date.parse('2026-11-02T09:14:00+05:30')})});
+    await s.fetch('https://unit.invalid/internal/bootstrap',{method:'POST',headers});
+    const pending=s.fetch('https://unit.invalid/test/halt-race/start',{method:'POST'});
+    let state;
+    for(let i=0;i<20;i++){
+      state=await (await s.fetch('https://unit.invalid/test/halt-race/state')).json();
+      if(state.started)break;
+    }
+    assert.equal(state.started,true);
+    const halted=await (await s.fetch('https://unit.invalid/internal/emergency-halt',{
+      method:'POST',headers})).json();
+    assert.equal(halted.status,'OWNER_EMERGENCY_HALT');
+    await s.fetch('https://unit.invalid/test/halt-race/release',{method:'POST'});
+    assert.equal((await (await pending).json()).telegramStatus,'HALTED');
+    assert.equal((await (await s.fetch('https://unit.invalid/test/halt-race/state')).json()).dispatches,0);
+  } finally {await mf.dispose();}
+});
+
 test('native separate ₹50k/₹100k read-only paper bridge survives restart without broker access',async()=>{
   const persist=await mkdtemp(path.join(os.tmpdir(),'nifty-readonly-paper-do-'));
   const options={modules:true,scriptPath:path.join(root,'runtime/harness.mjs'),

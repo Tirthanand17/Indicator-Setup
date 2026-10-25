@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import worker, { MarketSession } from './worker.mjs';
 import { assessAlarm, NSE_FO_CALENDAR_VERSION } from './alarm-core.mjs';
 import { createHmac, randomBytes } from 'node:crypto';
+import { claimMasterFetch,commitMasterPair } from './option-runtime.mjs';
 
 const KEY = 'SYNTHETIC-ONLY-0123456789-abcdefghijklmnop';
 const ist = (day, time) => Date.parse(`${day}T${time}+05:30`);
@@ -67,6 +68,87 @@ function configureMarket(s) {
   s.env.KITE_FUTURE_SYMBOL='NIFTY26OCTFUT';
   s.env.KITE_FUTURE_INSTRUMENT_TOKEN='12345';
 }
+
+test('halt during an in-flight market poll prevents later dispatch and new claims after restart',async t=>{
+  const s=setup(t);configureMarket(s);
+  Object.assign(s.env,{OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',
+    OFFLINE_READONLY_REVIEW_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true',
+    OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true',OFFLINE_TELEGRAM_SENDER_ENABLED:'true'});
+  await s.session.fetch(request());s.set(OPEN);
+  let release,started;
+  const blocked=new Promise(resolve=>{release=resolve;});
+  const entered=new Promise(resolve=>{started=resolve;});
+  s.session.pollReadOnlyMarket=async()=>{started();await blocked;return {status:'SYNTHETIC'};};
+  s.session.dispatchReadOnlyTelegram=()=>assert.fail('dispatch after owner halt');
+  const callback=s.session.alarm();await entered;
+  assert.equal((await (await s.session.fetch(request('/internal/emergency-halt'))).json()).status,
+    'OWNER_EMERGENCY_HALT');
+  release();assert.equal((await callback).telegramStatus,'HALTED');
+  const restarted=new MarketSession({storage:s.storage},s.env);
+  await assert.rejects(restarted.reserveReadOnlyQuote('2026-10-23:1',OPEN+20_000,'FUTURE'),/SCHEDULER_HALTED/);
+  await assert.rejects(restarted.finalizeReadOnlyPaperDay(OPEN),/SCHEDULER_HALTED/);
+  await assert.rejects(restarted.claimReadOnlyPaperDeliveryRehearsal(OPEN),/SCHEDULER_HALTED/);
+  assert.equal((await restarted.alarm()).shouldPoll,false);
+});
+
+test('halt after delivery claim prevents send; an already-started send still settles',async t=>{
+  const s=setup(t);configureMarket(s);
+  Object.assign(s.env,{OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',OFFLINE_READONLY_REVIEW_ENABLED:'true',
+    OFFLINE_PAPER_BRIDGE_ENABLED:'true',OFFLINE_READONLY_DELIVERY_REHEARSAL_ENABLED:'true',
+    OFFLINE_TELEGRAM_SENDER_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrst',
+    TELEGRAM_PRIVATE_CHAT_ID:'123456789'});
+  await s.session.fetch(request());
+  s.session.claimReadOnlyPaperDeliveryRehearsal=async()=>{
+    await s.session.fetch(request('/internal/emergency-halt'));
+    return {status:'SIMULATED_ATTEMPT_CLAIM',eventId:'synthetic',attempt:1,message:'paper only'};
+  };
+  assert.equal((await s.session.dispatchReadOnlyTelegram(()=>assert.fail('send after halt'))).status,
+    'HALTED_BEFORE_SEND');
+  // A separate initialized scheduler models a request already sent before halt.
+  const second=setup(t);configureMarket(second);Object.assign(second.env,s.env);
+  await second.session.fetch(request());
+  second.session.claimReadOnlyPaperDeliveryRehearsal=async()=>({status:'SIMULATED_ATTEMPT_CLAIM',
+    eventId:'synthetic',attempt:1,message:'paper only'});
+  let settled=false;
+  second.session.settleReadOnlyPaperDeliveryRehearsal=async input=>{
+    assert.equal(input.httpStatus,200);settled=true;return {status:'ACCEPTED_API_ONLY'};
+  };
+  const result=await second.session.dispatchReadOnlyTelegram(async()=>{
+    await second.session.fetch(request('/internal/emergency-halt'));
+    return {httpStatus:200,botResponse:{ok:true,result:{message_id:1}}};
+  });
+  assert.equal(result.status,'ACCEPTED_API_ONLY');assert.equal(settled,true);
+});
+
+test('option response arriving after halt cannot commit observed paper state',async t=>{
+  let release,started;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const entered=new Promise(resolve=>{started=resolve;});
+  const pair={masterFetchedAtMs:OPEN,...Object.fromEntries(['CE','PE'].map((kind,i)=>[kind,{
+    symbol:`NIFTY26O2925100${kind}`,kind,expiry:'2026-10-29',strike:25100,
+    token:12101+i,lotSize:65,tickSize:0.05}]))};
+  const s=setup(t,OPEN-60_000,async()=>{
+    started();await gate;
+    return Response.json({status:'success',data:Object.fromEntries(['CE','PE'].map(kind=>[
+      'NFO:'+pair[kind].symbol,{timestamp:'2026-10-23 09:15:40',instrument_token:pair[kind].token,
+        depth:{buy:[{price:100,quantity:195}],sell:[{price:100.5,quantity:195}]}}]))});
+  });
+  configureMarket(s);Object.assign(s.env,{OFFLINE_OPTION_SNAPSHOT_ENABLED:'true',
+    OFFLINE_READONLY_REVIEW_ENABLED:'true',OFFLINE_PAPER_BRIDGE_ENABLED:'true'});
+  await s.session.fetch(request());
+  assert.equal((await s.session.fetch(tokenRequest(s.env))).status,200);
+  const claim=claimMasterFetch(undefined,{tickId:'2026-10-23:0',observedAtMs:OPEN});
+  await s.storage.put('readonly-option-state-v1',commitMasterPair(claim.state,{
+    tickId:'2026-10-23:0',pair}));
+  s.set(OPEN+40_000);
+  const poll=s.session.pollReadOnlyOptions('2026-10-23:2',OPEN+40_000);
+  await entered;
+  await s.session.fetch(request('/internal/emergency-halt'));
+  release();await poll;
+  assert.equal(await s.storage.get('readonly-paper-ledger-v1'),undefined);
+  assert.equal(await s.storage.get('readonly-paper-bridge-v1'),undefined);
+  assert.equal(await s.storage.get('readonly-paper-delivery-v1'),undefined);
+});
 
 test('unauthenticated, wrong methods and disabled requests never touch a DO', async t => {
   const s = setup(t);

@@ -103,6 +103,16 @@ export class MarketSession {
   constructor(ctx, env) {
     this.storage = ctx.storage;
     this.env = env;
+    this.haltRequested = false;
+  }
+
+  // A halt is terminal for this scheduler. Read its durable state inside each
+  // transaction so a concurrent halt conflicts with, or precedes, the write.
+  // The local latch also closes the gap immediately before an external send.
+  async assertNotHalted(storage = this.storage) {
+    const state = await storage.get(STATE_KEY);
+    if (this.haltRequested || (state !== undefined &&
+        (!validState(state) || state.halted))) throw Error('SCHEDULER_HALTED');
   }
 
   get readonlyPaperEnabled() {
@@ -231,6 +241,7 @@ export class MarketSession {
       }
       const now = Date.now();
       if (isEmergencyHalt) {
+        this.haltRequested = true;
         const outcome = await this.storage.transaction(async txn => {
           const existing = await txn.get(STATE_KEY);
           // Stop a pending callback even if state cannot safely be interpreted.
@@ -415,10 +426,11 @@ export class MarketSession {
    * rehearsal of the separate read-only-paper alert journal. The source
    * ledger is never replaced by the synthetic counterpart.
    */
-  async withReadOnlyPaperDelivery(operation,nowMs) {
+  async withReadOnlyPaperDelivery(operation,nowMs,requireRunning=false) {
     if(!this.readonlyDeliveryRehearsalEnabled)
       throw Error('READONLY_DELIVERY_REHEARSAL_DISABLED');
     return this.storage.transaction(async txn=>{
+      if(requireRunning) await this.assertNotHalted(txn);
       const [ledger,stored]=await Promise.all([
         txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
       if(!ledger) throw Error('READONLY_DELIVERY_MISSING_LEDGER');
@@ -433,7 +445,7 @@ export class MarketSession {
 
   claimReadOnlyPaperDeliveryRehearsal(nowMs) {
     return this.withReadOnlyPaperDelivery((journal,ledger)=>
-      claimPaperDelivery(journal,ledger,nowMs),nowMs);
+      claimPaperDelivery(journal,ledger,nowMs),nowMs,true);
   }
 
   settleReadOnlyPaperDeliveryRehearsal(input) {
@@ -463,6 +475,11 @@ export class MarketSession {
     catch {return {status:'BLOCKED_DELIVERY_CLAIM',phoneDelivered:false};}
     if(claim.status!=='SIMULATED_ATTEMPT_CLAIM')
       return {status:claim.status,phoneDelivered:false};
+    try { await this.assertNotHalted(); }
+    catch {return {status:'HALTED_BEFORE_SEND',phoneDelivered:false};}
+    // No await between this latch check and starting the request. An already
+    // started request cannot be recalled; its receipt must still be settled.
+    if(this.haltRequested) return {status:'HALTED_BEFORE_SEND',phoneDelivered:false};
     let response;
     try {response=await sendFn({token,chatId,message:claim.message});}
     catch {response={httpStatus:null,botResponse:null};}
@@ -516,6 +533,10 @@ export class MarketSession {
         // Preserve corrupt evidence; initialization never overwrites it.
         return { status: 'BLOCKED_CORRUPT_STATE', shouldPoll: false };
       }
+      if(state.halted && state.status==='OWNER_EMERGENCY_HALT') {
+        await txn.deleteAlarm();
+        return {status:'OWNER_EMERGENCY_HALT',shouldPoll:false,nextAlarmAtMs:null,tickId:null};
+      }
       const day = new Date(now).toISOString().slice(0, 10);
       let decision;
       if (this.env.OFFLINE_SCHEDULER_ENABLED !== 'true' || state.halted || state.scheduledAtMs === null) {
@@ -562,6 +583,8 @@ export class MarketSession {
       const optionSlot=optionEnabled&&Number(decision.tickId.split(':')[1])%3===2;
       const market=optionSlot?await this.pollReadOnlyOptions(decision.tickId,now):
         await this.pollReadOnlyMarket(decision.tickId,now);
+      try { await this.assertNotHalted(); }
+      catch {return {...decision,marketStatus:market.status,telegramStatus:'HALTED'};}
       const telegram=this.readonlyTelegramSenderEnabled?
         await this.dispatchReadOnlyTelegram():{status:'SENDER_DISABLED'};
       return { ...decision,marketStatus:market.status,telegramStatus:telegram.status };
@@ -572,6 +595,7 @@ export class MarketSession {
   async pollReadOnlyMarket(tickId, nowMs) {
     let report = { schema: 1, tickId, observedAtMs: nowMs, status: 'BLOCKED_MISSING_TOKEN' };
     try {
+      await this.assertNotHalted();
       const stored = await this.storage.get(TOKEN_KEY);
       if (!validTokenRecord(stored)) throw new Error('invalid token state');
       const token = await openDailyToken(stored, this.env, nowMs);
@@ -612,6 +636,7 @@ export class MarketSession {
         // 30-minute retry spacing. Persist only a compact contract pair.
         await this.refreshOptionMaster(tickId,nowMs,quote.last_price,client);
       }
+      await this.assertNotHalted();
       // Review mode waits one 20-second slot for the five-minute candle to
       // close and pass the 8-second source-completeness guard. The old
       // observational-only cadence remains unchanged when review is disabled.
@@ -640,6 +665,7 @@ export class MarketSession {
             // The only production source of pending paper signals: reviewed
             // completed Kite candles. A review alone NEVER mutates balances.
             await this.storage.transaction(async txn=>{
+              await this.assertNotHalted(txn);
               const stored=await txn.get(READONLY_PAPER_BRIDGE_KEY);
               const next=stageReadOnlyReview(stored??newReadOnlyBridge(),{
                 tickId,observedAtMs:nowMs,review:report.review,
@@ -662,6 +688,7 @@ export class MarketSession {
   /** Durable one-quote-at-a-time allowance, committed before any HTTP GET. */
   async reserveReadOnlyQuote(tickId,observedAtMs,kind) {
     return this.storage.transaction(async txn=>{
+      await this.assertNotHalted(txn);
       const prior=await txn.get(READONLY_QUOTE_PACE_KEY);
       const result=reserveQuoteRequest(prior,{tickId,observedAtMs,kind});
       if(result.allowed) await txn.put(READONLY_QUOTE_PACE_KEY,result.state);
@@ -672,6 +699,7 @@ export class MarketSession {
   async finalizeReadOnlyPaperDay(nowMs) {
     if(!this.readonlyPaperEnabled) throw Error('READONLY_PAPER_DISABLED');
     return this.storage.transaction(async txn=>{
+      await this.assertNotHalted(txn);
       const [old,delivery]=await Promise.all([
         txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
       if(!old) return {marked:0};
@@ -701,6 +729,7 @@ export class MarketSession {
     let claimed;
     try {
       claimed=await this.storage.transaction(async txn=>{
+        await this.assertNotHalted(txn);
         const old=await txn.get(READONLY_OPTION_STATE_KEY);
         const r=claimMasterFetch(old,{tickId,observedAtMs:nowMs});
         if(r.state!==old) await txn.put(READONLY_OPTION_STATE_KEY,r.state);
@@ -714,6 +743,7 @@ export class MarketSession {
       const pair=discoverAtmNiftyOptionPair(csv,{observedAtMs:observed,
         masterFetchedAtMs:observed,futuresLastPrice});
       await this.storage.transaction(async txn=>{
+        await this.assertNotHalted(txn);
         const old=await txn.get(READONLY_OPTION_STATE_KEY);
         await txn.put(READONLY_OPTION_STATE_KEY,commitMasterPair(old,{tickId,pair}));
       });
@@ -731,6 +761,7 @@ export class MarketSession {
     let claimed=false;
     try {
       const pair=await this.storage.transaction(async txn=>{
+        await this.assertNotHalted(txn);
         const old=await txn.get(READONLY_OPTION_STATE_KEY);
         const r=claimOptionSnapshot(old,{tickId,observedAtMs:nowMs});
         if(r.state!==old) await txn.put(READONLY_OPTION_STATE_KEY,r.state);
@@ -754,6 +785,7 @@ export class MarketSession {
         }
         const evidence=validatePairEvidence({pair,quotes,observedAtMs:Date.now()});
         await this.storage.transaction(async txn=>{
+          await this.assertNotHalted(txn);
           const old=await txn.get(READONLY_OPTION_STATE_KEY);
           await txn.put(READONLY_OPTION_STATE_KEY,finishOptionSnapshot(old,{tickId,evidence}));
           if(this.readonlyPaperEnabled) {
