@@ -6,6 +6,8 @@ import { newReadOnlyBridge } from './readonly-paper-bridge.mjs';
 import { privateReadOnlySnapshot } from './readonly-dashboard.mjs';
 import { handlePrivateDashboard,issueDashboardSession } from './private-dashboard.mjs';
 import worker from './worker.mjs';
+import { newPaperDeliveryJournal,claimPaperDelivery,settlePaperDelivery,
+  suppressAmbiguousDelivery } from './paper-delivery.mjs';
 
 const KEY='readonly-private-dashboard-2026-AaBbCcDd012345';
 const ADMIN='readonly-scheduler-administrator-0123456789-AbCd';
@@ -51,11 +53,42 @@ test('read-only projection separates accounts, realized exits and unresolved equ
   assert.equal(result.daily[0].verifiedExits,1);
   assert.equal(result.daily[1].winRate,null);
   assert.equal(result.trades[0].netPnlRupees,null);
-  assert.equal(result.pendingOutboxCount,3);
+  assert.equal(result.pendingOutboxCount,null);
+  assert.equal(result.retainedOutboxCount,3);
+  assert.equal(result.deliveryStatus,'DELIVERY_JOURNAL_UNAVAILABLE');
   assert.equal(result.telegramDelivered,false);
   assert.equal(result.evidenceStatus,'STALE_OR_HISTORIC_OBSERVATION');
   assert.equal(JSON.stringify(result).includes('message'),false);
   assert.equal(JSON.stringify(result).includes('314159'),false); // no broker instrument token
+});
+
+test('delivery projection uses durable cursor and distinguishes accepted, ambiguous and suppressed',()=>{
+  const {bridge,ledger}=fixture();const nowMs=AT+80_000;
+  let journal=newPaperDeliveryJournal(nowMs);
+  const project=()=>privateReadOnlySnapshot(bridge,ledger,{nowMs,deliveryJournal:journal});
+  const claim=()=>{const c=claimPaperDelivery(journal,ledger,nowMs);journal=c.journal;return c.result;};
+  const first=claim();
+  journal=settlePaperDelivery(journal,ledger,{...first,nowMs,httpStatus:200,
+    botResponse:{ok:true,result:{message_id:123}}}).journal;
+  assert.equal(project().pendingOutboxCount,2);
+  assert.equal(project().delivery.acceptedByBotApi,1);
+  const second=claim();
+  journal=settlePaperDelivery(journal,ledger,{...second,nowMs,httpStatus:null,botResponse:null}).journal;
+  assert.equal(project().pendingOutboxCount,2);
+  assert.equal(project().delivery.queued,1);
+  assert.equal(project().delivery.blockingState,'AMBIGUOUS_ACK_REQUIRED');
+  journal=suppressAmbiguousDelivery(journal,ledger,{eventId:second.eventId,nowMs,
+    decision:'OWNER_SUPPRESS_RESEND_ACKNOWLEDGING_UNKNOWN_DELIVERY'}).journal;
+  assert.equal(project().pendingOutboxCount,1);
+  assert.equal(project().delivery.suppressedUnknown,1);
+  const third=claim();
+  journal=settlePaperDelivery(journal,ledger,{...third,nowMs,httpStatus:403,
+    botResponse:{ok:false,error_code:403}}).journal;
+  assert.equal(project().pendingOutboxCount,0);
+  assert.equal(project().delivery.rejected,1);
+  assert.equal(project().retainedOutboxCount,3);
+  assert.equal(project().telegramDelivered,false);
+  assert.throws(()=>privateReadOnlySnapshot(bridge,ledger,{nowMs,deliveryJournal:{...journal,nextIndex:0}}));
 });
 
 test('read-only dashboard requires private session and every market flag',async()=>{

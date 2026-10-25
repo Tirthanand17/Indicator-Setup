@@ -1,4 +1,13 @@
-# Canonical engineering progress — 24 October 2026
+# Canonical engineering progress — 25 October 2026
+
+**25 October independent-audit remediation:** emergency-halt race fenced,
+Undici tooling patched to 7.30.1, and observed dashboard delivery counts
+corrected. **223 JS + 19 native SQLite tests pass**, disabled-template
+preflight passes, current npm audit reports zero known vulnerabilities.
+Independent audit acceptance score **21/41 = 51%**, live acceptance **0/5**.
+This broader score replaces the old offline checklist for current overall
+reporting; the historical 23/25 statements below use a different denominator.
+[Current remediation tracker and remaining sequence](../../audit/AUDIT_REMEDIATION_PROGRESS.md).
 
 **24 October Phase36 Cloudflare read-only metrics gate (source only):**
 Built a narrowly scoped GraphQL Analytics reader for Worker CPU P50/P99,

@@ -1,6 +1,14 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
-**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
+**IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
+acceptance score **21/41 (51%)**, live acceptance **0/5**.
+[Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
+
+The 25 October fixes fence owner halt across asynchronous market/paper/delivery
+boundaries, patch Undici to 7.30.1, and derive observed dashboard delivery counts
+from the durable journal. Already-started sends may still receive and persist
+their response after halt; API acceptance does not prove phone receipt.
+**223 JS and 19 native SQLite tests pass; npm audit is clean.**
 
 **Phase36 read-only Cloudflare metrics collection gate (not activated):**
 `cloudflare-metrics-readonly.mjs` prepares tightly scoped GraphQL queries for

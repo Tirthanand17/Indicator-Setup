@@ -3,6 +3,7 @@
  */
 import { auditReadOnlyBridge } from './readonly-paper-bridge.mjs';
 import { auditPaperLedger, paperLedgerSummary } from './paper-ledger.mjs';
+import { paperDeliverySummary } from './paper-delivery.mjs';
 
 const IST_MS=330*60_000;
 const rupees=paise=>Number((paise/100).toFixed(2));
@@ -13,9 +14,10 @@ const validDay=day=>typeof day==='string'&&/^2026-\d\d-\d\d$/.test(day)&&
 
 /** Audits both persistent documents before deriving or disclosing any numbers. */
 export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
-  limit='50',nowMs=Date.now(),schedulerStatus='NOT_INITIALIZED'}={}) {
+  limit='50',nowMs=Date.now(),schedulerStatus='NOT_INITIALIZED',deliveryJournal}={}) {
   auditReadOnlyBridge(bridge);
   auditPaperLedger(ledger);
+  const delivery=deliveryJournal===undefined?null:paperDeliverySummary(deliveryJournal,ledger);
   if (ledger.positions.length>0 && bridge.totalOptionTicks===0)
     throw Error('ORPHAN_READONLY_PAPER_POSITIONS');
   const reportDay=day??istDay(nowMs);
@@ -64,6 +66,9 @@ export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
     totalOptionTicks:bridge.totalOptionTicks,
     pendingSignalKind:bridge.pending?.kind??null,
     lastMutationAtMs:ledger.lastMutationAtMs,
-    pendingOutboxCount:ledger.outbox.length,
+    retainedOutboxCount:ledger.outbox.length,
+    pendingOutboxCount:delivery?ledger.outbox.length-delivery.cursor:null,
+    deliveryStatus:delivery?'JOURNAL_VERIFIED':'DELIVERY_JOURNAL_UNAVAILABLE',
+    delivery,
     totalTrades:selected.length,accounts:balances,daily,trades};
 }
