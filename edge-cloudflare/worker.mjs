@@ -13,6 +13,7 @@ import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   reserveQuoteRequest, recordQuoteFailure,recordQuoteCompletion,clearQuoteAuthBlock,quotePaceStatus,optionRuntimeForDay,
   reselectOptionPair, claimOptionSnapshot, finishOptionSnapshot, noteOptionFailure,
   optionStatus } from './option-runtime.mjs';
+import { OBSERVED_PORTFOLIO_KEY,captureObservedPortfolio } from './observed-portfolio.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from './readonly-paper-bridge.mjs';
@@ -753,8 +754,9 @@ export class MarketSession {
     if(!this.readonlyPaperEnabled) throw Error('READONLY_PAPER_DISABLED');
     return this.storage.transaction(async txn=>{
       await this.assertNotHalted(txn);
-      const [old,delivery]=await Promise.all([
-        txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY)]);
+      const [old,delivery,bridge,metrics]=await Promise.all([
+        txn.get(READONLY_PAPER_LEDGER_KEY),txn.get(READONLY_PAPER_DELIVERY_KEY),
+        txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(OBSERVED_PORTFOLIO_KEY)]);
       if(!old) return {marked:0};
       auditPaperLedger(old);
       if(!old.positions.some(p=>p.status==='OPEN')) return {marked:0};
@@ -763,6 +765,10 @@ export class MarketSession {
         await txn.put(READONLY_PAPER_DELIVERY_KEY,
           reconcileReadOnlyDeliveryJournal(delivery,old,result.ledger,nowMs));
       if(result.marked.length) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
+      let nextMetrics;
+      try {nextMetrics=captureObservedPortfolio(metrics,bridge,old,bridge,result.ledger,[],nowMs);}
+      catch { /* Preserve corrupt history for inspection; never block protective exits. */ }
+      if(nextMetrics)await txn.put(OBSERVED_PORTFOLIO_KEY,nextMetrics);
       return {marked:result.marked.length};
     });
   }
@@ -881,14 +887,19 @@ export class MarketSession {
           if(this.readonlyPaperEnabled) {
             // Atomic double-entry paper debits, exits and pending outbox;
             // never use the separate synthetic test portfolio state.
-            const [oldBridge,oldLedger,oldDelivery]=await Promise.all([
+            const [oldBridge,oldLedger,oldDelivery,oldMetrics]=await Promise.all([
               txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
               this.readonlyDeliveryRehearsalEnabled?
-                txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined)]);
+                txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined),txn.get(OBSERVED_PORTFOLIO_KEY)]);
             const currentBridge=oldBridge??newReadOnlyBridge();
             const currentLedger=oldLedger??newPaperLedger(nowMs);
             const advanced=advanceReadOnlyPaperTurn(currentBridge,currentLedger,{
               tickId,observedAtMs:Date.now(),evidence,exitEvidence});
+            let nextMetrics;
+            try {nextMetrics=captureObservedPortfolio(oldMetrics,currentBridge,currentLedger,
+              advanced.state,advanced.ledger,[...exitEvidence,...[evidence.CE,evidence.PE].filter(Boolean)]);}
+            catch { /* Analytics history must not prevent a verified protective exit. */ }
+            if(nextMetrics)await txn.put(OBSERVED_PORTFOLIO_KEY,nextMetrics);
             if(this.readonlyDeliveryRehearsalEnabled) {
               const nextDelivery=reconcileReadOnlyDeliveryJournal(oldDelivery,oldLedger,
                 advanced.ledger,advanced.state.lastOptionAtMs);

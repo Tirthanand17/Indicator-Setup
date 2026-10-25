@@ -71,16 +71,24 @@ test('native twenty-second alarms close held positions before blocked history an
     assert.equal(hold.marketStatus,'MARKET_BATCH_OBSERVED');
     const before=await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json();
     assert.equal(before.pendingOutboxCount,2);assert.equal(before.lastOptionTickId,'2026-11-02:150');
+    const openMetrics=await (await s.fetch('https://unit.invalid/test/read-only-paper/metrics')).json();
+    assert.equal(openMetrics.lastTickId,'2026-11-02:150');assert.equal(openMetrics.marks.length,2);
+    assert.equal(openMetrics.marks[0].bidPaise,10000);
+    assert.notEqual(openMetrics.accounts.PAPER_50K.recent.at(-1).equityPaise,null);
     now=at('10:05:20');bid=170;await post(s,'/test/pipeline/clock',{nowMs:now});
     pending=s.fetch('https://unit.invalid/test/tick');await enteredHistory;
     const during=await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json();
     assert.equal(during.lastOptionTickId,'2026-11-02:151');assert.equal(during.pendingOutboxCount,4);
     assert.equal(during.accountBalances.every(a=>a.cashPaise>a.initialPaise),true);
+    const closedMetrics=await (await s.fetch('https://unit.invalid/test/read-only-paper/metrics')).json();
+    assert.equal(closedMetrics.lastTickId,'2026-11-02:151');assert.equal(closedMetrics.marks.length,0);
+    assert.equal(closedMetrics.accounts.PAPER_50K.recent.at(-1).equityPaise,during.accountBalances[0].cashPaise);
     releaseHistory();assert.equal((await (await pending).json()).marketStatus,'MARKET_BATCH_OBSERVED');pending=undefined;
     const requests=quotes;assert.equal((await (await s.fetch('https://unit.invalid/test/tick')).json()).shouldPoll,false);
     assert.equal(quotes,requests);assert.equal(histories,2);
     await mf.dispose();mf=new Miniflare(options);s=await getStub();
     assert.deepEqual(await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json(),during);
+    assert.deepEqual(await (await s.fetch('https://unit.invalid/test/read-only-paper/metrics')).json(),closedMetrics);
     now=at('10:05:40');await post(s,'/test/pipeline/clock',{nowMs:now});
     assert.equal((await (await s.fetch('https://unit.invalid/test/tick')).json()).marketStatus,'MARKET_BATCH_OBSERVED');
     assert.equal((await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json()).pendingOutboxCount,4);
@@ -258,6 +266,10 @@ test('native separate ₹50k/₹100k read-only paper bridge survives restart wit
     const staged=await (await post(s,'review',{tickId:'2026-10-23:271',
       observedAtMs:nowMs,review,futures})).json();
     assert.equal(staged.staged,true);
+    assert.equal((await (await post(s,'turn',{tickId:'2026-10-23:272',testRollback:true,
+      observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)})).json()).rolledBack,true);
+    assert.equal(await (await s.fetch('https://unit.invalid/test/read-only-paper/metrics')).json(),null);
+    assert.equal((await (await s.fetch('https://unit.invalid/test/read-only-paper/state')).json()).status,'NOT_INITIALIZED');
     const filled=await (await post(s,'turn',{tickId:'2026-10-23:272',
       observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)})).json();
     assert.equal(filled.entered,2);

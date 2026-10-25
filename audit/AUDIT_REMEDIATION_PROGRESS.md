@@ -6,28 +6,29 @@ phase checklists remain historical records with different denominators.
 
 ## Current verified progress
 
-**23/41 acceptance checks = 56.10%**
+**24/41 acceptance checks = 58.54%**
 
-`[██████░░░░] 56%`
+`[██████░░░░] 59%`
 
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-**Remediation tasks completed: 6/19.** Cadence (item 5) is now complete within
-the already-counted adapter/ledger scope; the 41-check score stays 23/41.
+**Remediation tasks completed: 7/19.** Observed portfolio metrics (item 6)
+adds one implementation acceptance check. Cloud acceptance remains unchanged.
 
-The audit baseline was 19/41. Four newly satisfied checks are the current
+The audit baseline was 19/41. Five newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
 verified in a successful GitHub Actions run, and the implemented/tested futures
-rollover and dynamic entry-option lifecycle. The dashboard correction is
+rollover and dynamic entry-option lifecycle, and observed portfolio metrics.
+The dashboard delivery correction is
 useful work within a still-incomplete implementation check and earns no
 additional point. This score measures evidence, not hours of work remaining.
 
 | Category | Before | Now |
 |---|---|---|
 | Architecture | 4/5 | 4/5 |
-| Implementation | 6/10 | 7/10 |
+| Implementation | 6/10 | 8/10 |
 | Automated tests | 4/6 | 5/6 |
 | Security | 3/6 | 4/6 |
 | Cloud deployment | 0/4 | 0/4 |
@@ -74,7 +75,16 @@ additional point. This score measures evidence, not hours of work remaining.
    completion pacing and unchanged duplicate/risk protections.
    [Traffic bounds, failure behavior and native evidence](OPTION_MONITORING_CADENCE.md).
 
-Validation: **288 JavaScript/extension/quality-runner tests, 22 native
+7. **Observed portfolio metrics:** exact-contract BID marks, modeled net
+   liquidation, unrealized P&L, committed capital, fees, per-trade net risk/reward,
+   lifetime/daily/monthly closed-trade statistics and persistent sampled equity
+   peaks/drawdown. Missing/stale/unverifiable marks stay unavailable; legacy or
+   interrupted histories disclose gaps. Metrics commit with balances/outbox,
+   survive native restart and roll back atomically. Private UI renders metrics,
+   bounded recent samples and explicit stale/failure states.
+   [Accounting definitions, worked example and limits](OBSERVED_PORTFOLIO_METRICS.md).
+
+Validation: **300 JavaScript/extension/quality-runner tests, 22 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -93,9 +103,9 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 3 | Automated lint, regression/type/security quality gates | Completed; local and GitHub CI verified |
 | 4 | Futures rollover and dynamic entry-option selection | Completed with offline/native evidence |
 | 5 | Option monitoring cadence and exit responsiveness | Completed with offline/native evidence; live timing unverified |
-| 6 | Complete observed portfolio records and metrics | Next |
+| 6 | Complete observed portfolio records and metrics | Completed with accounting/native/UI regression evidence |
 | 7 | Dashboard delivery status | Completed; broader dashboard still incomplete |
-| 8 | Complete observed-state backup/export/restore | Pending |
+| 8 | Complete observed-state backup/export/restore | Next |
 | 9 | Journal retention and schema/rollback lifecycle | Pending |
 | 10 | Authenticated Telegram ambiguity reconciliation | Pending |
 | 11 | Token, outage, heartbeat and quota operational alerts | Pending |

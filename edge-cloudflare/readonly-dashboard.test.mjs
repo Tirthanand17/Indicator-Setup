@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Script } from 'node:vm';
 import { newPaperLedger,enterPaperBasket,exitPaperPosition } from './paper-ledger.mjs';
 import { newReadOnlyBridge } from './readonly-paper-bridge.mjs';
+import { captureObservedPortfolio } from './observed-portfolio.mjs';
 import { privateReadOnlySnapshot } from './readonly-dashboard.mjs';
 import { handlePrivateDashboard,issueDashboardSession } from './private-dashboard.mjs';
 import worker from './worker.mjs';
@@ -48,7 +49,7 @@ test('read-only projection separates accounts, realized exits and unresolved equ
   assert.equal(result.totalTrades,2);
   assert.equal(result.accounts[0].closedCount,1);
   assert.equal(result.accounts[1].openCount,1);
-  assert.equal(result.accounts[0].markedEquityRupees,null);
+  assert.equal(result.accounts[0].markedEquityRupees,result.accounts[0].cashRupees);
   assert.equal(result.accounts[1].unrealizedPnlRupees,null);
   assert.equal(result.daily[0].verifiedExits,1);
   assert.equal(result.daily[1].winRate,null);
@@ -139,4 +140,33 @@ test('top-level worker does not permit private read-only route when disabled',as
   const e=env();e.OFFLINE_PRIVATE_DASHBOARD_ENABLED='false';
   e.MARKET_SESSION={idFromName:()=>{throw Error('must not access storage');}};
   assert.equal((await worker.fetch(request('/paper/api/readonly'),e)).status,404);
+});
+
+test('private dashboard renders fresh metrics, stale unavailable values and clears failed reports',async()=>{
+  const {bridge,ledger}=fixture(),now=AT+80000;
+  const portfolioMetrics=captureObservedPortfolio(undefined,newReadOnlyBridge(),newPaperLedger(AT),
+    bridge,ledger,[quote(now)],now);
+  let view=privateReadOnlySnapshot(bridge,ledger,{nowMs:now,portfolioMetrics}),broken=false;
+  const response=await handlePrivateDashboard(request('/paper/assets/readonly.js',{headers:await auth()}),env(),storage(bridge,ledger));
+  const makeNode=()=>({children:[],textContent:'',append(...nodes){this.children.push(...nodes);},
+    replaceChildren(...nodes){this.children=nodes;},addEventListener(){}});
+  const ids=['status','accounts','capital','daily','statistics','equity','trades','day','account','refresh'];
+  const nodes=Object.fromEntries(ids.map(id=>[id,makeNode()]));nodes.account.value='ALL';
+  const context={document:{getElementById:id=>nodes[id],createElement:makeNode,hidden:false},
+    fetch:async()=>{if(broken)throw Error('Synthetic unavailable');return {status:200,ok:true,json:async()=>view};},
+    setInterval:()=>{},location:{assign:()=>{throw Error('Unexpected navigation');}},Date,Intl,encodeURIComponent};
+  const script=new Script(await response.text());script.runInNewContext(context);
+  await new Promise(resolve=>setImmediate(resolve));
+  const text=n=>n.textContent+n.children.map(text).join(' ');
+  assert.match(text(nodes.capital),/FRESH_OBSERVED_BID/);
+  assert.match(text(nodes.statistics),/Profit factor/);
+  assert.equal(nodes.trades.children[0].children.length,15);
+  assert.ok(nodes.equity.children.length>0);
+  view=privateReadOnlySnapshot(bridge,ledger,{nowMs:now+16000,portfolioMetrics});
+  await new Script('refresh()').runInNewContext(context);
+  assert.match(text(nodes.capital),/STALE_POSITION_MARK/);
+  assert.match(text(nodes.capital),/Unavailable/);
+  broken=true;await new Script('refresh()').runInNewContext(context);
+  assert.match(nodes.status.textContent,/UNAVAILABLE/);
+  for(const id of ['accounts','capital','daily','statistics','equity','trades'])assert.equal(nodes[id].children.length,0);
 });

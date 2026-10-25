@@ -4,6 +4,7 @@ import { newPaperLedger } from '../paper-ledger.mjs';
 import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   claimOptionSnapshot, finishOptionSnapshot, optionStatus } from '../option-runtime.mjs';
 import { validatePairEvidence } from '../option-readonly.mjs';
+import { OBSERVED_PORTFOLIO_KEY,captureObservedPortfolio } from '../observed-portfolio.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
@@ -105,13 +106,16 @@ export class TestSession extends MarketSession {
     if(path==='/test/read-only-paper/turn'&&request.method==='POST') {
       const input=await request.json();
       return Response.json(await this.storage.transaction(async txn=>{
-        const [oldBridge,oldLedger,oldDelivery]=await Promise.all([
+        const [oldBridge,oldLedger,oldDelivery,oldMetrics]=await Promise.all([
           txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
           this.readonlyDeliveryRehearsalEnabled?
-            txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined)]);
+            txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined),txn.get(OBSERVED_PORTFOLIO_KEY)]);
         const bridge=oldBridge??newReadOnlyBridge();
         const ledger=oldLedger??newPaperLedger(input.observedAtMs);
         const result=advanceReadOnlyPaperTurn(bridge,ledger,input);
+        const metrics=captureObservedPortfolio(oldMetrics,bridge,ledger,result.state,result.ledger,
+          [...(input.exitEvidence??[]),...[input.evidence?.CE,input.evidence?.PE].filter(Boolean)],input.observedAtMs);
+        await txn.put(OBSERVED_PORTFOLIO_KEY,metrics);
         if(this.readonlyDeliveryRehearsalEnabled) {
           const nextDelivery=reconcileReadOnlyDeliveryJournal(oldDelivery,oldLedger,
             result.ledger,input.observedAtMs);
@@ -120,9 +124,15 @@ export class TestSession extends MarketSession {
         }
         if(result.state!==oldBridge) await txn.put(READONLY_PAPER_BRIDGE_KEY,result.state);
         if(result.ledger!==oldLedger) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
+        if(input.testRollback===true)throw Error('SYNTHETIC_ATOMIC_METRICS_ROLLBACK');
         return result.result;
+      }).catch(error=>{
+        if(input.testRollback===true&&error.message==='SYNTHETIC_ATOMIC_METRICS_ROLLBACK')return {rolledBack:true};
+        throw error;
       }));
     }
+    if(path==='/test/read-only-paper/metrics')
+      return Response.json((await this.storage.get(OBSERVED_PORTFOLIO_KEY))??null);
     if(path==='/test/read-only-paper/state') {
       const [bridge,ledger]=await Promise.all([
         this.storage.get(READONLY_PAPER_BRIDGE_KEY),
