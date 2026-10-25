@@ -4,7 +4,7 @@
 if (!location || !/^https:\/\/kite\.zerodha\.com$/.test(location.origin)) return;
 const outer=/^\/markets\/ext\/chart\//.test(location.pathname);
 const inner=/^\/static\/chart\/tradingview\//.test(location.pathname);
-function send(payload){try {chrome.runtime.sendMessage(payload,()=>void chrome.runtime.lastError);} catch {} }
+function send(payload){try {chrome.runtime.sendMessage(payload,()=>void chrome.runtime.lastError);} catch { /* A closed extension context cannot receive this heartbeat. */ } }
 if(outer||inner){
   const symbol=(location.pathname.match(/\/NFO-FUT\/(NIFTY\d{2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT)(?:\/|$)/)||[])[1]||null;
   const heartbeat=()=>send({type:'CHART_HEARTBEAT',symbol,chartFrame:inner});

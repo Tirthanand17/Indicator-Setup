@@ -1,0 +1,7 @@
+target-version = "py312"
+exclude = [".git", ".venv", "node_modules", "__pycache__"]
+
+[lint]
+# Undefined names, invalid control flow/comparisons and syntax errors.
+# Formatting/import-cleanup policy can expand independently of this gate.
+select = ["E9", "F63", "F7", "F82"]

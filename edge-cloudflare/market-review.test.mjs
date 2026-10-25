@@ -56,8 +56,6 @@ test('never use uncompleted 5m/15m bars to form a candidate',()=>{
   const good=evidence(fixture('downtrend_qualifying_review'));
   const fiveIncomplete=[...good.candles5,[kiteTime(good.observedAtMs-19_000),
     2,3,1,2,500]];
-  const fifteenIncomplete=[...good.candles15,[new Date(good.observedAtMs-20_000).toISOString(),
-    2,3,1,2,500]];
   // The one-second-shifted bar is rejected even when its timestamp is recent.
   assert.equal(reviewReadOnlyMarket({...good,candles5:fiveIncomplete}).status,'WAIT_DATA');
   // A properly aligned 15m current candle is ignored until 15m+8s.

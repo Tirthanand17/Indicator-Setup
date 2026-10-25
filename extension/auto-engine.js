@@ -31,7 +31,7 @@ function assess(bar,history){
  if(pe)return {status:'REVIEW_PE',reasons:['Five-indicator bearish alignment with 3-bar low breakdown','Near-close chart readings; not independently confirmed by exchange candle','Option premium, expiry, spread and position are NOT verified'],notify:true};
  return {status:'NO_TRADE',reasons:['Directional alignment, three-bar breakout or recent trend not confirmed'],notify:false};
 }
-function virtualPosition(bar,direction){const atr=bar.atr;const risk=Math.max(0.5*atr,bar.high-bar.low);if(direction==='CE') {const stop=Math.min(bar.low,bar.vwap)-0.25*atr;return {direction,entry:bar.close,stop,target:bar.close+1.5*(bar.close-stop),at:bar.end,symbol:bar.symbol};}const stop=Math.max(bar.high,bar.vwap)+0.25*atr;return {direction,entry:bar.close,stop,target:bar.close-1.5*(stop-bar.close),at:bar.end,symbol:bar.symbol};}
+function virtualPosition(bar,direction){const atr=bar.atr;if(direction==='CE') {const stop=Math.min(bar.low,bar.vwap)-0.25*atr;return {direction,entry:bar.close,stop,target:bar.close+1.5*(bar.close-stop),at:bar.end,symbol:bar.symbol};}const stop=Math.max(bar.high,bar.vwap)+0.25*atr;return {direction,entry:bar.close,stop,target:bar.close-1.5*(stop-bar.close),at:bar.end,symbol:bar.symbol};}
 function exitVirtual(p,b){if(!p||!validReading(b)||p.symbol!==b.symbol||b.end<=p.at)return {status:'WAIT_POSITION',notify:false};
  if(p.direction==='CE'){
    if(b.close<=p.stop)return {status:'EXIT_CE',reason:'Futures close crossed illustrative underlying invalidation',notify:true};

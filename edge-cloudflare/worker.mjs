@@ -11,7 +11,7 @@ import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   reserveQuoteRequest, recordQuoteFailure, clearQuoteAuthBlock, quotePaceStatus,
   claimMasterFetch, commitMasterPair,
   noteMasterFailure, claimOptionSnapshot, finishOptionSnapshot, noteOptionFailure,
-  optionStatus, validateOptionRuntime } from './option-runtime.mjs';
+  optionStatus } from './option-runtime.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from './readonly-paper-bridge.mjs';

@@ -98,7 +98,7 @@ export function auditPaperLedger(state) {
   const eventIds = new Set();
   for (const p of state.positions) {
     if (!p || !ACCOUNT_IDS.includes(p.accountId) ||
-      typeof p.signalId !== 'string' || !/^[A-Za-z0-9:._+\-]{8,220}$/.test(p.signalId) ||
+      typeof p.signalId !== 'string' || !/^[A-Za-z0-9:._+-]{8,220}$/.test(p.signalId) ||
       p.tradeId !== `${p.accountId}:${p.signalId}` ||
       tradeIds.has(p.tradeId) || signals.has(`${p.accountId}:${p.signalId}`) ||
       !['OPEN', 'CLOSED', 'EXIT_UNVERIFIABLE'].includes(p.status) ||
@@ -189,7 +189,7 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
   auditPaperLedger(state);
   const { day } = permitted(nowMs, true);
   reviewClock(state, nowMs);
-  if (typeof signalId !== 'string' || !/^[A-Za-z0-9:._+\-]{8,220}$/.test(signalId)) fail('INVALID_SIGNAL');
+  if (typeof signalId !== 'string' || !/^[A-Za-z0-9:._+-]{8,220}$/.test(signalId)) fail('INVALID_SIGNAL');
   if (!integer(slippageBps) || slippageBps < 0 || slippageBps > 100) fail('INVALID_SLIPPAGE');
   const { c, ask } = checkQuote(quote, nowMs);
   const next = structuredClone(state), results = {};

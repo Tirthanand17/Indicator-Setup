@@ -1,0 +1,4 @@
+# QA-only tools, never production or deployment dependencies.
+-r requirements-typecheck.txt
+ruff==0.17.2
+pip-audit==2.10.1
