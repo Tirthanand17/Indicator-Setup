@@ -36,6 +36,24 @@ test('fresh price reselects every strike after a 500-point move; CSV last_price 
   for(const price of [NaN,Infinity,0,'22505',24000])assert.throws(()=>selectCatalogPair(c,now,price));
 });
 
+test('next-year listed expiries are valid contract metadata without authorizing next-year sessions',()=>{
+  const csv=master(future(12347,'NIFTY27JANFUT','2027-01-28'),
+    '800,1,NIFTY27JAN22000CE,NIFTY,0,2027-01-28,22000,0.05,65,CE,NFO-OPT,NFO',
+    '801,1,NIFTY27JAN22000PE,NIFTY,0,2027-01-28,22000,0.05,65,PE,NFO-OPT,NFO');
+  assert.equal(selectCatalogPair(compileNiftyCatalog(csv,now),now,22005).expiry,'2026-10-29');
+  const december=at('2026-12-30'),c=compileNiftyCatalog(csv,december);
+  assert.equal(selectCatalogFuture(c,december).symbol,'NIFTY27JANFUT');
+  const pair=selectCatalogPair(c,december,22005);
+  assert.equal(pair.expiry,'2027-01-28');
+  const state=reselectOptionPair(undefined,{tickId:'2026-12-30:136',observedAtMs:december,pair});
+  assert.equal(state.pair.CE.expiry,'2027-01-28');
+  const opened=enterPaperBasket(newPaperLedger(december),{signalId:'YEAR:BOUNDARY:SIGNAL',
+    nowMs:december,quote:quote(pair.CE,december)});
+  assert.equal(opened.ledger.positions.length,2);
+  assert.throws(()=>compileNiftyCatalog(csv,at('2027-01-04')));
+  assert.throws(()=>newPaperLedger(at('2027-01-04')),/UNSUPPORTED_YEAR/);
+});
+
 test('bad master, duplicated identity, mismatched lot and unsupported days fail closed',()=>{
   const bad=[master().replace('NIFTY26OCTFUT','NIFTY26NOVFUT'),master(leg(200,'PE',22000)),
     master().replace('0.05,65,PE','0.05,75,PE'),master().replace('2026-10-27','2026-02-30')];

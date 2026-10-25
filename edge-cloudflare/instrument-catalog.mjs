@@ -9,7 +9,7 @@ const HEADER='instrument_token,exchange_token,tradingsymbol,name,last_price,expi
 const fail=code=>{throw Error('NIFTY_CATALOG_'+code);};
 const integer=n=>Number.isSafeInteger(n)&&n>0;
 const day=ms=>new Date(ms+OFFSET).toISOString().slice(0,10);
-const validDate=s=>typeof s==='string'&&/^2026-\d\d-\d\d$/.test(s)&&
+const validDate=s=>typeof s==='string'&&/^20\d\d-\d\d-\d\d$/.test(s)&&
   Number.isFinite(Date.parse(s+'T00:00:00Z'))&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
 const optionIdentity=c=>c&&['CE','PE'].includes(c.kind)&&
   new RegExp('^NIFTY\\d{2}[A-Z0-9]+'+c.kind+'$').test(c.symbol)&&validDate(c.expiry)&&

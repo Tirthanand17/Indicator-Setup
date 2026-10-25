@@ -13,7 +13,7 @@ const IST_OFFSET_MS = 330 * 60_000;
 
 const integer = n => Number.isSafeInteger(n);
 const positive = n => integer(n) && n > 0;
-const validDate = d => typeof d === 'string' && /^2026-\d\d-\d\d$/.test(d) &&
+const validDate = d => typeof d === 'string' && /^20\d\d-\d\d-\d\d$/.test(d) &&
   Number.isFinite(Date.parse(`${d}T00:00:00Z`)) &&
   new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
 const fail = msg => { throw new Error(`PAPER_LEDGER_${msg}`); };
@@ -24,7 +24,7 @@ function ist(nowMs) {
   const date = new Date(nowMs + IST_OFFSET_MS);
   if (!Number.isFinite(date.valueOf())) fail('INVALID_CLOCK');
   const day = date.toISOString().slice(0, 10);
-  if (!validDate(day)) fail('UNSUPPORTED_YEAR');
+  if (!validDate(day)||!day.startsWith('2026-')) fail('UNSUPPORTED_YEAR');
   return { day, minute: date.getUTCHours() * 60 + date.getUTCMinutes(),
     second: date.getUTCSeconds(), ms: nowMs };
 }

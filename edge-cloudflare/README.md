@@ -8,7 +8,7 @@ acceptance score **23/41 (56%)**, live acceptance **0/5**.
 NIFTY future and fresh ATM entry pair. One option batch also monitors original
 held contracts after the ATM strike moves; unavailable entry quotes do not hide
 valid exits. New records retain strike, and legacy records require exact
-catalogue identity. **278 JS/extension/gate and 21 native tests pass.**
+catalogue identity. **279 JS/extension/gate and 21 native tests pass.**
 [Selection policy, limits and native transport regression](../audit/INSTRUMENT_LIFECYCLE.md).
 
 **Automated quality gates:** `npm run quality:js` runs lint, edge/extension/gate

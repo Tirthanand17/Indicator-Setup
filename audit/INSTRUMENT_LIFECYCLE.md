@@ -21,6 +21,10 @@ This is offline/native-runtime implementation evidence; live acceptance is 0/5.
   strike wins, ties choose the lower strike, and distance must be <=250 points.
   Lot sizes and expiry are taken from the actual master, not inferred from a
   fixed weekly/monthly schedule.
+- Contract expiry dates may extend into a later year. They are metadata, not
+  authorization to trade an unsupported calendar year. Mixed long-dated master
+  rows do not invalidate the current year's selection; trading dates still use
+  the verified 2026 calendar and 2027 sessions remain disabled.
 - Every successful futures observation can reselect the entry pair from the
   cache, including a 500-point move. Selection cannot replace an in-flight
   option snapshot or roll back the last observed option tick.

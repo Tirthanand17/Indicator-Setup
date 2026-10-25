@@ -85,7 +85,8 @@ export function quotePaceStatus(state,nowMs) {
 const contractOk=(c,kind)=>c&&c.kind===kind&&typeof c.symbol==='string'&&
   symbol.test(c.symbol)&&c.symbol.endsWith(kind)&&integer(c.token)&&
   integer(c.lotSize)&&integer(c.strike)&&typeof c.expiry==='string'&&
-  /^2026-\d\d-\d\d$/.test(c.expiry);
+  /^20\d\d-\d\d-\d\d$/.test(c.expiry)&&Number.isFinite(Date.parse(c.expiry+'T00:00:00Z'))&&
+  new Date(c.expiry+'T00:00:00Z').toISOString().slice(0,10)===c.expiry;
 const legMatches=(v,c,day)=>v&&c&&v.contract&&
   v.contract.symbol===c.symbol&&v.contract.kind===c.kind&&
   v.contract.expiry===c.expiry&&v.contract.strike===c.strike&&

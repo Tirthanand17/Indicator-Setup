@@ -66,7 +66,7 @@ additional point. This score measures evidence, not hours of work remaining.
    redirect-error mode; manual mode preserves no-follow behavior.
    [Policy, bounds and regression evidence](INSTRUMENT_LIFECYCLE.md).
 
-Validation: **278 JavaScript/extension/quality-runner tests, 21 native
+Validation: **279 JavaScript/extension/quality-runner tests, 21 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.

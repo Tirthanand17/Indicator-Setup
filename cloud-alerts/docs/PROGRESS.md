@@ -5,7 +5,7 @@ future from the daily NFO catalogue, reselects ATM entry options after price
 moves and separately monitors original held contracts. Native tests cover
 catalogue/portfolio restart, missing entry quotes with valid exits, and the
 workerd-compatible no-follow redirect handling discovered by the new transport
-test. **278 JS/extension/runner + 21 native tests pass.** Independent audit score
+test. **279 JS/extension/runner + 21 native tests pass.** Independent audit score
 **23/41 = 56%**, live acceptance **0/5**. [Lifecycle policy and evidence](../../audit/INSTRUMENT_LIFECYCLE.md).
 
 **25 October automated quality gates:** pinned ESLint/Ruff, credential-isolated
