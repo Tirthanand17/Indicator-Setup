@@ -1,6 +1,77 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
-**IN DEVELOPMENT / PAPER ONLY. NOT DEPLOYED.** Checklist23/25 (92%), live acceptance0/5; [canonical progress](../cloud-alerts/docs/PROGRESS.md).
+**Inert cloud identity inspection:** a help-only-by-default CLI can perform an
+explicitly authorized set of GET-only Cloudflare metadata reads, correlating the
+exact Worker/version/ETag, disabled flags and SQLite namespace. It never deploys,
+creates resources or certifies Free-plan eligibility. Actual account inspection
+remains pending. [Procedure and limits](../audit/INERT_CLOUD_IDENTITY_VERIFICATION.md).
+
+**Unknown-exit position reconciliation:** a gated, halted-source owner workflow
+can retain the original debit as an explicit zero-credit paper write-off against
+a matching verified rollback archive. It creates no fill, refund, strategy P&L
+or resume. Accounting adjustments stay separate in reports, and versioned
+archives preserve the decision and original delivery history.
+[Procedure, schema versions and limits](../audit/UNVERIFIABLE_POSITION_RECONCILIATION.md).
+
+**Operational health/watchdog:** a separately gated read-only endpoint reports
+token, auth, heartbeat, outage and source-budget conditions without provider
+requests. An explicitly run external monitor persists dedupe and optional
+grouped-notification claims, with cooldowns and no uncertain-send retries.
+No monitor, bot or service was activated.
+[Procedure and limits](../audit/OPERATIONAL_HEALTH_AND_ALERTS.md).
+
+**Owner delivery reconciliation:** gated administrator inspection and exact-attempt
+suppression can resolve a halted source's uncertain journal entry without
+resending, asserting phone receipt or resuming processing. A bounded operator
+client requires explicit acknowledgement; duplicate requests and late definitive
+receipts preserve the durable cursor. The feature remains disabled.
+[Procedure and limitations](../audit/DELIVERY_AMBIGUITY_RECONCILIATION.md).
+
+**Journal lifecycle:** financial records use a preserve-at-cap policy with
+reserved terminal-event capacity; diagnostics retain bounded rings. A gated
+capacity report and archive-backed, halted-source metadata migration enforce
+explicit schema compatibility. Rollback uses an isolated quarantined target.
+[Operator procedure and limitations](../audit/OBSERVED_JOURNAL_LIFECYCLE.md).
+
+**Observed-state recovery:** separately gated encrypted export and empty-target
+restore now preserve both observed accounts, delivery watermarks, portfolio
+metrics and market-selection/scheduler state. The operator client verifies
+before saving or restoring; recovered copies remain durably quarantined.
+No hosted backup, destination or live restore is established.
+[Snapshot scope, commands and native drill](../audit/OBSERVED_STATE_RECOVERY.md).
+The historical archive checkpoints below describe the separate synthetic archive.
+
+**IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
+acceptance score **27/41 (66%)**, live acceptance **0/5**.
+[Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
+Historical phase test counts below are snapshots; current validation totals
+are maintained in that tracker.
+
+**Current monitoring cadence:** each eligible requested 20-second tick uses one
+shared quote for the front future, entry pair and original held contracts (at
+most five instruments). Paper exits commit before candle-history reads. The
+same durable rate/dedupe guards remain; cloud wake-up timing is unverified.
+**288 JS/extension/gate and 22 native tests pass.**
+[Traffic bounds, cold starts and failure behavior](../audit/OPTION_MONITORING_CADENCE.md).
+
+**Current instrument lifecycle:** a bounded daily catalogue selects the front
+NIFTY future and fresh ATM entry pair. One option batch also monitors original
+held contracts after the ATM strike moves; unavailable entry quotes do not hide
+valid exits. New records retain strike, and legacy records require exact
+catalogue identity. **279 JS/extension/gate and 21 native tests pass.**
+[Selection policy, limits and native transport regression](../audit/INSTRUMENT_LIFECYCLE.md).
+
+**Automated quality gates:** `npm run quality:js` runs lint, edge/extension/gate
+tests, disabled preflight, native SQLite regressions and npm advisories.
+`npm run quality:all` includes Python lint/types/tests/advisories using a Linux
+Python 3.12 QA environment. [Setup and CI evidence](../audit/OFFLINE_QUALITY_GATES.md).
+**265 JS/extension/gate, 19 native and 778 Python tests pass; one Python skip.**
+
+The 25 October fixes fence owner halt across asynchronous market/paper/delivery
+boundaries, patch Undici to 7.30.1, and derive observed dashboard delivery counts
+from the durable journal. Already-started sends may still receive and persist
+their response after halt; API acceptance does not prove phone receipt.
+**223 JS and 19 native SQLite tests pass; npm audit is clean.**
 
 **Phase36 read-only Cloudflare metrics collection gate (not activated):**
 `cloudflare-metrics-readonly.mjs` prepares tightly scoped GraphQL queries for
@@ -131,7 +202,7 @@ Offline **178 JS + 8 native** tests pass. [Phase28 audit](../audit/PHASE28_READO
 
 The Worker additionally implements POST `/internal/token` **only if both** `OFFLINE_SCHEDULER_ENABLED=true` and `READONLY_MARKET_RUNTIME_ENABLED=true`. Its binary-bounded (2KiB) handoff matches the existing Python `token_sender.py` HMAC-SHA256 request (`X-Relay-Timestamp`, `X-Relay-Nonce`, `X-Relay-Signature`), within90s of local clock, with exact API identity check. An atomic Durable Object transaction rejects nonce replay, older signed tokens, equal-second conflicting tokens, and corrupt prior records. An independent32-byte AES-GCM key encrypts bearer credentials at rest, with cryptographically authenticated signed-time/06:00 IST expiry/fingerprint metadata. Credentials, signatures, raw HTTP error bodies and Kite headers do not appear in public diagnostics.
 
-**For a future separately authorized activation only**, the secret bindings would be `TOKEN_RELAY_HMAC_KEY` (same strong HMAC key as the local Python sender), `TOKEN_VAULT_AES_KEY` (fresh32-byte base64 AES key), `KITE_API_KEY`, plus deployment config `KITE_FUTURE_SYMBOL` and `KITE_FUTURE_INSTRUMENT_TOKEN`. Store these as secret bindings and verify the valid monthly NIFTY futures identity before enabling; do **not** commit live values. The current example deliberately contains no credentials or actual instrument identity. Cloud service creation, domain, DNS and token upload require new permission.
+**For a future separately authorized activation only**, secret bindings are `TOKEN_RELAY_HMAC_KEY`, `TOKEN_VAULT_AES_KEY` (fresh 32-byte base64 AES key), and `KITE_API_KEY`. Futures identity is discovered from a validated same-day NFO master; configured `KITE_FUTURE_SYMBOL` and `KITE_FUTURE_INSTRUMENT_TOKEN` are no longer used as fallback hints. Keep real credentials out of code and chats. Cloud activation and daily token transfer require the applicable owner authorization.
 
 Only `market-readonly.mjs` can construct external Kite market requests. Its final URL gate allows GET `https://api.kite.trade/quote?i=NFO:NIFTY…`, approved futures 5m/15m historical GETs and NFO instrument CSV. It rejects other hosts, non-HTTPS, redirects, transaction paths, unexpected types, oversized responses and malformed OHLC. The alarm's opt-in sampler performs a futures quote at an eligible20-second slot, and two historical candle reads at five-minute boundaries, recording bounded **sanitized metadata only**. Missing/stale/mismatched exchange quote timestamps, invalid futures config, expired token, network faults and storage failures fail closed. No fallback to a trading-capable SDK.
 

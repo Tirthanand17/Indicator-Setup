@@ -31,7 +31,7 @@ test('synthetic read-only quote and both candle intervals use GET, no redirects,
   const calls=[];
   const client=createReadOnlyKite({apiKey,accessToken,fetchImpl:async (url,init) => {
     calls.push({url,init});
-    assert.equal(init.method,'GET'); assert.equal(init.redirect,'error');
+    assert.equal(init.method,'GET'); assert.equal(init.redirect,'manual');
     assert.equal(init.credentials,'omit'); assert.equal(init.cache,'no-store');
     assert.equal(init.headers.Authorization,`token ${apiKey}:${accessToken}`);
     if(url.includes('/quote?')) return json({['NFO:'+future]:{last_price:123.4,depth:{buy:[]}}});

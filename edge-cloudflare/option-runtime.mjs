@@ -10,7 +10,7 @@ const MIN_QUOTE_INTERVAL_MS=1_100;
 const MASTER_RETRY_MS=30*60_000;
 const MAX_MASTER_ATTEMPTS=3;
 const MAX_DAILY_REQUESTS=1_125;
-const KINDS=['FUTURE','OPTION_PAIR'];
+const KINDS=['FUTURE','OPTION_PAIR','MARKET_BATCH'];
 const fail=code=>{throw new Error('READONLY_OPTION_RUNTIME_'+code);};
 const integer=n=>Number.isSafeInteger(n)&&n>0;
 const dayIst=ms=>new Date(ms+IST_OFFSET).toISOString().slice(0,10);
@@ -63,6 +63,14 @@ export function recordQuoteFailure(state,{tickId,observedAtMs,errorCode}={}) {
       Math.max(state.blockedUntilMs,observedAtMs+60_000):state.blockedUntilMs});
 }
 
+/** Pace from response completion too, including failed/slow requests. */
+export function recordQuoteCompletion(state,{tickId,observedAtMs}={}) {
+  validateQuotePace(state);
+  if(!state||state.lastTickId!==tickId||!integer(observedAtMs)||observedAtMs<state.lastReservedAtMs)
+    fail('OUT_OF_ORDER_COMPLETION');
+  return Object.freeze({...state,blockedUntilMs:Math.max(state.blockedUntilMs,observedAtMs+MIN_QUOTE_INTERVAL_MS)});
+}
+
 /** Only a newly authorized token handoff can lift the sticky 403 block. */
 export function clearQuoteAuthBlock(state) {
   validateQuotePace(state);
@@ -85,7 +93,8 @@ export function quotePaceStatus(state,nowMs) {
 const contractOk=(c,kind)=>c&&c.kind===kind&&typeof c.symbol==='string'&&
   symbol.test(c.symbol)&&c.symbol.endsWith(kind)&&integer(c.token)&&
   integer(c.lotSize)&&integer(c.strike)&&typeof c.expiry==='string'&&
-  /^2026-\d\d-\d\d$/.test(c.expiry);
+  /^20\d\d-\d\d-\d\d$/.test(c.expiry)&&Number.isFinite(Date.parse(c.expiry+'T00:00:00Z'))&&
+  new Date(c.expiry+'T00:00:00Z').toISOString().slice(0,10)===c.expiry;
 const legMatches=(v,c,day)=>v&&c&&v.contract&&
   v.contract.symbol===c.symbol&&v.contract.kind===c.kind&&
   v.contract.expiry===c.expiry&&v.contract.strike===c.strike&&
@@ -175,6 +184,26 @@ export function noteMasterFailure(state,{tickId}={}) {
   if(!state||state.status!=='MASTER_PENDING'||state.lastMasterTickId!==tickId)
     fail('MASTER_FAILURE_REJECTED');
   return {...state,pair:null,evidence:null,status:'MASTER_BLOCKED'};
+}
+
+/** Reselect from a separately cached daily master; never rewrite in-flight evidence. */
+export function reselectOptionPair(state,{tickId,observedAtMs,pair,masterAttempts=1}={}) {
+  const current=optionRuntimeForDay(state,observedAtMs);
+  if(!isTick(tickId,observedAtMs)||!pair||!contractOk(pair.CE,'CE')||!contractOk(pair.PE,'PE')||
+    pair.CE.expiry!==pair.PE.expiry||pair.CE.strike!==pair.PE.strike||
+    pair.CE.lotSize!==pair.PE.lotSize||pair.CE.token===pair.PE.token||pair.CE.expiry<=current.day||
+    !integer(pair.masterFetchedAtMs)||dayIst(pair.masterFetchedAtMs)!==current.day||
+    pair.masterFetchedAtMs>observedAtMs||!integer(masterAttempts)||masterAttempts>3)
+    fail('PAIR_RESELECT_REJECTED');
+  if(current.status==='OPTION_PENDING'||(current.lastOptionTickId&&
+    Number(tickId.split(':')[1])<=Number(current.lastOptionTickId.split(':')[1])))fail('PAIR_RESELECT_IN_FLIGHT');
+  const compact={CE:{...pair.CE},PE:{...pair.PE},masterFetchedAtMs:pair.masterFetchedAtMs};
+  if(JSON.stringify(current.pair)===JSON.stringify(compact))return current;
+  const next={...current,attempts:Math.max(current.attempts,masterAttempts),
+    lastMasterTickId:current.lastMasterTickId??tickId,nextMasterTryAtMs:observedAtMs+MASTER_RETRY_MS,
+    pair:compact,
+    evidence:null,status:'MASTER_READY'};
+  validateOptionRuntime(next);return next;
 }
 
 /** Consume an option tick even on network failure to prevent replay. */

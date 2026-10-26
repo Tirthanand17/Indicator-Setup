@@ -7,13 +7,16 @@ import { estimateLeg, COST_POLICY } from './strategy-core.mjs';
 
 export const PAPER_LEDGER_KEY = 'paper-ledger-v1';
 export const PAPER_ACCOUNT_CAPITALS = Object.freeze({ PAPER_50K: 5_000_000, PAPER_100K: 10_000_000 });
+export const UNKNOWN_EXIT_WRITE_OFF_ACK='OWNER_ACCEPTS_UNKNOWN_EXIT_ZERO_CREDIT_NO_STRATEGY_FILL';
+export const paperPositionActive=p=>['OPEN','EXIT_UNVERIFIABLE'].includes(p.status);
+export const missedExitCutoff=p=>Date.parse(new Date(p.entryAtMs+330*60000).toISOString().slice(0,10)+'T15:26:00+05:30');
 const ACCOUNT_IDS = Object.keys(PAPER_ACCOUNT_CAPITALS);
 const MAX_TRADES = 512, MAX_REJECTIONS = 1024, MAX_OUTBOX = 1024;
 const IST_OFFSET_MS = 330 * 60_000;
 
 const integer = n => Number.isSafeInteger(n);
 const positive = n => integer(n) && n > 0;
-const validDate = d => typeof d === 'string' && /^2026-\d\d-\d\d$/.test(d) &&
+const validDate = d => typeof d === 'string' && /^20\d\d-\d\d-\d\d$/.test(d) &&
   Number.isFinite(Date.parse(`${d}T00:00:00Z`)) &&
   new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
 const fail = msg => { throw new Error(`PAPER_LEDGER_${msg}`); };
@@ -24,7 +27,7 @@ function ist(nowMs) {
   const date = new Date(nowMs + IST_OFFSET_MS);
   if (!Number.isFinite(date.valueOf())) fail('INVALID_CLOCK');
   const day = date.toISOString().slice(0, 10);
-  if (!validDate(day)) fail('UNSUPPORTED_YEAR');
+  if (!validDate(day)||!day.startsWith('2026-')) fail('UNSUPPORTED_YEAR');
   return { day, minute: date.getUTCHours() * 60 + date.getUTCMinutes(),
     second: date.getUTCSeconds(), ms: nowMs };
 }
@@ -61,6 +64,7 @@ export function checkQuote(quote, nowMs) {
   if (!c || !['CE', 'PE'].includes(c.kind) ||
     typeof c.symbol !== 'string' || !/^NIFTY[A-Z0-9]+(?:CE|PE)$/.test(c.symbol) ||
     !c.symbol.endsWith(c.kind) || !positive(c.lotSize) || !positive(c.token) ||
+    (c.strike!==undefined&&!positive(c.strike)) ||
     !validDate(c.expiry) || c.expiry < current.day) fail('INVALID_CONTRACT');
   if (!integer(quote.updatedAtMs) || nowMs - quote.updatedAtMs > 15_000 ||
     quote.updatedAtMs - nowMs > 3000 || ist(quote.updatedAtMs).day !== current.day) {
@@ -86,7 +90,7 @@ export function newPaperLedger(nowMs) {
 
 /** Reconstruct every balance; any failed invariant blocks subsequent writes. */
 export function auditPaperLedger(state) {
-  if (!state || state.schema !== 1 || !integer(state.lastMutationAtMs) ||
+  if (!state || ![1,2].includes(state.schema) || !integer(state.lastMutationAtMs) ||
     !state.accounts || typeof state.accounts !== 'object' ||
     Object.keys(state.accounts).sort().join(',') !== ACCOUNT_IDS.slice().sort().join(',') ||
     !Array.isArray(state.positions) || state.positions.length > MAX_TRADES ||
@@ -98,10 +102,10 @@ export function auditPaperLedger(state) {
   const eventIds = new Set();
   for (const p of state.positions) {
     if (!p || !ACCOUNT_IDS.includes(p.accountId) ||
-      typeof p.signalId !== 'string' || !/^[A-Za-z0-9:._+\-]{8,220}$/.test(p.signalId) ||
+      typeof p.signalId !== 'string' || !/^[A-Za-z0-9:._+-]{8,220}$/.test(p.signalId) ||
       p.tradeId !== `${p.accountId}:${p.signalId}` ||
       tradeIds.has(p.tradeId) || signals.has(`${p.accountId}:${p.signalId}`) ||
-      !['OPEN', 'CLOSED', 'EXIT_UNVERIFIABLE'].includes(p.status) ||
+      !['OPEN', 'CLOSED', 'EXIT_UNVERIFIABLE','EXIT_WRITTEN_OFF'].includes(p.status) ||
       !positive(p.lotSize) || !positive(p.lots) || p.lots > 3 ||
       !positive(p.entryFillPaise) || !positive(p.entryAskPaise) ||
       p.entryFillPaise < p.entryAskPaise ||
@@ -112,6 +116,7 @@ export function auditPaperLedger(state) {
       !positive(p.entryQuoteAtMs) || p.entryQuoteAtMs - p.entryAtMs > 3000 ||
       p.entryAtMs - p.entryQuoteAtMs > 15000 ||
       !positive(p.token) || !validDate(p.expiry) ||
+      (p.strike!==undefined&&!positive(p.strike)) ||
       !['CE', 'PE'].includes(p.kind) || typeof p.symbol !== 'string' ||
       !/^NIFTY[A-Z0-9]+(?:CE|PE)$/.test(p.symbol) || !p.symbol.endsWith(p.kind) ||
       !positive(p.stopBidPaise) || p.stopBidPaise >= p.entryAskPaise ||
@@ -120,10 +125,21 @@ export function auditPaperLedger(state) {
       !integer(p.slippageBps) || p.slippageBps < 0 || p.slippageBps > 100 ||
       p.feePolicy !== COST_POLICY) fail('CORRUPT_POSITION');
     tradeIds.add(p.tradeId); signals.add(`${p.accountId}:${p.signalId}`);
+    if(p.status==='EXIT_WRITTEN_OFF') {
+      const r=p.ownerResolution;
+      if(state.schema!==2||!r||Object.keys(r).sort().join(',')!=='acknowledgement,atMs,baselineArchiveId,kind,schema'||
+        r.schema!==1||r.kind!=='WRITE_OFF_UNKNOWN_NO_EXIT_CREDIT'||r.acknowledgement!==UNKNOWN_EXIT_WRITE_OFF_ACK||
+        !positive(r.atMs)||r.atMs<missedExitCutoff(p)||r.atMs>state.lastMutationAtMs||
+        typeof r.baselineArchiveId!=='string'||!/^[a-f0-9]{64}$/.test(r.baselineArchiveId)||
+        !['exitAtMs','exitQuoteAtMs','exitFillPaise','exitFeePaise','exitCreditPaise','exitReason','netPnlPaise'].every(k=>p[k]===null)||
+        p.exitBidPaise!==undefined)fail('CORRUPT_OWNER_WRITE_OFF');
+    }else if(p.ownerResolution!==undefined)fail('ORPHAN_OWNER_RESOLUTION');
     balance[p.accountId] -= p.entryDebitPaise;
     if (p.status !== 'CLOSED') {
-      if (active.has(p.accountId)) fail('MULTIPLE_ACTIVE_POSITIONS');
-      active.add(p.accountId);
+      if(paperPositionActive(p)) {
+        if (active.has(p.accountId)) fail('MULTIPLE_ACTIVE_POSITIONS');
+        active.add(p.accountId);
+      }
       if (p.exitAtMs !== null || p.exitCreditPaise !== null || p.netPnlPaise !== null ||
           p.exitFeePaise !== null) fail('CORRUPT_OPEN_POSITION');
     } else {
@@ -155,9 +171,13 @@ export function auditPaperLedger(state) {
     eventIds.add(e.eventId);
   }
   for (const p of state.positions) {
+    if(p.status==='EXIT_WRITTEN_OFF') {
+      const event=state.outbox.find(e=>e.eventId===`PAPER_UNVERIFIABLE:${p.tradeId}`);
+      if(!event||event.atMs<missedExitCutoff(p)||event.atMs>p.ownerResolution.atMs)fail('NONCAUSAL_OWNER_RESOLUTION');
+    }
     if (!eventIds.has(`PAPER_ENTRY:${p.tradeId}`) ||
       (p.status === 'CLOSED') !== eventIds.has(`PAPER_EXIT:${p.tradeId}`) ||
-      (p.status === 'EXIT_UNVERIFIABLE') !== eventIds.has(`PAPER_UNVERIFIABLE:${p.tradeId}`)) {
+      (['EXIT_UNVERIFIABLE','EXIT_WRITTEN_OFF'].includes(p.status)) !== eventIds.has(`PAPER_UNVERIFIABLE:${p.tradeId}`)) {
       fail('MISSING_OUTBOX_EVENT');
     }
   }
@@ -189,7 +209,7 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
   auditPaperLedger(state);
   const { day } = permitted(nowMs, true);
   reviewClock(state, nowMs);
-  if (typeof signalId !== 'string' || !/^[A-Za-z0-9:._+\-]{8,220}$/.test(signalId)) fail('INVALID_SIGNAL');
+  if (typeof signalId !== 'string' || !/^[A-Za-z0-9:._+-]{8,220}$/.test(signalId)) fail('INVALID_SIGNAL');
   if (!integer(slippageBps) || slippageBps < 0 || slippageBps > 100) fail('INVALID_SLIPPAGE');
   const { c, ask } = checkQuote(quote, nowMs);
   const next = structuredClone(state), results = {};
@@ -204,13 +224,15 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
     if (old) { results[accountId] = { status: 'DUPLICATE', tradeId: old.tradeId }; continue; }
     if (reject) { results[accountId] = { status: 'REJECTED', reason: reject.reason }; continue; }
     const { initialPaise, cashPaise } = next.accounts[accountId];
-    const active = next.positions.some(p => p.accountId === accountId && p.status !== 'CLOSED');
+    const active = next.positions.some(p => p.accountId === accountId && paperPositionActive(p));
     const todayEntries = next.positions.filter(p => p.accountId === accountId &&
       ist(p.entryAtMs).day === day).length;
     const dailyLoss = next.positions.filter(p => p.accountId === accountId &&
       p.status === 'CLOSED' && ist(p.exitAtMs).day === day && p.netPnlPaise < 0)
       .reduce((sum, p) => sum + p.netPnlPaise, 0);
-    const remainingDaily = Math.max(0, Math.floor(initialPaise * 0.06) + dailyLoss);
+    const ownerLoss=next.positions.filter(p=>p.accountId===accountId&&p.status==='EXIT_WRITTEN_OFF'&&
+      ist(p.ownerResolution.atMs).day===day).reduce((sum,p)=>sum+p.entryDebitPaise,0);
+    const remainingDaily = Math.max(0, Math.floor(initialPaise * 0.06) + dailyLoss-ownerLoss);
     let selected = null;
     for (let lots = Math.min(3, quoteLotLimit); lots > 0; lots--) {
       const qty = lots * c.lotSize;
@@ -233,10 +255,15 @@ export function enterPaperBasket(state, { signalId, quote, nowMs, slippageBps = 
       results[accountId] = { status: 'REJECTED', reason }; continue;
     }
     requireRoom(next, 'positions', MAX_TRADES);
+    requireRoom(next, 'rejections', MAX_REJECTIONS);
+    // Every active position needs one terminal outbox event, even at capacity.
+    const outstanding=next.positions.filter(paperPositionActive).length;
+    if(next.outbox.length+outstanding+2>MAX_OUTBOX)fail('RESERVED_EXIT_CAPACITY');
     const tradeId = `${accountId}:${signalId}`;
     next.accounts[accountId].cashPaise -= selected.debit;
     next.positions.push({ tradeId, accountId, signalId, symbol: c.symbol, kind: c.kind,
       expiry: c.expiry, token: c.token, lotSize: c.lotSize, lots: selected.lots,
+      ...(c.strike===undefined?{}:{strike:c.strike}),
       entryAtMs: nowMs, entryQuoteAtMs: quote.updatedAtMs, entryAskPaise: ask,
       entryFillPaise: fill, entryDebitPaise: selected.debit, entryFeePaise: selected.entryFee,
       exitFeeAssumedPaise: selected.exitFee, slippageBps, feePolicy: COST_POLICY,
@@ -266,7 +293,8 @@ export function exitPaperPosition(state, { tradeId, quote, nowMs } = {}) {
     status: old.status === 'CLOSED' ? 'DUPLICATE' : 'UNVERIFIABLE', tradeId }, paperOnly: true };
   const { c, bid } = checkQuote(quote, nowMs);
   if (old.symbol !== c.symbol || old.kind !== c.kind || old.expiry !== c.expiry ||
-    old.token !== c.token || old.lotSize !== c.lotSize) fail('CONTRACT_MISMATCH');
+    old.token !== c.token || old.lotSize !== c.lotSize ||
+    (old.strike!==undefined&&old.strike!==c.strike)) fail('CONTRACT_MISMATCH');
   if (nowMs <= old.entryAtMs || quote.updatedAtMs < old.entryQuoteAtMs) fail('NONCAUSAL_EXIT');
   const qty = old.lots * old.lotSize;
   if (quote.bidQuantity < qty) return { ledger: state, result: { status: 'WAIT_DEPTH', tradeId }, paperOnly: true };
@@ -324,12 +352,33 @@ export function paperLedgerSummary(state) {
       openCount: rows.filter(p => p.status === 'OPEN').length,
       unverifiableCount: rows.filter(p => p.status === 'EXIT_UNVERIFIABLE').length,
       closedCount: rows.filter(p => p.status === 'CLOSED').length,
+      writtenOffCount:rows.filter(p=>p.status==='EXIT_WRITTEN_OFF').length,
+      ownerAdjustmentPaise:-rows.filter(p=>p.status==='EXIT_WRITTEN_OFF').reduce((sum,p)=>sum+p.entryDebitPaise,0),
       realizedNetPnlPaise: rows.filter(p => p.status === 'CLOSED')
         .reduce((sum, p) => sum + p.netPnlPaise, 0),
       markedToMarket: false };
   });
-  return { schema: 1, paperOnly: true, realOrdersEnabled: false, accounts,
+  return { schema: state.schema, paperOnly: true, realOrdersEnabled: false, accounts,
     positionCount: state.positions.length, rejectionCount: state.rejections.length,
     pendingOutboxCount: state.outbox.length, lastMutationAtMs: state.lastMutationAtMs,
     outboxDeliveryImplemented: false, liveMarketConnected: false };
+}
+
+/** Owner paper-accounting decision, not a market exit, credit, refund or fill. */
+export function writeOffUnknownPaperExits(state,{tradeIds,baselineArchiveId,acknowledgement,nowMs}={}) {
+  auditPaperLedger(state);ist(nowMs);reviewClock(state,nowMs);
+  if(!Array.isArray(tradeIds)||tradeIds.length<1||tradeIds.length>2||new Set(tradeIds).size!==tradeIds.length||
+    acknowledgement!==UNKNOWN_EXIT_WRITE_OFF_ACK||typeof baselineArchiveId!=='string'||!/^[a-f0-9]{64}$/.test(baselineArchiveId))
+    fail('OWNER_WRITE_OFF_ACK_REQUIRED');
+  const next=structuredClone(state);
+  for(const id of tradeIds) {
+    const p=next.positions.find(p=>p.tradeId===id);
+    if(!p||!paperPositionActive(p)||nowMs<missedExitCutoff(p))fail('INELIGIBLE_OWNER_WRITE_OFF');
+    if(p.status==='OPEN')outbox(next,'PAPER_UNVERIFIABLE',p.tradeId,nowMs,
+      `${p.accountId} ${p.symbol} missed exit acknowledged by owner; no exit credit; paper debit written off`);
+    p.status='EXIT_WRITTEN_OFF';
+    p.ownerResolution={schema:1,kind:'WRITE_OFF_UNKNOWN_NO_EXIT_CREDIT',atMs:nowMs,
+      baselineArchiveId,acknowledgement};
+  }
+  next.schema=2;next.lastMutationAtMs=nowMs;auditPaperLedger(next);return next;
 }

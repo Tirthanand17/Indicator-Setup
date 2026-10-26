@@ -11,11 +11,11 @@ const fail = code => { throw new Error(`NIFTY_OPTION_READONLY_${code}`); };
 const positiveInt = n => Number.isSafeInteger(n) && n > 0;
 const positiveNumber = n => typeof n === 'number' && Number.isFinite(n) && n > 0;
 const dayIst = ms => new Date(ms + IST_MS).toISOString().slice(0, 10);
-const validDay = day => typeof day === 'string' && /^2026-\d\d-\d\d$/.test(day) &&
+const validDay = day => typeof day === 'string' && /^20\d\d-\d\d-\d\d$/.test(day) &&
   Number.isFinite(Date.parse(day+'T00:00:00Z')) &&
   new Date(day+'T00:00:00Z').toISOString().slice(0, 10) === day;
 
-function csvRecord(line) {
+export function csvRecord(line) {
   const fields=[]; let value='', quoted=false, closed=false;
   for(let i=0;i<line.length;i++) {
     const c=line[i];

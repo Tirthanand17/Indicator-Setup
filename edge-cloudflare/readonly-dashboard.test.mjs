@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import { Script } from 'node:vm';
 import { newPaperLedger,enterPaperBasket,exitPaperPosition } from './paper-ledger.mjs';
 import { newReadOnlyBridge } from './readonly-paper-bridge.mjs';
+import { captureObservedPortfolio } from './observed-portfolio.mjs';
+import {unresolvedFixture,EOD} from './test-support/position-reconciliation-fixture.mjs';
+import {writeOffUnknownPaperExits,UNKNOWN_EXIT_WRITE_OFF_ACK} from './paper-ledger.mjs';
 import { privateReadOnlySnapshot } from './readonly-dashboard.mjs';
 import { handlePrivateDashboard,issueDashboardSession } from './private-dashboard.mjs';
 import worker from './worker.mjs';
+import { newPaperDeliveryJournal,claimPaperDelivery,settlePaperDelivery,
+  suppressAmbiguousDelivery } from './paper-delivery.mjs';
 
 const KEY='readonly-private-dashboard-2026-AaBbCcDd012345';
 const ADMIN='readonly-scheduler-administrator-0123456789-AbCd';
@@ -46,16 +51,47 @@ test('read-only projection separates accounts, realized exits and unresolved equ
   assert.equal(result.totalTrades,2);
   assert.equal(result.accounts[0].closedCount,1);
   assert.equal(result.accounts[1].openCount,1);
-  assert.equal(result.accounts[0].markedEquityRupees,null);
+  assert.equal(result.accounts[0].markedEquityRupees,result.accounts[0].cashRupees);
   assert.equal(result.accounts[1].unrealizedPnlRupees,null);
   assert.equal(result.daily[0].verifiedExits,1);
   assert.equal(result.daily[1].winRate,null);
   assert.equal(result.trades[0].netPnlRupees,null);
-  assert.equal(result.pendingOutboxCount,3);
+  assert.equal(result.pendingOutboxCount,null);
+  assert.equal(result.retainedOutboxCount,3);
+  assert.equal(result.deliveryStatus,'DELIVERY_JOURNAL_UNAVAILABLE');
   assert.equal(result.telegramDelivered,false);
   assert.equal(result.evidenceStatus,'STALE_OR_HISTORIC_OBSERVATION');
   assert.equal(JSON.stringify(result).includes('message'),false);
   assert.equal(JSON.stringify(result).includes('314159'),false); // no broker instrument token
+});
+
+test('delivery projection uses durable cursor and distinguishes accepted, ambiguous and suppressed',()=>{
+  const {bridge,ledger}=fixture();const nowMs=AT+80_000;
+  let journal=newPaperDeliveryJournal(nowMs);
+  const project=()=>privateReadOnlySnapshot(bridge,ledger,{nowMs,deliveryJournal:journal});
+  const claim=()=>{const c=claimPaperDelivery(journal,ledger,nowMs);journal=c.journal;return c.result;};
+  const first=claim();
+  journal=settlePaperDelivery(journal,ledger,{...first,nowMs,httpStatus:200,
+    botResponse:{ok:true,result:{message_id:123}}}).journal;
+  assert.equal(project().pendingOutboxCount,2);
+  assert.equal(project().delivery.acceptedByBotApi,1);
+  const second=claim();
+  journal=settlePaperDelivery(journal,ledger,{...second,nowMs,httpStatus:null,botResponse:null}).journal;
+  assert.equal(project().pendingOutboxCount,2);
+  assert.equal(project().delivery.queued,1);
+  assert.equal(project().delivery.blockingState,'AMBIGUOUS_ACK_REQUIRED');
+  journal=suppressAmbiguousDelivery(journal,ledger,{eventId:second.eventId,nowMs,
+    decision:'OWNER_SUPPRESS_RESEND_ACKNOWLEDGING_UNKNOWN_DELIVERY'}).journal;
+  assert.equal(project().pendingOutboxCount,1);
+  assert.equal(project().delivery.suppressedUnknown,1);
+  const third=claim();
+  journal=settlePaperDelivery(journal,ledger,{...third,nowMs,httpStatus:403,
+    botResponse:{ok:false,error_code:403}}).journal;
+  assert.equal(project().pendingOutboxCount,0);
+  assert.equal(project().delivery.rejected,1);
+  assert.equal(project().retainedOutboxCount,3);
+  assert.equal(project().telegramDelivered,false);
+  assert.throws(()=>privateReadOnlySnapshot(bridge,ledger,{nowMs,deliveryJournal:{...journal,nextIndex:0}}));
 });
 
 test('read-only dashboard requires private session and every market flag',async()=>{
@@ -106,4 +142,43 @@ test('top-level worker does not permit private read-only route when disabled',as
   const e=env();e.OFFLINE_PRIVATE_DASHBOARD_ENABLED='false';
   e.MARKET_SESSION={idFromName:()=>{throw Error('must not access storage');}};
   assert.equal((await worker.fetch(request('/paper/api/readonly'),e)).status,404);
+});
+
+test('private dashboard renders fresh metrics, stale unavailable values and clears failed reports',async()=>{
+  const {bridge,ledger}=fixture(),now=AT+80000;
+  const portfolioMetrics=captureObservedPortfolio(undefined,newReadOnlyBridge(),newPaperLedger(AT),
+    bridge,ledger,[quote(now)],now);
+  let view=privateReadOnlySnapshot(bridge,ledger,{nowMs:now,portfolioMetrics}),broken=false;
+  const response=await handlePrivateDashboard(request('/paper/assets/readonly.js',{headers:await auth()}),env(),storage(bridge,ledger));
+  const makeNode=()=>({children:[],textContent:'',append(...nodes){this.children.push(...nodes);},
+    replaceChildren(...nodes){this.children=nodes;},addEventListener(){}});
+  const ids=['status','accounts','capital','daily','statistics','equity','trades','day','account','refresh'];
+  const nodes=Object.fromEntries(ids.map(id=>[id,makeNode()]));nodes.account.value='ALL';
+  const context={document:{getElementById:id=>nodes[id],createElement:makeNode,hidden:false},
+    fetch:async()=>{if(broken)throw Error('Synthetic unavailable');return {status:200,ok:true,json:async()=>view};},
+    setInterval:()=>{},location:{assign:()=>{throw Error('Unexpected navigation');}},Date,Intl,encodeURIComponent};
+  const script=new Script(await response.text());script.runInNewContext(context);
+  await new Promise(resolve=>setImmediate(resolve));
+  const text=n=>n.textContent+n.children.map(text).join(' ');
+  assert.match(text(nodes.capital),/FRESH_OBSERVED_BID/);
+  assert.match(text(nodes.statistics),/Profit factor/);
+  assert.equal(nodes.trades.children[0].children.length,15);
+  assert.ok(nodes.equity.children.length>0);
+  view=privateReadOnlySnapshot(bridge,ledger,{nowMs:now+16000,portfolioMetrics});
+  await new Script('refresh()').runInNewContext(context);
+  assert.match(text(nodes.capital),/STALE_POSITION_MARK/);
+  assert.match(text(nodes.capital),/Unavailable/);
+  const unknown=unresolvedFixture({both:true}),resolved=writeOffUnknownPaperExits(unknown.ledger,{
+    tradeIds:unknown.ledger.positions.map(p=>p.tradeId),nowMs:EOD+60000,
+    baselineArchiveId:'a'.repeat(64),acknowledgement:UNKNOWN_EXIT_WRITE_OFF_ACK});
+  const resolvedMetrics=captureObservedPortfolio(unknown.metrics,unknown.bridge,unknown.ledger,unknown.bridge,resolved,[],EOD+60000);
+  view=privateReadOnlySnapshot(unknown.bridge,resolved,{nowMs:EOD+60000,portfolioMetrics:resolvedMetrics});
+  await new Script('refresh()').runInNewContext(context);
+  assert.match(text(nodes.accounts),/1 owner write-offs/);
+  assert.match(text(nodes.statistics),/0 strategy closed/);
+  assert.match(text(nodes.trades),/Owner debit write-off/);
+  assert.match(text(nodes.trades),/exit unknown/);
+  broken=true;await new Script('refresh()').runInNewContext(context);
+  assert.match(nodes.status.textContent,/UNAVAILABLE/);
+  for(const id of ['accounts','capital','daily','statistics','equity','trades'])assert.equal(nodes[id].children.length,0);
 });

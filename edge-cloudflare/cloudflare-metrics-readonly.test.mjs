@@ -41,7 +41,7 @@ test('two fake GraphQL responses produce only sanitized, non-authorizing metrics
     n++;
     assert.equal(url,'https://api.cloudflare.com/client/v4/graphql');
     assert.equal(options.method,'POST');
-    assert.equal(options.redirect,'error');
+    assert.equal(options.redirect,'manual');
     assert.equal(options.headers.Authorization,`Bearer ${secret}`);
     const request=JSON.parse(options.body);
     assert.equal(request.variables.accountTag,tag);

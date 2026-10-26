@@ -3,6 +3,7 @@
  * No secret, cloud API, deploy command, HTTP request or account access here.
  */
 import { sessionStatus } from './alarm-core.mjs';
+import {marketTrafficPlan} from './market-cadence.mjs';
 
 export const FREE_REFERENCE_2026_10_24 = Object.freeze({
   sourceWorkers: 'https://developers.cloudflare.com/workers/platform/pricing/',
@@ -17,7 +18,7 @@ export const FREE_REFERENCE_2026_10_24 = Object.freeze({
   durableStoredBytes: 5_000_000_000,
 });
 
-const SAFE_VARS = Object.freeze([
+export const INERT_RUNTIME_FLAGS = Object.freeze([
   'OFFLINE_SCHEDULER_ENABLED', 'READONLY_MARKET_RUNTIME_ENABLED',
   'OFFLINE_READONLY_REVIEW_ENABLED',
   'OFFLINE_OPTION_SNAPSHOT_ENABLED',
@@ -26,7 +27,12 @@ const SAFE_VARS = Object.freeze([
   'OFFLINE_TELEGRAM_SENDER_ENABLED',
   'OFFLINE_PAPER_LEDGER_ENABLED', 'OFFLINE_SYNTHETIC_SESSION_ENABLED',
   'OFFLINE_DELIVERY_REHEARSAL_ENABLED', 'OFFLINE_PRIVATE_DASHBOARD_ENABLED',
+  'OFFLINE_OBSERVED_ARCHIVE_ENABLED','OFFLINE_OBSERVED_RESTORE_ENABLED',
+  'OFFLINE_DELIVERY_RECONCILIATION_ENABLED',
+  'OFFLINE_OPERATIONAL_HEALTH_ENABLED',
+  'OFFLINE_POSITION_RECONCILIATION_ENABLED',
 ]);
+const SAFE_VARS = INERT_RUNTIME_FLAGS;
 const sorted = values => [...values].sort().join(',');
 const exactKeys = (object, keys) => object && !Array.isArray(object) &&
   typeof object === 'object' && sorted(Object.keys(object)) === sorted(keys);
@@ -72,8 +78,11 @@ export function validateDisabledCloudTemplate(config, packageManifest) {
  * correct billing, exchange data quality, wakeup latency or phone receipt.
  */
 export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
-  durableReadsPerAlarm = 6, durableWritesPerAlarm = 6,
+  // Conservative planning allowance including metric/quarantine checks.
+  // Not measured billed rows; manual archive traffic is additional.
+  durableReadsPerAlarm = 60, durableWritesPerAlarm = 20,
   ownerDashboardRequests = 100, dashboardRowsReadPerRequest = 8,
+  healthProbeRequests = 0, healthRowsReadPerRequest = 12,
   dailyHandoffRequests = 1, storedBytes = 4_000_000,
   observedWorkerCpuMsPerInvocation = null,
   observedDurableDurationGbSecondsPerDay = null } = {}) {
@@ -81,7 +90,7 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
   if (marketStatus === null) throw Error('UNVERIFIED_EXCHANGE_YEAR');
   const counts = [alarmsPerRegularDay, durableReadsPerAlarm, durableWritesPerAlarm,
     ownerDashboardRequests, dashboardRowsReadPerRequest,
-    dailyHandoffRequests, storedBytes];
+    dailyHandoffRequests, storedBytes,healthProbeRequests,healthRowsReadPerRequest];
   if (!counts.every(value => integer(value))) throw Error('INVALID_FORECAST_ASSUMPTION');
   if (observedWorkerCpuMsPerInvocation !== null &&
       (!Number.isFinite(observedWorkerCpuMsPerInvocation) ||
@@ -92,10 +101,10 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
   // Unusual NSE sessions MUST NOT be converted into normal market slots.
   const alarms = marketStatus === 'REGULAR' ? alarmsPerRegularDay : 0;
   const expected = {
-    workerRequestsPerDay: ownerDashboardRequests + dailyHandoffRequests,
-    durableRequestsPerDay: alarms + ownerDashboardRequests + dailyHandoffRequests,
+    workerRequestsPerDay: ownerDashboardRequests + dailyHandoffRequests+healthProbeRequests,
+    durableRequestsPerDay: alarms + ownerDashboardRequests + dailyHandoffRequests+healthProbeRequests,
     durableRowsReadPerDay: alarms * durableReadsPerAlarm +
-      ownerDashboardRequests * dashboardRowsReadPerRequest + dailyHandoffRequests,
+      ownerDashboardRequests * dashboardRowsReadPerRequest + dailyHandoffRequests+healthProbeRequests*healthRowsReadPerRequest,
     durableRowsWrittenPerDay: alarms * durableWritesPerAlarm + dailyHandoffRequests,
     durableStoredBytes: storedBytes,
   };
@@ -112,12 +121,16 @@ export function forecastFreeDailyUsage({ istDate, alarmsPerRegularDay = 1125,
     exceeded.push('durableDurationGbSecondsPerDay');
   return Object.freeze({ status: 'ESTIMATE_ONLY_NOT_DEPLOYMENT_APPROVAL',
     marketStatus, istDate, alarms, estimated: Object.freeze(expected),
+    marketTraffic:marketTrafficPlan(istDate),
+    storageAssumptions:Object.freeze({durableReadsPerAlarm,durableWritesPerAlarm,
+      source:'SOURCE_OPERATION_ENVELOPE_NOT_MEASURED_SQL_ROWS'}),
     freeReference: FREE_REFERENCE_2026_10_24,
     measuredActualCloudUse: false,
     modeledLimitsExceeded: Object.freeze(exceeded),
     unresolved: Object.freeze([
       'OWNER_APPROVAL_MISSING', 'ACTUAL_CLOUD_QUOTAS_AND_LATENCY_UNMEASURED',
       'INDEPENDENT_PRIVATE_BACKUP_UNVERIFIED',
+      'SQL_ROW_AMPLIFICATION_UNMEASURED','BATCH_PAYLOAD_AND_DO_CPU_UNMEASURED',
       ...(observedWorkerCpuMsPerInvocation === null ? ['WORKER_CPU_UNMEASURED'] : []),
       ...(observedDurableDurationGbSecondsPerDay === null ? ['DO_DURATION_UNMEASURED'] : []),
     ]),

@@ -5,6 +5,10 @@
 .dev.vars
 .dev.vars.*
 *.enc
+*.reconciliation.json
+*.ops-monitor.json
+*.ops-monitor.json.lock/
+*.ops-monitor.json.*.tmp
 *.sqlite
 *.sqlite3
 *.sqlite3-*
@@ -20,4 +24,6 @@ node_modules/
 .coverage
 htmlcov/
 test-results/
+.mypy_cache/
+.ruff_cache/
 

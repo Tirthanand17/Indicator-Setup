@@ -30,6 +30,7 @@ async function signingKey(secret) {
 /** Reject partial/corrupt journals before computing any export or capacity row. */
 export function auditPaperArchiveState(ledger, session = null, marks = null) {
   auditPaperLedger(ledger);
+  if(ledger.schema!==1)fail('UNSUPPORTED_SYNTHETIC_LEDGER');
   if (session !== null) auditSyntheticSession(session);
   if (marks !== null) {
     if (session === null) fail('ORPHAN_QUOTE_MARKS');

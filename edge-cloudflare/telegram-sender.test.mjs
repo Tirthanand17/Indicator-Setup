@@ -23,7 +23,7 @@ test('sends only a single HTTPS JSON POST to the configured private chat',async(
     requests++;
     assert.equal(url,`https://api.telegram.org/bot${token}/sendMessage`);
     assert.equal(options.method,'POST');
-    assert.equal(options.redirect,'error');
+    assert.equal(options.redirect,'manual');
     assert.equal(options.headers.Accept,'application/json');
     const body=JSON.parse(options.body);
     assert.deepEqual(body,{chat_id:123456789,text:message,

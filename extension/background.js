@@ -3,7 +3,6 @@
 importScripts('engine.js','auto-engine.js','auto-runner.js','telegram.js');
 const ICON='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA6ElEQVR42mMUVLb4zzCAgIlhgMGAO4CFkAJ2y2CKLfl5fC1OOUZcaYAaFhPjECZ6WY7LXCZ6WY7L/MGVC2jhe4seQ7yhQNMQgFmOzRF0jwJcjmCil4UnSs7TzwH4gpzmDsBmOS7f0yUN4LOc6g4gNt4pcgCurEVKvJPtAHTL8eVzYnxPkgNw+ZASy4lqD5AatKRYTjAEcFl+ouQ8yRaR7ABcQYtsMYyNTpMCUFpE6LUhsiOo5WP01hETMfFJbctJygW0tBzDAfhar7RqnA6+jgmtQwHdfCZSOxLU7hcwEuqcDljPaMR0TgF/Pl42IevvlQAAAABJRU5ErkJggg==';
 let queue=Promise.resolve();
-const isFut=s=>/^NIFTY\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT$/.test(s||'');
 function chartPathSymbol(s){try{const u=new URL(s);if(u.origin!=='https://kite.zerodha.com')return null;const m=u.pathname.match(/^\/markets\/ext\/chart\/web\/tvc\/NFO-FUT\/(NIFTY\d{2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT)\//);return m?m[1]:null;}catch{return null;}}
 function safeUI(s){return s&&s.id===chrome.runtime.id&&s.url&&s.url.startsWith(chrome.runtime.getURL(''));}
 function validChartSender(sender){
@@ -13,7 +12,7 @@ function validChartSender(sender){
  // The deepest TradingView frame is an origin-bound blob iframe; no hash is read or transmitted.
  return u.startsWith('blob:https://kite.zerodha.com/')?symbol:null;
 }
-async function chartState(){let symbol=null;try{const tabs=await chrome.tabs.query({url:'https://kite.zerodha.com/markets/ext/chart/*'});for(const t of tabs){const s=chartPathSymbol(t.url||'');if(s){symbol=s;break;}}}catch{}return {chartOpen:!!symbol,chartSymbol:symbol};}
+async function chartState(){let symbol=null;try{const tabs=await chrome.tabs.query({url:'https://kite.zerodha.com/markets/ext/chart/*'});for(const t of tabs){const s=chartPathSymbol(t.url||'');if(s){symbol=s;break;}}}catch{ /* Chart query failure reports no visible chart. */ }return {chartOpen:!!symbol,chartSymbol:symbol};}
 async function addLog(entry){const {logs=[]}=await chrome.storage.local.get('logs');await chrome.storage.local.set({logs:[entry,...logs].slice(0,150),lastResult:entry});}
 async function notifyOnce(key,title,message){
  const {sentKeys=[]}=await chrome.storage.local.get('sentKeys');if(sentKeys.includes(key))return false;

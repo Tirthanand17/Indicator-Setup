@@ -4,11 +4,14 @@ import { newPaperLedger } from '../paper-ledger.mjs';
 import { READONLY_QUOTE_PACE_KEY, READONLY_OPTION_STATE_KEY,
   claimOptionSnapshot, finishOptionSnapshot, optionStatus } from '../option-runtime.mjs';
 import { validatePairEvidence } from '../option-readonly.mjs';
+import { OBSERVED_PORTFOLIO_KEY,captureObservedPortfolio } from '../observed-portfolio.mjs';
 import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
   newReadOnlyBridge, stageReadOnlyReview, advanceReadOnlyPaperTurn,
   readOnlyBridgeSummary } from '../readonly-paper-bridge.mjs';
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from '../readonly-delivery.mjs';
 import { sendTelegramPaperMessage } from '../telegram-sender.mjs';
+import {OBSERVED_ARCHIVE_KEYS,restoreObservedArchiveToEmpty} from '../observed-archive.mjs';
+import {reconcileUnknownPositions} from '../position-reconciliation.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -18,6 +21,67 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/test/position-reconciliation/rollback'&&request.method==='POST') {
+      const body=await request.json();
+      try {await reconcileUnknownPositions({transaction:fn=>this.storage.transaction(async txn=>{
+        await fn(txn);throw Error('SYNTHETIC_POSITION_RECONCILIATION_ABORT');
+      })},{...body,signingSecret:this.env.OBSERVED_ARCHIVE_HMAC_KEY,encryptionKeyBase64:this.env.OBSERVED_ARCHIVE_AES_KEY,nowMs:clock});}
+      catch(error){return Response.json({rolledBack:error.message==='SYNTHETIC_POSITION_RECONCILIATION_ABORT'});}
+      throw Error('Rollback expected');
+    }
+    if(path==='/test/archive/alarm')return Response.json(await this.alarm());
+    if(path==='/test/archive/seed'&&request.method==='POST') {
+      const input=await request.json();clock=input.nowMs;
+      if(input.sqlTable)this.storage.sql.exec('CREATE TABLE archive_recovery_guard (value TEXT)');
+      await this.storage.transaction(async txn=>{
+        for(const [name,key] of Object.entries(OBSERVED_ARCHIVE_KEYS))
+          if(input.state?.[name]!==null&&input.state?.[name]!==undefined)await txn.put(key,input.state[name]);
+        if(input.extra)await txn.put(input.extra.key,input.extra.value);
+        if(input.alarm)await txn.setAlarm(input.alarm);
+      });return Response.json({seeded:true});
+    }
+    if(path==='/test/archive/state')return Response.json({
+      state:Object.fromEntries(await Promise.all(Object.entries(OBSERVED_ARCHIVE_KEYS)
+        .map(async([name,key])=>[name,(await this.storage.get(key))??null]))),
+      alarm:await this.storage.getAlarm(),vaultPresent:await this.storage.get('daily-token-v1')!==undefined,
+      keys:[...(await this.storage.list()).keys()],
+      tables:Array.from(this.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table'")).map(r=>r.name),
+    });
+    if(path==='/test/archive/rollback'&&request.method==='POST') {
+      const sealedArchive=await request.json();
+      try {await restoreObservedArchiveToEmpty({transaction:callback=>this.storage.transaction(async txn=>{
+        await callback(txn);throw Error('SYNTHETIC_ARCHIVE_ABORT');
+      })},{sealedArchive,signingSecret:this.env.OBSERVED_ARCHIVE_HMAC_KEY,
+        encryptionKeyBase64:this.env.OBSERVED_ARCHIVE_AES_KEY,nowMs:clock});}
+      catch(error){return Response.json({rolledBack:error.message==='SYNTHETIC_ARCHIVE_ABORT'});}
+      throw Error('Rollback expected');
+    }
+    if(path==='/test/transport/telegram'&&request.method==='POST')
+      return Response.json(await sendTelegramPaperMessage({token:this.env.TELEGRAM_BOT_TOKEN,
+        chatId:this.env.TELEGRAM_PRIVATE_CHAT_ID,message:'SYNTHETIC LOCAL TRANSPORT TEST ONLY'}));
+    if(path==='/test/market/poll'&&request.method==='POST') {
+      const input=await request.json();clock=input.nowMs;
+      return Response.json(input.kind==='SESSION'?await this.pollReadOnlySession(input.tickId,clock):
+        input.kind==='OPTION'?await this.pollReadOnlyOptions(input.tickId,clock):await this.pollReadOnlyMarket(input.tickId,clock));
+    }
+    if(path==='/test/halt-race/start'&&request.method==='POST') {
+      clock=(await this.storage.get('scheduler-v1')).scheduledAtMs;
+      this.pollReadOnlySession=async()=>{
+        this.raceStarted=true;
+        await new Promise(resolve=>{this.releaseHaltRace=resolve;});
+        return {status:'SYNTHETIC_PAUSED_MARKET'};
+      };
+      this.dispatchReadOnlyTelegram=async()=>{
+        this.raceDispatches=(this.raceDispatches??0)+1;
+        return {status:'SYNTHETIC_NO_SEND'};
+      };
+      return Response.json(await this.alarm());
+    }
+    if(path==='/test/halt-race/state') return Response.json({
+      started:this.raceStarted??false,dispatches:this.raceDispatches??0});
+    if(path==='/test/halt-race/release'&&request.method==='POST') {
+      this.releaseHaltRace?.();return Response.json({released:true});
+    }
     if (path === '/test/now') return Response.json({ now: Date.now() });
     if (path === '/test/pipeline/clock' && request.method === 'POST') {
       const { nowMs } = await request.json();
@@ -79,13 +143,16 @@ export class TestSession extends MarketSession {
     if(path==='/test/read-only-paper/turn'&&request.method==='POST') {
       const input=await request.json();
       return Response.json(await this.storage.transaction(async txn=>{
-        const [oldBridge,oldLedger,oldDelivery]=await Promise.all([
+        const [oldBridge,oldLedger,oldDelivery,oldMetrics]=await Promise.all([
           txn.get(READONLY_PAPER_BRIDGE_KEY),txn.get(READONLY_PAPER_LEDGER_KEY),
           this.readonlyDeliveryRehearsalEnabled?
-            txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined)]);
+            txn.get(READONLY_PAPER_DELIVERY_KEY):Promise.resolve(undefined),txn.get(OBSERVED_PORTFOLIO_KEY)]);
         const bridge=oldBridge??newReadOnlyBridge();
         const ledger=oldLedger??newPaperLedger(input.observedAtMs);
         const result=advanceReadOnlyPaperTurn(bridge,ledger,input);
+        const metrics=captureObservedPortfolio(oldMetrics,bridge,ledger,result.state,result.ledger,
+          [...(input.exitEvidence??[]),...[input.evidence?.CE,input.evidence?.PE].filter(Boolean)],input.observedAtMs);
+        await txn.put(OBSERVED_PORTFOLIO_KEY,metrics);
         if(this.readonlyDeliveryRehearsalEnabled) {
           const nextDelivery=reconcileReadOnlyDeliveryJournal(oldDelivery,oldLedger,
             result.ledger,input.observedAtMs);
@@ -94,9 +161,15 @@ export class TestSession extends MarketSession {
         }
         if(result.state!==oldBridge) await txn.put(READONLY_PAPER_BRIDGE_KEY,result.state);
         if(result.ledger!==oldLedger) await txn.put(READONLY_PAPER_LEDGER_KEY,result.ledger);
+        if(input.testRollback===true)throw Error('SYNTHETIC_ATOMIC_METRICS_ROLLBACK');
         return result.result;
+      }).catch(error=>{
+        if(input.testRollback===true&&error.message==='SYNTHETIC_ATOMIC_METRICS_ROLLBACK')return {rolledBack:true};
+        throw error;
       }));
     }
+    if(path==='/test/read-only-paper/metrics')
+      return Response.json((await this.storage.get(OBSERVED_PORTFOLIO_KEY))??null);
     if(path==='/test/read-only-paper/state') {
       const [bridge,ledger]=await Promise.all([
         this.storage.get(READONLY_PAPER_BRIDGE_KEY),
@@ -129,7 +202,7 @@ export class TestSession extends MarketSession {
         return Response.json({error:'INVALID_TEST_SCENARIO'},{status:400});
       return Response.json(await this.dispatchReadOnlyTelegram(args=>
         sendTelegramPaperMessage({...args,fetchImpl:async(_url,options)=>{
-          if(options.method!=='POST'||options.redirect!=='error')
+          if(options.method!=='POST'||options.redirect!=='manual')
             throw Error('UNSAFE_TEST_REQUEST');
           if(scenario==='ambiguous') throw Error('SIMULATED_NETWORK_OUTAGE');
           if(scenario==='rate') return Response.json({ok:false,error_code:429,

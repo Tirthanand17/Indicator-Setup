@@ -55,6 +55,27 @@ test('real parity-derived five-indicator CE review opens two independent paper a
   assert.equal(summary.totalPaperPositions,2);
 });
 
+test('capacity-blocked re-entry cannot roll back verified exits from the same observed tick',()=>{
+  const {review,futures}=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,review,futures});
+  const entered=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20000,evidence:evidence(nowMs+20000)});
+  const ledger=structuredClone(entered.ledger);
+  ledger.rejections=Array.from({length:1024},(_,i)=>({accountId:i%2?'PAPER_50K':'PAPER_100K',
+    signalId:'capacity-rejection-'+i,atMs:nowMs+20000,reason:'TEST_RISK_REJECTION'}));
+  const nextAt=nowMs+300000;
+  const pending=stageReadOnlyReview(entered.state,{tickId:tick(286),observedAtMs:nextAt,
+    review:{...review,fiveMinuteCandleAtMs:review.fiveMinuteCandleAtMs+300000},
+    futures:{...futures,exchangeAtMs:nextAt-1000}});
+  const result=advanceReadOnlyPaperTurn(pending,ledger,{tickId:tick(287),observedAtMs:nextAt+20000,
+    evidence:evidence(nextAt+20000,170,171)});
+  assert.equal(result.result.exited,2);assert.equal(result.result.entered,0);
+  assert.equal(result.result.entryStatus,'PAPER_ENTRY_CAPACITY_BLOCKED');
+  assert.equal(result.ledger.positions.every(p=>p.status==='CLOSED'),true);
+  assert.equal(result.ledger.outbox.length,4);assert.equal(result.ledger.rejections.length,1024);
+  assert.equal(result.state.pending,null);assert.equal(auditPaperLedger(result.ledger),true);
+});
+
 test('fresh BID exit closes two paper accounts once; replay cannot double credit',()=>{
   const {review,futures}=reviewFrom('uptrend_mirrored_qualifying_review');
   const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),
@@ -111,8 +132,10 @@ test('stale/missing/wrong-side or mismatched data cannot create a paper fill',()
     tickId:tick(272),observedAtMs:nowMs+20_000,evidence:changed});
   assert.equal(blocked.result.entered,0);
   assert.equal(blocked.ledger.positions.length,0);
-  assert.throws(()=>advanceReadOnlyPaperTurn(staged,ledger,{
-    tickId:tick(273),observedAtMs:nowMs+40_000,evidence:evidence(nowMs+40_000)}));
+  const lateEntry=advanceReadOnlyPaperTurn(staged,ledger,{
+    tickId:tick(273),observedAtMs:nowMs+40_000,evidence:evidence(nowMs+40_000)});
+  assert.equal(lateEntry.result.entered,0);
+  assert.equal(lateEntry.state.pending,null);
   assert.throws(()=>advanceReadOnlyPaperTurn(staged,ledger,{
     tickId:tick(272),observedAtMs:nowMs+45_000,evidence:evidence(nowMs+45_000)}));
   assert.equal(ledger.outbox.length,0);
@@ -144,4 +167,44 @@ test('15:26 close records unresolved paper exits without inventing sale proceeds
   assert.equal(eod.ledger.positions.every(x=>x.status==='EXIT_UNVERIFIABLE'),true);
   assert.equal(eod.ledger.outbox.filter(x=>x.kind==='PAPER_UNVERIFIABLE').length,2);
   assert.equal(eod.ledger.positions.every(x=>x.exitCreditPaise===null),true);
+});
+
+test('new ATM evidence cannot replace old exit identity; missing entry quotes still permit valid exits',()=>{
+  const p=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,...p});
+  const entered=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)});
+  const time=nowMs+80_000,newEntry=evidence(time,100,100.5,22550);
+  for(const leg of [newEntry.CE,newEntry.PE])leg.contract.token+=100;
+  const missing=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:newEntry,exitEvidence:[]});
+  assert.equal(missing.result.exited,0);
+  assert.equal(missing.ledger.positions.every(p=>p.status==='OPEN'),true);
+  const closed=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:{...newEntry,CE:null,PE:null},
+    exitEvidence:[quote('CE',time,170,171)]});
+  assert.equal(closed.result.exited,2);assert.equal(closed.result.entered,0);
+  assert.equal(closed.ledger.positions.every(p=>p.strike===22050&&p.status==='CLOSED'),true);
+  const stale=advanceReadOnlyPaperTurn(entered.state,entered.ledger,{
+    tickId:tick(275),observedAtMs:time,evidence:newEntry,
+    exitEvidence:[quote('CE',time-20_000,170,171)]});
+  assert.equal(stale.result.exited,0);
+});
+
+test('STOP and TARGET close at the adjacent twenty-second slot, and TIME at 15:15:00',()=>{
+  const p=reviewFrom('uptrend_mirrored_qualifying_review');
+  const staged=stageReadOnlyReview(newReadOnlyBridge(),{tickId:tick(271),observedAtMs:nowMs,...p});
+  const opened=advanceReadOnlyPaperTurn(staged,newPaperLedger(nowMs),{
+    tickId:tick(272),observedAtMs:nowMs+20_000,evidence:evidence(nowMs+20_000)});
+  for(const [reason,bid,ask,slot,time] of [
+    ['STOP',70,71,273,nowMs+40_000],['TARGET',150,151,273,nowMs+40_000],
+    ['TIME',100,100.5,1080,Date.parse('2026-10-23T15:15:00+05:30')]]) {
+    const input={tickId:tick(slot),observedAtMs:time,evidence:evidence(time,bid,ask)};
+    const closed=advanceReadOnlyPaperTurn(opened.state,opened.ledger,input);
+    assert.equal(closed.result.exited,2);
+    assert.equal(closed.ledger.positions.every(p=>p.status==='CLOSED'&&p.exitReason===reason&&p.exitAtMs===time),true);
+    const duplicate=advanceReadOnlyPaperTurn(closed.state,closed.ledger,input);
+    assert.equal(duplicate.result.status,'DUPLICATE_OPTION_TICK');
+    assert.strictEqual(duplicate.ledger,closed.ledger);
+  }
 });

@@ -3,6 +3,8 @@
  */
 import { auditReadOnlyBridge } from './readonly-paper-bridge.mjs';
 import { auditPaperLedger, paperLedgerSummary } from './paper-ledger.mjs';
+import { paperDeliverySummary } from './paper-delivery.mjs';
+import { observedPortfolioMetrics } from './observed-portfolio.mjs';
 
 const IST_MS=330*60_000;
 const rupees=paise=>Number((paise/100).toFixed(2));
@@ -13,9 +15,10 @@ const validDay=day=>typeof day==='string'&&/^2026-\d\d-\d\d$/.test(day)&&
 
 /** Audits both persistent documents before deriving or disclosing any numbers. */
 export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
-  limit='50',nowMs=Date.now(),schedulerStatus='NOT_INITIALIZED'}={}) {
+  limit='50',nowMs=Date.now(),schedulerStatus='NOT_INITIALIZED',deliveryJournal,portfolioMetrics}={}) {
   auditReadOnlyBridge(bridge);
   auditPaperLedger(ledger);
+  const delivery=deliveryJournal===undefined?null:paperDeliverySummary(deliveryJournal,ledger);
   if (ledger.positions.length>0 && bridge.totalOptionTicks===0)
     throw Error('ORPHAN_READONLY_PAPER_POSITIONS');
   const reportDay=day??istDay(nowMs);
@@ -24,13 +27,13 @@ export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
       !Number.isSafeInteger(nowMs)||nowMs<=0||
       typeof schedulerStatus!=='string'||!/^[A-Z_]{2,60}$/.test(schedulerStatus))
     throw Error('INVALID_READONLY_DASHBOARD_QUERY');
+  const metrics=observedPortfolioMetrics(ledger,bridge,portfolioMetrics,nowMs,reportDay);
   const balances=paperLedgerSummary(ledger).accounts.map(a=>({
     accountId:a.accountId,initialRupees:rupees(a.initialPaise),
     cashRupees:rupees(a.cashPaise),realizedNetPnlRupees:rupees(a.realizedNetPnlPaise),
     openCount:a.openCount,closedCount:a.closedCount,
     unverifiableCount:a.unverifiableCount,
-    markedEquityRupees:null,unrealizedPnlRupees:null,
-    valuationStatus:a.openCount+a.unverifiableCount===0?'FLAT_CASH':'NO_FRESH_POSITION_MARK',
+    ...metrics.accounts.find(m=>m.accountId===a.accountId),
   }));
   const selected=ledger.positions.filter(p=>account==='ALL'||p.accountId===account);
   const trades=selected.slice().reverse().slice(0,Number(limit)).map(p=>({
@@ -41,12 +44,13 @@ export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
     exitFillRupees:p.status==='CLOSED'?rupees(p.exitFillPaise):null,
     netPnlRupees:p.status==='CLOSED'?rupees(p.netPnlPaise):null,
     exitReason:p.status==='CLOSED'?p.exitReason:null,
+    ...metrics.trades.get(p.tradeId),
   }));
   const daily=balances.map(a=>{
     const positions=ledger.positions.filter(p=>p.accountId===a.accountId);
     const entries=positions.filter(p=>istDay(p.entryAtMs)===reportDay);
     const exits=positions.filter(p=>p.status==='CLOSED'&&istDay(p.exitAtMs)===reportDay);
-    return {accountId:a.accountId,entries:entries.length,verifiedExits:exits.length,
+    return {...metrics.daily.find(m=>m.accountId===a.accountId),accountId:a.accountId,entries:entries.length,verifiedExits:exits.length,
       unresolvedEntries:entries.filter(p=>p.status==='EXIT_UNVERIFIABLE').length,
       wins:exits.filter(p=>p.netPnlPaise>0).length,
       losses:exits.filter(p=>p.netPnlPaise<0).length,
@@ -58,12 +62,17 @@ export function privateReadOnlySnapshot(bridge,ledger,{account='ALL',day,
     nowMs>=lastAt&&nowMs-lastAt<=30_000?'RECENT_READONLY_OBSERVATION':'STALE_OR_HISTORIC_OBSERVATION';
   return {status:'READY',source:'READONLY_KITE_EVIDENCE_PAPER_ONLY',paperOnly:true,
     syntheticOnly:false,realOrdersEnabled:false,telegramDelivered:false,
-    markedToMarket:false,livePositionValuationAvailable:false,
+    markedToMarket:balances.some(a=>a.valuationStatus==='FRESH_OBSERVED_BID'),
+    livePositionValuationAvailable:balances.some(a=>a.valuationStatus==='FRESH_OBSERVED_BID'),
+    metricsStatus:metrics.metricsStatus,healthStatus:metrics.healthStatus,valuationMethod:metrics.valuationMethod,
     account,day:reportDay,schedulerStatus,evidenceStatus,
     lastOptionAtMs:lastAt,lastOptionTickId:bridge.lastOptionTickId,
     totalOptionTicks:bridge.totalOptionTicks,
     pendingSignalKind:bridge.pending?.kind??null,
     lastMutationAtMs:ledger.lastMutationAtMs,
-    pendingOutboxCount:ledger.outbox.length,
-    totalTrades:selected.length,accounts:balances,daily,trades};
+    retainedOutboxCount:ledger.outbox.length,
+    pendingOutboxCount:delivery?ledger.outbox.length-delivery.cursor:null,
+    deliveryStatus:delivery?'JOURNAL_VERIFIED':'DELIVERY_JOURNAL_UNAVAILABLE',
+    delivery,
+    totalTrades:selected.length,accounts:balances,daily,monthly:metrics.monthly,trades};
 }
