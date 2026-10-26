@@ -1,5 +1,7 @@
 /** Read-only operational evidence, not provider connectivity or cost acceptance. */
 import {sessionStatus} from './alarm-core.mjs';
+import {NSE_FO_CALENDAR} from './calendar-data.mjs';
+import {calendarMaintenanceStatus} from './calendar-schema.mjs';
 import {validState,validMarketObservation} from './runtime-state.mjs';
 import {auditPaperLedger} from './paper-ledger.mjs';
 import {auditPaperDelivery} from './paper-delivery.mjs';
@@ -7,7 +9,7 @@ import {validateQuotePace} from './option-runtime.mjs';
 import {auditObservedLifecycle,observedRetentionReport} from './observed-lifecycle.mjs';
 
 export const OPS_CODES=Object.freeze({
-  CALENDAR_UNVERIFIED:'WARNING',STATE_INVALID:'CRITICAL',RECOVERY_QUARANTINE:'WARNING',RUNTIME_DISABLED:'WARNING',
+  CALENDAR_UNVERIFIED:'WARNING',CALENDAR_EXPIRING:'WARNING',STATE_INVALID:'CRITICAL',RECOVERY_QUARANTINE:'WARNING',RUNTIME_DISABLED:'WARNING',
   SCHEDULER_NOT_INITIALIZED:'CRITICAL',SCHEDULER_HALTED:'WARNING',HEARTBEAT_STALE:'CRITICAL',ALARM_MISSING:'CRITICAL',
   TOKEN_MISSING:'CRITICAL',TOKEN_EXPIRED:'CRITICAL',TOKEN_INVALID:'CRITICAL',TOKEN_EXPIRING:'WARNING',
   AUTH_BLOCKED:'CRITICAL',MARKET_UNAVAILABLE:'CRITICAL',MARKET_PARTIAL:'WARNING',MARKET_STALE:'CRITICAL',
@@ -23,6 +25,7 @@ export function operationalHealth({scheduler,market,pacing,ledger,delivery,lifec
   const preparation=runtimeEnabled&&calendar==='REGULAR'&&minute>=540&&minute<930;
   const opening=Date.parse(day+'T09:15:00+05:30');
   const issues=new Set(),add=code=>issues.add(code);
+  if(calendarMaintenanceStatus(NSE_FO_CALENDAR,day).annualRefreshDue)add('CALENDAR_EXPIRING');
   if(calendar===null||calendar==='SPECIAL')add('CALENDAR_UNVERIFIED');
   if(!runtimeEnabled)add('RUNTIME_DISABLED');
   if(recovery!==undefined)add('RECOVERY_QUARANTINE');

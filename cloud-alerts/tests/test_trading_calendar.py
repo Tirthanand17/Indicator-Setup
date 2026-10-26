@@ -48,6 +48,46 @@ def test_nontrading_and_special_session_handling():
     assert '2026' in CALENDAR_VERSION
 
 
+def test_calendar_manifest_digest_and_annual_maintenance():
+    from cloud_alerts.trading_calendar import _load_calendar, maintenance_status
+    with pytest.raises(ValueError, match='DIGEST_MISMATCH'):
+        _load_calendar(b'{"years":[2027]}')
+    assert not maintenance_status(date(2026, 11, 15))['annual_refresh_due']
+    status = maintenance_status(date(2026, 11, 16))
+    assert status['annual_refresh_due']
+    assert status['covered_through'] == '2026-12-31'
+    assert status['reviewed_at'] == '2026-10-26'
+    assert not status['live_reverified']
+
+
+def test_every_calendar_day_matches_javascript_runtime():
+    import shutil
+    import subprocess
+    from pathlib import Path
+    from cloud_alerts.trading_calendar import COVERED_YEARS
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('Node unavailable on this Python platform; required in combined CI')
+    root = Path(__file__).resolve().parents[2]
+    script = """
+      import {sessionStatus} from './edge-cloudflare/alarm-core.mjs';
+      import {NSE_FO_CALENDAR} from './edge-cloudflare/calendar-data.mjs';
+      const days = [];
+      for (const {year} of NSE_FO_CALENDAR.years) {
+      for (let ms = Date.parse(`${year}-01-01`); ms < Date.parse(`${year+1}-01-01`); ms += 86400000) {
+        const day = new Date(ms).toISOString().slice(0,10); days.push([day, sessionStatus(day)]);
+      }
+      }
+      console.log(JSON.stringify(days));
+    """
+    result = subprocess.run([node, '--input-type=module', '-e', script], cwd=root,
+                            capture_output=True, text=True, check=True, timeout=30)
+    days = json.loads(result.stdout)
+    assert len(days) == sum((date(year+1, 1, 1)-date(year, 1, 1)).days for year in COVERED_YEARS)
+    for day, status in days:
+        assert session_status(date.fromisoformat(day)) == status
+
+
 def test_special_session_never_claims_regular_poll_slot():
     special = date(2026, 11, 8)
     scheduler = CandlePollScheduler()

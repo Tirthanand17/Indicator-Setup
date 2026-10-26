@@ -20,6 +20,13 @@ Those three previously held checks are now counted. No actual write-off,
 monitor, notification service or deployment was activated. Cloud acceptance
 remains unchanged, and operational resume/hosted recovery are unverified.
 
+Task 13 now has shared reviewed calendar data, reproducible generated runtime
+artifacts, strict update validation/staging, expiry warnings and full-year
+cross-language regression coverage. It remains partial: an official 2027 F&O
+calendar and future-revision migration/activation are not verified. The score
+and completed-task count therefore remain unchanged. Task 14 can proceed
+independently while that publication/review prerequisite remains outstanding.
+
 The audit baseline was 19/41. Eight newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
@@ -131,9 +138,19 @@ additional point. This score measures evidence, not hours of work remaining.
     archive recovery drills pass. No runtime resume or real decision is claimed.
     [Accounting, procedure and limits](UNVERIFIABLE_POSITION_RECONCILIATION.md).
 
-Validation: **351 JavaScript/extension/quality-runner tests, 33 native
-workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
-Python type baseline passes for 49 source files; ESLint and Ruff pass;
+13. **Calendar maintenance (partial):** one reviewed manifest and generated
+    JavaScript/Python artifacts with CI drift detection; official-source hashes;
+    local evidence-backed staging without promotion; immutable runtime data,
+    Python integrity guard and expiry warning. Exceptional sessions remain
+    excluded and unknown years cannot claim or rearm regular ticks. Verified
+    2027 data and revision migration/activation remain outstanding.
+    [Sources, procedure, validation and limits](CALENDAR_MAINTENANCE.md).
+
+Validation: **358 JavaScript/extension/quality-runner tests and 33 native
+workerd/SQLite tests pass**. Local WSL Python: **779 pass, two skips** (one
+platform-specific and cross-language parity because Linux Node is absent);
+combined CI must run the parity regression with both runtimes available.
+Python type baseline passes for 50 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
 New regressions cover late quote completion after halt, no dispatch after halt,
 durable rejection of claims after restart, settlement of already-started sends,
@@ -157,8 +174,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 10 | Authenticated Telegram ambiguity reconciliation | Implemented; native owner suppression/restart drill verified |
 | 11 | Token, outage, heartbeat and quota operational alerts | Implemented; read-only health, persistent external watchdog and opt-in notifications tested |
 | 12 | Unverifiable-position reconciliation | Implemented explicit owner zero-credit accounting; local native recovery/reconciliation drill verified |
-| 13 | Future calendar and exceptional-session maintenance | Next |
-| 14 | Public ingress hardening; history/IAM/log verification | Pending |
+| 13 | Future calendar and exceptional-session maintenance | Tooling implemented and locally verified; official 2027 data and revision activation pending |
+| 14 | Public ingress hardening; history/IAM/log verification | Next independent task |
 | 15 | Inert Free-only cloud identity/deployment verification | Account/deployment evidence required |
 | 16 | Actual secure daily token handoff lifecycle | Owner handoff and cloud access required |
 | 17 | Five live acceptance gates | Pending |

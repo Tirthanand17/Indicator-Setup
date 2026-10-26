@@ -8,7 +8,7 @@ import argparse
 from datetime import date, datetime
 import json
 from zoneinfo import ZoneInfo
-from .trading_calendar import session_status, CalendarUnavailable, CALENDAR_VERSION, SOURCE_URLS
+from .trading_calendar import session_status, CalendarUnavailable, CALENDAR_VERSION, SOURCE_URLS, maintenance_status
 
 
 def run_cli(argv: list[str] | None = None) -> int:
@@ -26,6 +26,7 @@ def run_cli(argv: list[str] | None = None) -> int:
     print(json.dumps({'calendar': CALENDAR_VERSION, 'exchange_date_ist':target.isoformat(),
         'exchange_segment':'NSE_FO', 'session_status':status,
         'regular_session_verified':status=='REGULAR',
+        'maintenance':maintenance_status(target),
         'calendar_is_live':False, 'official_circulars':list(SOURCE_URLS),
         'broker_calls_made':False,'phone_messages_sent':False},sort_keys=True))
     return 0

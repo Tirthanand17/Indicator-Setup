@@ -1,0 +1,4 @@
+# Calendar digest and generated artifacts must have identical bytes on all hosts.
+cloud-alerts/cloud_alerts/data/nse-fo-calendar.json text eol=lf
+cloud-alerts/cloud_alerts/calendar_digest.py text eol=lf
+edge-cloudflare/calendar-data.mjs text eol=lf

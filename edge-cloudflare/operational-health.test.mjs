@@ -7,6 +7,11 @@ import worker from './worker.mjs';
 const base=()=>{const s=fixture();return {...s,lifecycle:undefined,recovery:undefined,delivery:{...s.delivery,active:null,totalAttempts:1},
   tokenStatus:'HANDOFF_DECRYPTABLE',tokenExpiresAtMs:AT+20*3600000,alarmAtMs:AT+40000,runtimeEnabled:true,nowMs:AT+30000};};
 const codes=s=>operationalHealth(s).issues.map(i=>i.code);
+
+test('calendar coverage expiry enters the existing operational warning registry',()=>{
+  const conditions=codes({...base(),runtimeEnabled:false,nowMs:Date.parse('2026-11-16T10:00:00+05:30')});
+  assert.ok(conditions.includes('CALENDAR_EXPIRING'));
+});
 test('fresh runtime health is sanitized evidence rather than provider authentication or billing proof',()=>{
   const s=base(),v=operationalHealth(s);assert.deepEqual(v.issues,[]);
   assert.equal(v.expectedSession,true);assert.equal(v.readOnly,true);

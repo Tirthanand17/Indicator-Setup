@@ -3,7 +3,9 @@
  * subscription, cloud account, actual quotes, Telegram, or broker orders.
  * A qualifying tick is a *synthetic candidate*, NOT trade authorization.
  */
-export const NSE_FO_CALENDAR_VERSION = 'NSE-FO-2026-FAOP71777-FAOP72262';
+import {NSE_FO_CALENDAR} from './calendar-data.mjs';
+import {calendarSessionStatus} from './calendar-schema.mjs';
+export const NSE_FO_CALENDAR_VERSION = NSE_FO_CALENDAR.revision;
 export const ALARM_INTERVAL_MS = 20_000;
 const IST_OFFSET_MS = 330 * 60_000;
 /** Official NSE/FAOP/76940 dated 19 Oct 2026: Diwali Muhurat F&O
@@ -11,17 +13,11 @@ const IST_OFFSET_MS = 330 * 60_000;
  * validated only for the REGULAR session; an exceptional session is NEVER
  * auto-promoted to a paper-trading day.
  */
-export const NSE_FO_SPECIAL_2026 = Object.freeze({
-  '2026-11-08': Object.freeze({ circular: 'NSE/FAOP/76940',
-    continuousOpenIst: '14:20', continuousCloseIst: '15:40',
-    automatedPaperSessionEligible: false }),
-});
-const CLOSED_2026 = new Set([
-  '2026-01-15', '2026-01-26', '2026-03-03', '2026-03-26',
-  '2026-03-31', '2026-04-03', '2026-04-14', '2026-05-01',
-  '2026-05-28', '2026-06-26', '2026-09-14', '2026-10-02',
-  '2026-10-20', '2026-11-10', '2026-11-24', '2026-12-25',
-]);
+export const NSE_FO_SPECIAL_2026 = Object.freeze(Object.fromEntries(
+  (NSE_FO_CALENDAR.years.find((year) => year.year === 2026)?.overrides ?? [])
+    .filter((entry) => entry.classification === 'SPECIAL').map((entry) => [entry.date,
+      Object.freeze({circular: entry.source, continuousOpenIst: entry.continuousOpenIst,
+        continuousCloseIst: entry.continuousCloseIst, automatedPaperSessionEligible: false})])));
 const result = (status, nextAlarmAtMs = null, tickId = null, latenessMs = null) =>
   Object.freeze({
     status, shouldPoll: status === 'POLL_SYNTHETIC_TICK',
@@ -31,17 +27,11 @@ const validMillis = (v) => Number.isSafeInteger(v) && Number.isFinite(v);
 
 /** Shared pinned NSE F&O calendar for both the scheduler and strategy port. */
 export function sessionStatus(istDate) {
-  if (typeof istDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(istDate)) return null;
-  const date = new Date(`${istDate}T00:00:00Z`);
-  if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== istDate ||
-      date.getUTCFullYear() !== 2026) return null;
-  if (Object.hasOwn(NSE_FO_SPECIAL_2026, istDate)) return 'SPECIAL';
-  if ([0, 6].includes(date.getUTCDay())) return 'WEEKEND';
-  return CLOSED_2026.has(istDate) ? 'HOLIDAY' : 'REGULAR';
+  return calendarSessionStatus(NSE_FO_CALENDAR, istDate);
 }
 
 export function validClaimedTickId(value) {
-  if (typeof value !== 'string' || !/^2026-\d{2}-\d{2}:(0|[1-9]\d{0,3})$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^20\d{2}-\d{2}-\d{2}:(0|[1-9]\d{0,3})$/.test(value)) return false;
   const [date, slot] = value.split(':');
   const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === date &&
@@ -56,8 +46,9 @@ function nextMarketOpenAfter(observedAtMs) {
     const localDay = new Date(Date.UTC(
       local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + daysAhead,
     ));
-    if (localDay.getUTCFullYear() !== 2026) return null;
-    if (sessionStatus(localDay.toISOString().slice(0, 10)) !== 'REGULAR') continue;
+    const status = sessionStatus(localDay.toISOString().slice(0, 10));
+    if (status === null) return null;
+    if (status !== 'REGULAR') continue;
     const openingAt = localDay.getTime() + 9 * 60 * 60_000 +
       15 * 60_000 - IST_OFFSET_MS;
     if (openingAt > observedAtMs) return openingAt;
@@ -86,9 +77,9 @@ export function assessAlarm({
   // IST has a fixed UTC+05:30 offset. Never use host local timezone.
   const local = new Date(observedAtMs + IST_OFFSET_MS);
   if (!Number.isFinite(local.valueOf())) return result('BLOCKED_INVALID_CLOCK');
-  if (local.getUTCFullYear() !== 2026) return result('BLOCKED_UNSUPPORTED_YEAR');
   const date = local.toISOString().slice(0, 10);
   const calendarStatus = sessionStatus(date);
+  if (calendarStatus === null) return result('BLOCKED_UNSUPPORTED_YEAR');
   if (calendarStatus === 'SPECIAL') {
     return result('CLOSED_SPECIAL_SESSION', nextMarketOpenAfter(observedAtMs));
   }

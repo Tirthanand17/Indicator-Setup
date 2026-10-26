@@ -32,6 +32,7 @@ export function runQuality(args,{source=process.env,run=spawnSync,log=console.lo
   const python=source.QUALITY_PYTHON??(process.platform==='win32'?'python':'python3');
   const checks=[];
   if(args[0]!=='--python') checks.push(
+    ['Calendar generated data',node,['scripts/calendar-maintenance.mjs','--check']],
     ['JavaScript lint',node,[path.join(edge,'node_modules/eslint/bin/eslint.js'),
       '--config',path.join(root,'eslint.config.mjs'),'eslint.config.mjs','edge-cloudflare','extension','scripts','--max-warnings=0']],
     ['JavaScript tests',node,['--test','edge-cloudflare/*.test.mjs','extension/tests/*.test.cjs','scripts/*.test.mjs']],
