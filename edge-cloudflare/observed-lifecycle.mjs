@@ -1,12 +1,12 @@
 /** Version gate and non-destructive retention policy for observed journals. */
-import {auditPaperLedger} from './paper-ledger.mjs';
+import {auditPaperLedger,paperPositionActive} from './paper-ledger.mjs';
 export const OBSERVED_LIFECYCLE_KEY='readonly-lifecycle-v1';
 export const RETENTION_POLICY='PRESERVE_FINANCIAL_HALT_AT_CAP_V1';
 export function auditObservedLifecycle(value) {
   if(value===undefined||value===null)return true; // Explicitly supported legacy stores.
   if(typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!==
     'baselineArchiveId,migratedAtMs,minimumReaderVersion,retentionPolicy,schema,writerVersion'||
-    value.schema!==1||value.writerVersion!==1||value.minimumReaderVersion!==1||
+    value.schema!==1||![1,2].includes(value.writerVersion)||value.minimumReaderVersion!==value.writerVersion||
     value.retentionPolicy!==RETENTION_POLICY||!Number.isSafeInteger(value.migratedAtMs)||value.migratedAtMs<=0||
     typeof value.baselineArchiveId!=='string'||!/^[a-f0-9]{64}$/.test(value.baselineArchiveId))
     throw Error('OBSERVED_LIFECYCLE_INCOMPATIBLE_SCHEMA');
@@ -25,7 +25,7 @@ export function observedRetentionReport(state) {
     .map(([kind,used,limit])=>({kind,used,limit,remaining:limit-used,
       status:used>=limit?'AT_LIMIT':used>=Math.ceil(limit*.9)?'CRITICAL':used>=Math.ceil(limit*.75)?'WARNING':'OK',
       retention:'PRESERVE_ALL_NO_AUTOMATIC_PRUNING'}));
-  const active=l.positions.filter(p=>p.status!=='CLOSED').length;
+  const active=l.positions.filter(paperPositionActive).length;
   const levels=['OK','WARNING','CRITICAL','AT_LIMIT'];
   return {status:state.lifecycle?'CURRENT_SCHEMA':'SUPPORTED_LEGACY_SCHEMA',retentionPolicy:RETENTION_POLICY,
     capacityStatus:levels[Math.max(...rows.map(r=>levels.indexOf(r.status)))],

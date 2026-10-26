@@ -4,6 +4,8 @@ import { Script } from 'node:vm';
 import { newPaperLedger,enterPaperBasket,exitPaperPosition } from './paper-ledger.mjs';
 import { newReadOnlyBridge } from './readonly-paper-bridge.mjs';
 import { captureObservedPortfolio } from './observed-portfolio.mjs';
+import {unresolvedFixture,EOD} from './test-support/position-reconciliation-fixture.mjs';
+import {writeOffUnknownPaperExits,UNKNOWN_EXIT_WRITE_OFF_ACK} from './paper-ledger.mjs';
 import { privateReadOnlySnapshot } from './readonly-dashboard.mjs';
 import { handlePrivateDashboard,issueDashboardSession } from './private-dashboard.mjs';
 import worker from './worker.mjs';
@@ -166,6 +168,16 @@ test('private dashboard renders fresh metrics, stale unavailable values and clea
   await new Script('refresh()').runInNewContext(context);
   assert.match(text(nodes.capital),/STALE_POSITION_MARK/);
   assert.match(text(nodes.capital),/Unavailable/);
+  const unknown=unresolvedFixture({both:true}),resolved=writeOffUnknownPaperExits(unknown.ledger,{
+    tradeIds:unknown.ledger.positions.map(p=>p.tradeId),nowMs:EOD+60000,
+    baselineArchiveId:'a'.repeat(64),acknowledgement:UNKNOWN_EXIT_WRITE_OFF_ACK});
+  const resolvedMetrics=captureObservedPortfolio(unknown.metrics,unknown.bridge,unknown.ledger,unknown.bridge,resolved,[],EOD+60000);
+  view=privateReadOnlySnapshot(unknown.bridge,resolved,{nowMs:EOD+60000,portfolioMetrics:resolvedMetrics});
+  await new Script('refresh()').runInNewContext(context);
+  assert.match(text(nodes.accounts),/1 owner write-offs/);
+  assert.match(text(nodes.statistics),/0 strategy closed/);
+  assert.match(text(nodes.trades),/Owner debit write-off/);
+  assert.match(text(nodes.trades),/exit unknown/);
   broken=true;await new Script('refresh()').runInNewContext(context);
   assert.match(nodes.status.textContent,/UNAVAILABLE/);
   for(const id of ['accounts','capital','daily','statistics','equity','trades'])assert.equal(nodes[id].children.length,0);

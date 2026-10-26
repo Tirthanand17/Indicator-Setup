@@ -1,5 +1,12 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Unknown-exit position reconciliation:** a gated, halted-source owner workflow
+can retain the original debit as an explicit zero-credit paper write-off against
+a matching verified rollback archive. It creates no fill, refund, strategy P&L
+or resume. Accounting adjustments stay separate in reports, and versioned
+archives preserve the decision and original delivery history.
+[Procedure, schema versions and limits](../audit/UNVERIFIABLE_POSITION_RECONCILIATION.md).
+
 **Operational health/watchdog:** a separately gated read-only endpoint reports
 token, auth, heartbeat, outage and source-budget conditions without provider
 requests. An explicitly run external monitor persists dedupe and optional

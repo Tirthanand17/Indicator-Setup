@@ -80,9 +80,11 @@ established by POSIX mode bits. Verify before relying on a saved artifact and
 copy the encrypted file to an approved private off-host destination. A failed
 write can leave an incomplete file; verification will reject it.
 
-Envelopes retain format/domain version 1; new payloads use schema 2 and the
+Envelopes retain format/domain version 1; legacy-ledger payloads use schema 2,
+and owner-write-off ledger schema 2 uses payload schema 3. The
 reader still authenticates original schema 1 archives before adding a null
 legacy lifecycle field. [Migration and rollback policy](OBSERVED_JOURNAL_LIFECYCLE.md).
+[Owner write-off accounting and version requirements](UNVERIFIABLE_POSITION_RECONCILIATION.md).
 The whole signed
 payload is encrypted with AES-256-GCM using a fresh random 96-bit nonce and
 domain-bound additional authenticated data. Decryption/authentication and an

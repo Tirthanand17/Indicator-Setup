@@ -81,6 +81,7 @@ export function auditObservedArchiveState(state,createdAtMs) {
   auditObservedLifecycle(state.lifecycle);
   if(state.lifecycle?.migratedAtMs>createdAtMs)fail('LIFECYCLE_CLOCK');
   auditPaperLedger(state.ledger);auditReadOnlyBridge(state.bridge);
+  if(state.ledger.schema===2&&state.lifecycle?.writerVersion!==2)fail('LEDGER_LIFECYCLE_VERSION');
   if(createdAtMs<state.ledger.lastMutationAtMs||
     (state.bridge.lastOptionAtMs!==null&&createdAtMs<state.bridge.lastOptionAtMs)||
     (state.bridge.pending&&createdAtMs<state.bridge.pending.reviewAtMs)||
@@ -121,7 +122,7 @@ export async function readObservedStateInTransaction(storage,txn,createdAtMs) {
 
 export async function sealObservedArchive({state,createdAtMs,...secrets}={}) {
   const snapshot=structuredClone(state);auditObservedArchiveState(snapshot,createdAtMs);
-  const payload={format:DOMAIN,schema:2,scope:SCOPE,createdAtMs,state:snapshot};
+  const payload={format:DOMAIN,schema:snapshot.ledger.schema===2?3:2,scope:SCOPE,createdAtMs,state:snapshot};
   const encoded=encode(payload);if(encoded.length>MAX_OBSERVED_CLEAR_BYTES)fail('SIZE_LIMIT');
   const k=await keys(secrets);
   const tag=b64(new Uint8Array(await crypto.subtle.sign('HMAC',k.sign,encoded)));
@@ -141,13 +142,14 @@ export async function openObservedArchive({sealedArchive,...secrets}={}) {
   try {signed=JSON.parse(decoder.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv,additionalData:aad},k.encrypt,cipher)));}
   catch {fail('AUTHENTICATION_FAILED');}
   if(!exact(signed,['payload','tag'])||!exact(signed.payload,['format','schema','scope','createdAtMs','state'])||
-    signed.payload.format!==DOMAIN||![1,2].includes(signed.payload.schema)||signed.payload.scope!==SCOPE)fail('INVALID_PAYLOAD');
+    signed.payload.format!==DOMAIN||![1,2,3].includes(signed.payload.schema)||signed.payload.scope!==SCOPE)fail('INVALID_PAYLOAD');
   const encoded=encode(signed.payload),tag=unb64(signed.tag,32);
   if(encoded.length>MAX_OBSERVED_CLEAR_BYTES||tag.length!==32||
     !await crypto.subtle.verify('HMAC',k.sign,tag,encoded))fail('SIGNATURE_MISMATCH');
   const original=signed.payload.state;
   if(signed.payload.schema===1&&!exact(original,Object.keys(OBSERVED_ARCHIVE_KEYS).filter(k=>k!=='lifecycle')))fail('INVALID_V1_STATE');
   const state=signed.payload.schema===1?{...structuredClone(original),lifecycle:null}:structuredClone(original);
+  if((signed.payload.schema===3)!==(state.ledger?.schema===2))fail('PAYLOAD_LEDGER_VERSION');
   auditObservedArchiveState(state,signed.payload.createdAtMs);
   return {...structuredClone(signed.payload),state,sourcePayloadSchema:signed.payload.schema,
     archiveId:hex(await crypto.subtle.digest('SHA-256',encoded))};

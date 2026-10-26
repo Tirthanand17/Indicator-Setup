@@ -38,6 +38,7 @@ test('unexpected deployment bindings, enabled feature, public route and scripts 
     mutate(c=>{c.vars.OFFLINE_OBSERVED_RESTORE_ENABLED='true';}),
     mutate(c=>{c.vars.OFFLINE_DELIVERY_RECONCILIATION_ENABLED='true';}),
     mutate(c=>{c.vars.OFFLINE_OPERATIONAL_HEALTH_ENABLED='true';}),
+    mutate(c=>{c.vars.OFFLINE_POSITION_RECONCILIATION_ENABLED='true';}),
     mutate(c=>{c.vars.SCHEDULER_ADMIN_KEY='secret-accidentally-in-public-config';}),
     mutate(c=>{c.routes=['https://domain.invalid/*'];}),
     mutate(c=>{c.triggers={crons:['* * * * *']};}),

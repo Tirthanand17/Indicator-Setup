@@ -103,12 +103,12 @@ test('native lifecycle migration is atomic, idempotent, restart-safe and rejects
     assert.equal(report.status,'CURRENT_SCHEMA');assert.equal(report.automaticDeletion,false);
     await mf.dispose();mf=new Miniflare(options(persist));s=await stub(mf);
     assert.deepEqual((await state(s)).state.lifecycle,after.state.lifecycle);
-    const future={...after.state,lifecycle:{...after.state.lifecycle,writerVersion:2}};
+    const future={...after.state,lifecycle:{...after.state.lifecycle,writerVersion:3}};
     await post(s,'/test/archive/seed',{state:future,nowMs:AT+40000});
     assert.equal((await (await s.fetch('https://unit.invalid/test/archive/alarm')).json()).status,'BLOCKED_INCOMPATIBLE_SCHEMA');
     assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/bootstrap',{method:'POST',headers})).status,503);
     assert.deepEqual((await state(s)).state.ledger,book.ledger);
-    assert.equal((await state(s)).state.lifecycle.writerVersion,2);
+    assert.equal((await state(s)).state.lifecycle.writerVersion,3);
     await post(s,'/test/archive/seed',{nowMs:AT+40000,extra:{key:'readonly-lifecycle-v1',value:null}});
     assert.equal((await (await s.fetch('https://unit.invalid/test/archive/alarm')).json()).status,'BLOCKED_INCOMPATIBLE_SCHEMA');
     assert.equal((await mf.dispatchFetch('https://unit.invalid/internal/observed-archive',{headers})).status,503);

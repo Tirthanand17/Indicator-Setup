@@ -11,6 +11,7 @@ import { READONLY_PAPER_LEDGER_KEY, READONLY_PAPER_BRIDGE_KEY,
 import { READONLY_PAPER_DELIVERY_KEY, reconcileReadOnlyDeliveryJournal } from '../readonly-delivery.mjs';
 import { sendTelegramPaperMessage } from '../telegram-sender.mjs';
 import {OBSERVED_ARCHIVE_KEYS,restoreObservedArchiveToEmpty} from '../observed-archive.mjs';
+import {reconcileUnknownPositions} from '../position-reconciliation.mjs';
 // Keep the synthetic clock ahead of the real timer so workerd does not
 // immediately fire past-due alarms behind the test's explicit callbacks.
 let clock = Date.now() + 120_000;
@@ -20,6 +21,14 @@ export default worker;
 export class TestSession extends MarketSession {
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if(path==='/test/position-reconciliation/rollback'&&request.method==='POST') {
+      const body=await request.json();
+      try {await reconcileUnknownPositions({transaction:fn=>this.storage.transaction(async txn=>{
+        await fn(txn);throw Error('SYNTHETIC_POSITION_RECONCILIATION_ABORT');
+      })},{...body,signingSecret:this.env.OBSERVED_ARCHIVE_HMAC_KEY,encryptionKeyBase64:this.env.OBSERVED_ARCHIVE_AES_KEY,nowMs:clock});}
+      catch(error){return Response.json({rolledBack:error.message==='SYNTHETIC_POSITION_RECONCILIATION_ABORT'});}
+      throw Error('Rollback expected');
+    }
     if(path==='/test/archive/alarm')return Response.json(await this.alarm());
     if(path==='/test/archive/seed'&&request.method==='POST') {
       const input=await request.json();clock=input.nowMs;

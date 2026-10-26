@@ -52,7 +52,7 @@ test('active sources, stale snapshots and failed migration transactions leave no
 test('unknown manifest versions block writer checks and alarms without changing accounting',async()=>{
   await assert.rejects(()=>assertObservedWriter({get:async()=>null}),/INCOMPATIBLE_SCHEMA/);
   const s=halted(),store=storeFor(s),archive=await seal(s);await migrate(store,archive);
-  const data=store.dump();data[OBSERVED_LIFECYCLE_KEY].writerVersion=2;
+  const data=store.dump();data[OBSERVED_LIFECYCLE_KEY].writerVersion=3;
   const blocked={get:async key=>data[key],transaction:async fn=>fn({get:async key=>data[key],deleteAlarm:async()=>{}})};
   const session=new MarketSession({storage:blocked},{OFFLINE_SCHEDULER_ENABLED:'true'});
   await assert.rejects(()=>session.assertNotHalted(),/INCOMPATIBLE_SCHEMA/);

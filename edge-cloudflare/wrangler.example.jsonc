@@ -20,7 +20,8 @@
     "OFFLINE_OBSERVED_ARCHIVE_ENABLED": "false",
     "OFFLINE_OBSERVED_RESTORE_ENABLED": "false",
     "OFFLINE_DELIVERY_RECONCILIATION_ENABLED": "false",
-    "OFFLINE_OPERATIONAL_HEALTH_ENABLED": "false"
+    "OFFLINE_OPERATIONAL_HEALTH_ENABLED": "false",
+    "OFFLINE_POSITION_RECONCILIATION_ENABLED": "false"
   },
   "durable_objects": {
     "bindings": [{ "name": "MARKET_SESSION", "class_name": "MarketSession" }]

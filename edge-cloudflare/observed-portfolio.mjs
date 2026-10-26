@@ -1,5 +1,5 @@
 /** Observed-option paper net liquidation and sampled drawdown, never broker equity. */
-import {auditPaperLedger,checkQuote,moneyScaled} from './paper-ledger.mjs';
+import {auditPaperLedger,checkQuote,moneyScaled,paperPositionActive} from './paper-ledger.mjs';
 import {auditReadOnlyBridge} from './readonly-paper-bridge.mjs';
 import {estimateLeg} from './strategy-core.mjs';
 import {validClaimedTickId} from './alarm-core.mjs';
@@ -20,6 +20,20 @@ const recordMatches=(r,b,l)=>r.lastTickId===b.lastOptionTickId&&r.bridgeObserved
   r.ledgerMutationAtMs===l.lastMutationAtMs&&r.positionCount===l.positions.length&&
   r.rejectionCount===l.rejections.length&&r.outboxCount===l.outbox.length;
 
+function ownerAdjustmentStatistics(ledger,accountId,filter=()=>true) {
+  const rows=ledger.positions.filter(p=>p.accountId===accountId&&p.status==='EXIT_WRITTEN_OFF'&&filter(p));
+  const debit=sum(rows.map(p=>p.entryDebitPaise));
+  return {ownerWriteOffCount:rows.length,ownerWriteOffDebitRupees:rs(debit),ownerAdjustmentPnlRupees:rs(-debit)};
+}
+function accountingHistory(ledger,accountId) {
+  const events=ledger.positions.filter(p=>p.accountId===accountId&&['CLOSED','EXIT_WRITTEN_OFF'].includes(p.status))
+    .map(p=>({at:p.status==='CLOSED'?p.exitAtMs:p.ownerResolution.atMs,id:p.tradeId,
+      pnl:p.status==='CLOSED'?p.netPnlPaise:-p.entryDebitPaise})).sort((a,b)=>a.at-b.at||a.id.localeCompare(b.id));
+  let equity=ledger.accounts[accountId].initialPaise,peakPaise=equity,drawdownPaise=0,drawdownPercent=0;
+  for(const e of events){equity=sum([equity,e.pnl]);peakPaise=Math.max(peakPaise,equity);
+    drawdownPaise=Math.max(drawdownPaise,peakPaise-equity);drawdownPercent=Math.max(drawdownPercent,pct(peakPaise-equity,peakPaise));}
+  return {peakPaise,drawdownPaise,drawdownPercent};
+}
 function closedStatistics(ledger,accountId,filter=()=>true) {
   const positions=ledger.positions.filter(p=>p.accountId===accountId&&p.status==='CLOSED'&&filter(p))
     .sort((a,b)=>a.exitAtMs-b.exitAtMs||a.tradeId.localeCompare(b.tradeId));
@@ -56,6 +70,7 @@ function exitValue(position,bidPaise,onDay) {
 }
 
 function positionValue(p,marks,nowMs) {
+  if(p.status==='EXIT_WRITTEN_OFF')return {status:'OWNER_WRITE_OFF_UNKNOWN_EXIT',value:null,mark:null};
   if(p.status==='EXIT_UNVERIFIABLE')return {status:'BLOCKED_UNVERIFIABLE_EXIT',value:null,mark:null};
   if(p.status==='CLOSED')return {status:'CLOSED',value:null,mark:null};
   if(day(p.entryAtMs)!==day(nowMs))return {status:'CARRIED_POSITION_UNVERIFIED',value:null,mark:null};
@@ -141,11 +156,11 @@ export function captureObservedPortfolio(prior,oldBridge,oldLedger,bridge,ledger
   }
   const accounts={};
   for(const id of IDS) {
-    const own=ledger.positions.filter(p=>p.accountId===id&&p.status!=='CLOSED');
+    const own=ledger.positions.filter(p=>p.accountId===id&&paperPositionActive(p));
     const values=own.map(p=>positionValue(p,marks,nowMs));
     const known=values.every(v=>v.value!==null);
     const equity=known?sum([ledger.accounts[id].cashPaise,...values.map(v=>v.value.creditPaise)]):null;
-    const realized=closedStatistics(ledger,id);
+    const realized=accountingHistory(ledger,id);
     const previous=prior?.accounts[id];
     const initial=ledger.accounts[id].initialPaise;
     const recent=previous?structuredClone(previous.recent):[];
@@ -156,13 +171,13 @@ export function captureObservedPortfolio(prior,oldBridge,oldLedger,bridge,ledger
       const [oldDay,oldSlot]=oldBridge.lastOptionTickId.split(':'),[newDay,newSlot]=bridge.lastOptionTickId.split(':');
       gap=oldDay!==newDay||Number(newSlot)-Number(oldSlot)!==1;
     }
-    const peak=Math.max(previous?.peakEquityPaise??initial,Math.round(realized.realizedPeakEquityRupees*100),equity??0);
+    const peak=Math.max(previous?.peakEquityPaise??initial,realized.peakPaise,equity??0);
     const drawdown=equity===null?null:peak-equity;
     const sample={atMs:nowMs,equityPaise:equity};
     if(newTime)recent.push(sample);else recent[recent.length-1]=sample;
     accounts[id]={peakEquityPaise:peak,
-      maxDrawdownPaise:Math.max(previous?.maxDrawdownPaise??Math.round(realized.maxRealizedDrawdownRupees*100),drawdown??0),
-      maxDrawdownPercent:Math.max(previous?.maxDrawdownPercent??realized.maxRealizedDrawdownPercent,drawdown===null?0:pct(drawdown,peak)),
+      maxDrawdownPaise:Math.max(previous?.maxDrawdownPaise??realized.drawdownPaise,drawdown??0),
+      maxDrawdownPercent:Math.max(previous?.maxDrawdownPercent??realized.drawdownPercent,drawdown===null?0:pct(drawdown,peak)),
       historyComplete:(previous?.historyComplete??!(oldLedger?.positions.length))&&known&&!gap,
       startedAtMs:previous?.startedAtMs??nowMs,samples:(previous?.samples??0)+(newTime?1:0),
       missingSamples:(previous?.missingSamples??0)+(newTime&&!known?1:0),recent:recent.slice(-128)};
@@ -196,11 +211,13 @@ export function observedPortfolioMetrics(ledger,bridge,record,nowMs,reportDay=da
       unrealizedPnlRupees:valuation.value?rs(valuation.value.creditPaise-p.entryDebitPaise):p.status==='CLOSED'?0:null,
       entryFeeRupees:rs(p.entryFeePaise),exitFeeRupees:p.status==='CLOSED'?rs(p.exitFeePaise):null,
       incurredFeesRupees:rs(p.entryFeePaise+(p.exitFeePaise??0)),entryDebitRupees:rs(p.entryDebitPaise),
+      ownerWriteOffRupees:p.status==='EXIT_WRITTEN_OFF'?rs(p.entryDebitPaise):0,
+      ownerResolutionAtMs:p.ownerResolution?.atMs??null,
       netRiskRupees:rs(risk),netPotentialRewardRupees:rs(reward),
       netRiskReward:risk!==null&&risk>0&&reward!==null?Number((reward/risk).toFixed(4)):null});
   }
   const accounts=IDS.map(id=>{
-    const own=ledger.positions.filter(p=>p.accountId===id),active=own.filter(p=>p.status!=='CLOSED');
+    const own=ledger.positions.filter(p=>p.accountId===id),active=own.filter(paperPositionActive);
     const values=active.map(p=>positionValue(p,marks,nowMs));
     const known=values.every(v=>v.value!==null),reserved=sum(active.map(p=>p.entryDebitPaise));
     const credit=known?sum(values.map(v=>v.value.creditPaise)):null;
@@ -213,6 +230,7 @@ export function observedPortfolioMetrics(ledger,bridge,record,nowMs,reportDay=da
     return {accountId:id,markedEquityRupees:rs(equity),unrealizedPnlRupees:known?rs(credit-reserved):null,
       totalNetPnlRupees:equity===null?null:rs(equity-initial),totalReturnPercent:equity===null?null:pct(equity-initial,initial),
       availableCapitalRupees:rs(ledger.accounts[id].cashPaise),capitalCommittedRupees:rs(reserved),
+      ...ownerAdjustmentStatistics(ledger,id),
       incurredFeesRupees:rs(sum(own.map(p=>p.entryFeePaise+(p.exitFeePaise??0)))),
       estimatedOpenExitFeesRupees:known?rs(sum(values.map(v=>v.value.feePaise))):null,
       grossRealizedBeforeFeesRupees:rs(sum(own.filter(p=>p.status==='CLOSED').map(p=>(p.exitFillPaise-p.entryFillPaise)*p.lots*p.lotSize))),
@@ -220,15 +238,19 @@ export function observedPortfolioMetrics(ledger,bridge,record,nowMs,reportDay=da
       peakEquityRupees:rs(peak),drawdownRupees:rs(drawdown),drawdownPercent:drawdown===null?null:pct(drawdown,peak),
       maxDrawdownRupees:history?rs(history.maxDrawdownPaise):own.length===0?0:null,
       maxDrawdownPercent:history?.maxDrawdownPercent??(own.length===0?0:null),
-      drawdownBasis:'SAMPLED_NET_LIQUIDATION_EQUITY',sampledHistoryComplete:history?.historyComplete??own.length===0,
+      drawdownBasis:own.some(p=>p.status==='EXIT_WRITTEN_OFF')?'SAMPLED_PAPER_EQUITY_INCLUDING_OWNER_WRITE_OFFS':'SAMPLED_NET_LIQUIDATION_EQUITY',
+      sampledHistoryComplete:history?.historyComplete??own.length===0,
       historyStartedAtMs:history?.startedAtMs??null,missingValuationSamples:history?.missingSamples??null,
       recentEquitySamples:history?.recent.map(s=>({atMs:s.atMs,equityRupees:rs(s.equityPaise)}))??[],
       ...lifetime};
   });
-  const months=[...new Set([reportDay.slice(0,7),...ledger.positions.filter(p=>p.status==='CLOSED').map(p=>day(p.exitAtMs).slice(0,7))])].sort();
-  const daily=IDS.map(accountId=>({accountId,...closedStatistics(ledger,accountId,p=>day(p.exitAtMs)===reportDay)}));
+  const months=[...new Set([reportDay.slice(0,7),...ledger.positions.filter(p=>p.status==='CLOSED'||p.status==='EXIT_WRITTEN_OFF')
+    .map(p=>day(p.status==='CLOSED'?p.exitAtMs:p.ownerResolution.atMs).slice(0,7))])].sort();
+  const daily=IDS.map(accountId=>({accountId,...closedStatistics(ledger,accountId,p=>day(p.exitAtMs)===reportDay),
+    ...ownerAdjustmentStatistics(ledger,accountId,p=>day(p.ownerResolution.atMs)===reportDay)}));
   const monthly=months.flatMap(month=>IDS.map(accountId=>({month,accountId,
-    ...closedStatistics(ledger,accountId,p=>day(p.exitAtMs).startsWith(month))})));
+    ...closedStatistics(ledger,accountId,p=>day(p.exitAtMs).startsWith(month)),
+    ...ownerAdjustmentStatistics(ledger,accountId,p=>day(p.ownerResolution.atMs).startsWith(month))})));
   return {metricsStatus,accounts,trades,monthly,daily,
     valuationMethod:'PAPER_BID_MINUS_ADVERSE_SLIPPAGE_AND_ESTIMATED_SELL_FEES',
     healthStatus:accounts.some(a=>a.valuationStatus==='BLOCKED_UNVERIFIABLE_EXIT')?'BLOCKED_UNVERIFIABLE_EXIT':

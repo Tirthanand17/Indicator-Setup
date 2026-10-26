@@ -22,6 +22,7 @@ const asRupees = n => n === null ? null : Number((n / 100).toFixed(2));
  */
 export function captureSyntheticPortfolioMarks(ledger, session, input) {
   auditPaperLedger(ledger);
+  if(ledger.schema!==1)fail('UNSUPPORTED_SYNTHETIC_LEDGER');
   auditSyntheticSession(session);
   if (input?.source !== SYNTHETIC_SOURCE ||
       input.tickId !== session.lastTickId || input.observedAtMs !== session.lastObservedAtMs ||
@@ -83,6 +84,7 @@ export function auditPortfolioMarks(record, session) {
 export function portfolioValuation(ledger, session, record, nowMs,
   schedulerStatus = 'NOT_INITIALIZED') {
   auditPaperLedger(ledger);
+  if(ledger.schema!==1)fail('UNSUPPORTED_SYNTHETIC_LEDGER');
   if (session !== undefined && session !== null) auditSyntheticSession(session);
   if (record !== undefined && record !== null) {
     if (!session) fail('ORPHAN_MARKS');

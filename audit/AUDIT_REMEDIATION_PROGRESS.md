@@ -6,37 +6,42 @@ phase checklists remain historical records with different denominators.
 
 ## Current verified progress
 
-**24/41 acceptance checks = 58.54%**
+**27/41 acceptance checks = 65.85%**
 
-`[██████░░░░] 59%`
+`[███████░░░] 66%`
 
 **Live cloud acceptance: 0/5.** No target deployment or live market/phone
 acceptance is established by this work. Feature flags remain disabled.
 
-**Remediation tasks completed: 11/19.** Read-only operational health and the
-independent, persistent opt-in notification watchdog (item 11) are implemented
-and tested. No actual monitor or notification service was activated.
-The score remains conservatively 24/41 while operator reconciliation and
-operational recovery remain incomplete. Cloud acceptance remains unchanged.
+**Remediation tasks completed: 12/19.** Unknown-exit owner accounting (item 12)
+now completes the accumulated local observed recovery/retention architecture,
+archive/restore/lifecycle implementation and recovery/reconciliation drill.
+Those three previously held checks are now counted. No actual write-off,
+monitor, notification service or deployment was activated. Cloud acceptance
+remains unchanged, and operational resume/hosted recovery are unverified.
 
-The audit baseline was 19/41. Five newly satisfied checks are the current
+The audit baseline was 19/41. Eight newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
 verified in a successful GitHub Actions run, and the implemented/tested futures
-rollover and dynamic entry-option lifecycle, and observed portfolio metrics.
+rollover and dynamic entry-option lifecycle, and observed portfolio metrics,
+plus the observed recovery/retention architecture, archive/restore/lifecycle
+implementation, and local durable recovery/reconciliation drill. The last three
+have evidence across tasks 8–12, including exact accounting, schema compatibility,
+retained delivery uncertainty, rollback/restart and explicit owner decisions.
 The dashboard delivery correction is
 useful work within a still-incomplete implementation check and earns no
 additional point. This score measures evidence, not hours of work remaining.
 
 | Category | Before | Now |
 |---|---|---|
-| Architecture | 4/5 | 4/5 |
-| Implementation | 6/10 | 8/10 |
+| Architecture | 4/5 | 5/5 |
+| Implementation | 6/10 | 9/10 |
 | Automated tests | 4/6 | 5/6 |
 | Security | 3/6 | 4/6 |
 | Cloud deployment | 0/4 | 0/4 |
 | Cloud acceptance | 0/5 | 0/5 |
-| Operational readiness | 2/5 | 3/5 |
+| Operational readiness | 2/5 | 4/5 |
 
 ## Completed changes
 
@@ -118,7 +123,15 @@ additional point. This score measures evidence, not hours of work remaining.
     sends. Native inspection/decryption tests preserve source records and secrets.
     [Setup, persistence rules, traffic and limitations](OPERATIONAL_HEALTH_AND_ALERTS.md).
 
-Validation: **341 JavaScript/extension/quality-runner tests, 31 native
+12. **Unknown-exit position accounting:** authenticated, archived-baseline owner
+    zero-credit write-off for missed/unverifiable paper exits; exact cash and
+    delivery preservation; separate owner adjustments rather than fabricated
+    strategy fills/P&L; daily-risk protection and protocol-2/payload-3 version
+    guards. Native transaction rollback, duplicate/restart, private reporting and
+    archive recovery drills pass. No runtime resume or real decision is claimed.
+    [Accounting, procedure and limits](UNVERIFIABLE_POSITION_RECONCILIATION.md).
+
+Validation: **351 JavaScript/extension/quality-runner tests, 33 native
 workerd/SQLite tests and 778 Python tests pass** (one platform-specific skip);
 Python type baseline passes for 49 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
@@ -143,8 +156,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 9 | Journal retention and schema/rollback lifecycle | Implemented preservation policy, versioned migration and rollback drill |
 | 10 | Authenticated Telegram ambiguity reconciliation | Implemented; native owner suppression/restart drill verified |
 | 11 | Token, outage, heartbeat and quota operational alerts | Implemented; read-only health, persistent external watchdog and opt-in notifications tested |
-| 12 | Unverifiable-position reconciliation | Next |
-| 13 | Future calendar and exceptional-session maintenance | Pending |
+| 12 | Unverifiable-position reconciliation | Implemented explicit owner zero-credit accounting; local native recovery/reconciliation drill verified |
+| 13 | Future calendar and exceptional-session maintenance | Next |
 | 14 | Public ingress hardening; history/IAM/log verification | Pending |
 | 15 | Inert Free-only cloud identity/deployment verification | Account/deployment evidence required |
 | 16 | Actual secure daily token handoff lifecycle | Owner handoff and cloud access required |

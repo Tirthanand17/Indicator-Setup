@@ -35,7 +35,7 @@ runtime or unattended journal rollover is claimed.
 ## Schema and migration contract
 
 The optional `readonly-lifecycle-v1` manifest records writer/minimum-reader
-protocol version 1, the retention policy, migration time and SHA-256 identity
+protocol version 1 (legacy) or 2 (owner-write-off accounting), the retention policy, migration time and SHA-256 identity
 of a verified baseline archive. Absent manifests are explicitly supported legacy
 stores; unknown/corrupt manifests are never interpreted as a fresh store.
 Critical paper/claim, delivery-settlement, bootstrap and token transactions
@@ -77,7 +77,8 @@ The server retains only its archive ID, not another on-host copy of the bundle.
 ## Archive compatibility and rollback
 
 New encrypted exports keep envelope/domain version 1 and use payload schema 2
-with an eleventh `lifecycle` state field. The current reader also authenticates
+with an eleventh `lifecycle` state field for legacy ledgers, or payload schema 3
+for owner-write-off ledger schema 2. The current reader also authenticates
 payload schema 1 from the previous implementation. Only after authenticating
 the original bytes does it add a null legacy manifest in memory. The archive ID
 remains the hash of those original authenticated bytes. Unknown payload versions
@@ -88,6 +89,10 @@ A public, entirely synthetic golden fixture was produced by commit `f1d40e4`
 before changing the reader, so compatibility is tested against the previous
 exporter rather than a reconstruction by the new implementation. Its fixture
 keys protect no real account data and must never be reused in deployment.
+
+[Position reconciliation](UNVERIFIABLE_POSITION_RECONCILIATION.md) upgrades the
+ledger and manifest atomically with owner accounting. No legacy metadata command
+downgrades that financial format or resumes its scheduler.
 
 Rollback restores a verified baseline into a **different empty target** using
 the current compatible reader. The source is left intact, target accounting and

@@ -3,8 +3,9 @@ import {assertObservedWriter,observedRetentionReport} from './observed-lifecycle
 import {migrateObservedLifecycle} from './observed-lifecycle-ops.mjs';
 import {deliveryReconciliationView,reconcileUncertainDelivery,readReconciliationJSON} from './delivery-reconciliation.mjs';
 import {operationalHealth} from './operational-health.mjs';
+import {positionReconciliationView,reconcileUnknownPositions} from './position-reconciliation.mjs';
 import {OBSERVED_RECOVERY_KEY,snapshotObservedState,sealObservedArchive,
-  restoreObservedArchiveToEmpty,readObservedArchiveJSON} from './observed-archive.mjs';
+  restoreObservedArchiveToEmpty,readObservedArchiveJSON,readObservedStateInTransaction} from './observed-archive.mjs';
 /** Undeployed paper-only scheduler and optional read-only Kite market sampler.
  * SQLite-backed DO storage uses transactional KV. No order endpoint, Telegram,
  * broker SDK, filesystem or constructor alarm scheduling. Runtime is opt-in.
@@ -89,6 +90,9 @@ export default {
       (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
        env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
+    const positionReconciliationRoute=path==='/internal/readonly-paper/reconcile'&&
+      new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&
+      ['GET','POST'].includes(request.method)&&env.OFFLINE_POSITION_RECONCILIATION_ENABLED==='true';
     const operationsRoute=path==='/internal/operations'&&request.method==='GET'&&
       new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&env.OFFLINE_OPERATIONAL_HEALTH_ENABLED==='true';
     if(operationsRoute) {
@@ -105,7 +109,7 @@ export default {
       ((path==='/internal/observed-archive'&&request.method==='GET')||
        (path==='/internal/observed-lifecycle'&&(request.method==='GET'||request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'))||
        (path==='/internal/observed-archive/restore'&&request.method==='POST'&&env.OFFLINE_OBSERVED_RESTORE_ENABLED==='true'));
-    if (!tokenRoute && !dashboardRoute && (!(archiveRoute||reconciliationRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
+    if (!tokenRoute && !dashboardRoute && (!(archiveRoute||reconciliationRoute||positionReconciliationRoute||(path === '/internal/bootstrap' && request.method === 'POST') ||
           (path === '/internal/emergency-halt' && request.method === 'POST') ||
           (path === '/internal/scheduler' && request.method === 'GET') ||
           (path === '/internal/release-readiness' && request.method === 'GET') ||
@@ -179,6 +183,21 @@ export class MarketSession {
     try {
       if(request.method!=='GET'&&await this.storage.get(OBSERVED_RECOVERY_KEY)!==undefined&&
         !['/internal/observed-archive/restore','/internal/observed-lifecycle'].includes(path))return reply({status:'ARCHIVE_RESTORED_QUARANTINED',paperOnly:true},503);
+      if(path==='/internal/readonly-paper/reconcile') {
+        if(this.env.OFFLINE_POSITION_RECONCILIATION_ENABLED!=='true'||new URL(request.url).protocol!=='https:'||
+          new URL(request.url).search!==''||!['GET','POST'].includes(request.method))return reply({error:'Not found'},404);
+        if(request.method==='GET')return await this.storage.transaction(async txn=>{
+          const state=await readObservedStateInTransaction(this.storage,txn,Date.now());
+          return reply(positionReconciliationView(state,{nowMs:Date.now(),alarmAtMs:await txn.getAlarm()}));
+        });
+        if(request.headers.get('content-type')!=='application/json')return reply({error:'JSON required'},400);
+        let body;
+        try {body=await readObservedArchiveJSON(request.body);}
+        catch{return reply({status:'INVALID_POSITION_REQUEST'},400);}
+        if(!body||Object.keys(body).sort().join(',')!=='request,sealedArchive')return reply({status:'INVALID_POSITION_REQUEST'},400);
+        try {return reply(await reconcileUnknownPositions(this.storage,{...body,...observedArchiveSecrets(this.env),nowMs:Date.now()}));}
+        catch {return reply({status:'POSITION_RECONCILIATION_REJECTED'},409);}
+      }
       if(path==='/internal/readonly-delivery/reconcile') {
         if(this.env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED!=='true'||new URL(request.url).protocol!=='https:'||
           new URL(request.url).search!==''||!['GET','POST'].includes(request.method))return reply({error:'Not found'},404);
