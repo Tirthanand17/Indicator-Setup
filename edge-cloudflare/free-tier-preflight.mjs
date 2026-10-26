@@ -18,7 +18,7 @@ export const FREE_REFERENCE_2026_10_24 = Object.freeze({
   durableStoredBytes: 5_000_000_000,
 });
 
-const SAFE_VARS = Object.freeze([
+export const INERT_RUNTIME_FLAGS = Object.freeze([
   'OFFLINE_SCHEDULER_ENABLED', 'READONLY_MARKET_RUNTIME_ENABLED',
   'OFFLINE_READONLY_REVIEW_ENABLED',
   'OFFLINE_OPTION_SNAPSHOT_ENABLED',
@@ -32,6 +32,7 @@ const SAFE_VARS = Object.freeze([
   'OFFLINE_OPERATIONAL_HEALTH_ENABLED',
   'OFFLINE_POSITION_RECONCILIATION_ENABLED',
 ]);
+const SAFE_VARS = INERT_RUNTIME_FLAGS;
 const sorted = values => [...values].sort().join(',');
 const exactKeys = (object, keys) => object && !Array.isArray(object) &&
   typeof object === 'object' && sorted(Object.keys(object)) === sorted(keys);

@@ -6,6 +6,7 @@ test('quality subprocesses cannot inherit application credentials or enabled fla
   const source={PATH:'/synthetic/bin',HOME:'/synthetic/home',SystemRoot:'synthetic-windows',
     KITE_API_KEY:'synthetic-secret',TELEGRAM_BOT_TOKEN:'synthetic-secret',
     CLOUDFLARE_API_TOKEN:'synthetic-secret',PYTHONPATH:'/untrusted/imports',
+    CLOUDFLARE_IDENTITY_READ_TOKEN:'synthetic-secret',CLOUDFLARE_IDENTITY_READ_APPROVED:'yes',
     NODE_OPTIONS:'--require=/untrusted/script',ALERTS_ENABLED:'true',OFFLINE_TELEGRAM_SENDER_ENABLED:'true',
     OBSERVED_ARCHIVE_HMAC_KEY:'synthetic-secret',OBSERVED_ARCHIVE_AES_KEY:'synthetic-secret',
     OFFLINE_OBSERVED_ARCHIVE_ENABLED:'true',OFFLINE_OBSERVED_RESTORE_ENABLED:'true',OFFLINE_DELIVERY_RECONCILIATION_ENABLED:'true',
@@ -14,6 +15,7 @@ test('quality subprocesses cannot inherit application credentials or enabled fla
   assert.equal(env.PATH,source.PATH);assert.equal(env.SystemRoot,source.SystemRoot);
   assert.equal(JSON.stringify(env).includes('synthetic-secret'),false);
   assert.equal(env.PYTHONPATH,undefined);assert.equal(env.NODE_OPTIONS,undefined);
+  assert.equal(env.CLOUDFLARE_IDENTITY_READ_APPROVED,undefined);
   assert.equal(env.ALERTS_ENABLED,'false');assert.equal(env.OFFLINE_TELEGRAM_SENDER_ENABLED,'false');
   assert.equal(env.OFFLINE_OBSERVED_ARCHIVE_ENABLED,'false');assert.equal(env.OFFLINE_OBSERVED_RESTORE_ENABLED,'false');
   assert.equal(env.OFFLINE_DELIVERY_RECONCILIATION_ENABLED,'false');

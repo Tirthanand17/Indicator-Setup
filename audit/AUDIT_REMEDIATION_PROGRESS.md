@@ -34,6 +34,13 @@ partial because deployed perimeter, account IAM/logs and remote-only history
 coverage are unverified. No additional acceptance point or completed-task count
 is claimed. Task 15 is the next account-evidence stage.
 
+Task 15 now has a tested GET-only metadata inspector for the pinned account,
+Worker/version/ETag and SQLite namespace, with disabled-binding validation,
+exposure/logging observations, consistency rechecks, deadlines and redacted
+reports. It defaults to zero requests. Required account settings were absent;
+no real inspection, Free/no-card verification, deployment or rollback is
+claimed. The score and completed-task count remain unchanged.
+
 The audit baseline was 19/41. Eight newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
@@ -160,7 +167,14 @@ additional point. This score measures evidence, not hours of work remaining.
     IAM, external logs and remote-only coverage remain unverified.
     [Policies, evidence, limitations and remaining account checks](INGRESS_AND_SECRET_HISTORY.md).
 
-Validation: **365 JavaScript/extension/quality-runner tests and 34 native
+15. **Inert cloud identity inspection (partial):** a fixed-scope read-only CLI
+    validates current deployment/version metadata, settings and namespace
+    correlation without enabling runtime or accepting a release. Unknown plan,
+    source-bundle correspondence, IAM, routes/instances and rollback evidence
+    remain explicit blockers. No actual account was inspected.
+    [API sources, command, exit codes and remaining evidence](INERT_CLOUD_IDENTITY_VERIFICATION.md).
+
+Validation: **373 JavaScript/extension/quality-runner tests and 34 native
 workerd/SQLite tests pass**, including preservation of the reconciliation
 413 size-error contract. Local WSL Python: **783 pass, two skips** (one
 platform-specific and cross-language parity because Linux Node is absent);
@@ -191,7 +205,7 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 12 | Unverifiable-position reconciliation | Implemented explicit owner zero-credit accounting; local native recovery/reconciliation drill verified |
 | 13 | Future calendar and exceptional-session maintenance | Tooling implemented and locally verified; official 2027 data and revision activation pending |
 | 14 | Public ingress hardening; history/IAM/log verification | Source controls and local history review implemented; deployed perimeter/IAM/logs and remote coverage pending |
-| 15 | Inert Free-only cloud identity/deployment verification | Next; account/deployment evidence required |
+| 15 | Inert Free-only cloud identity/deployment verification | GET-only inspection tooling implemented; actual account, Free/no-card, source/deployment and rollback evidence pending |
 | 16 | Actual secure daily token handoff lifecycle | Owner handoff and cloud access required |
 | 17 | Five live acceptance gates | Pending |
 | 18 | Actual cloud resource/cost measurements | Deployment and telemetry required |

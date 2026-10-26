@@ -1,5 +1,11 @@
 # Offline Cloudflare migration — scheduler, market adapter and paper ledger
 
+**Inert cloud identity inspection:** a help-only-by-default CLI can perform an
+explicitly authorized set of GET-only Cloudflare metadata reads, correlating the
+exact Worker/version/ETag, disabled flags and SQLite namespace. It never deploys,
+creates resources or certifies Free-plan eligibility. Actual account inspection
+remains pending. [Procedure and limits](../audit/INERT_CLOUD_IDENTITY_VERIFICATION.md).
+
 **Unknown-exit position reconciliation:** a gated, halted-source owner workflow
 can retain the original debit as an explicit zero-credit paper write-off against
 a matching verified rollback archive. It creates no fill, refund, strategy P&L
@@ -36,8 +42,10 @@ No hosted backup, destination or live restore is established.
 The historical archive checkpoints below describe the separate synthetic archive.
 
 **IN DEVELOPMENT / PAPER ONLY. Deployment unverified.** Independent audit
-acceptance score **23/41 (56%)**, live acceptance **0/5**.
+acceptance score **27/41 (66%)**, live acceptance **0/5**.
 [Current remediation and remaining work](../audit/AUDIT_REMEDIATION_PROGRESS.md).
+Historical phase test counts below are snapshots; current validation totals
+are maintained in that tracker.
 
 **Current monitoring cadence:** each eligible requested 20-second tick uses one
 shared quote for the front future, entry pair and original held contracts (at
