@@ -25,6 +25,7 @@ from .runtime_guard import single_worker
 from .operational import assess_operational
 from .config_guard import configuration_blockers
 from .worker_supervisor import WorkerSupervisor
+from .ingress import TokenAdmission
 IST=ZoneInfo('Asia/Kolkata')
 
 class AppSettings:
@@ -296,8 +297,18 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
                             status_code=200 if report['monitoring_data_ready'] else 503,
                             headers={'Cache-Control': 'no-store'})
 
+    token_admission = TokenAdmission()
+
     @app.post('/internal/token')
     async def handoff(request:Request):
+        if not token_admission.claim():
+            raise HTTPException(429, 'request budget exceeded', headers={'Retry-After':'60'})
+        try:
+            return await _handoff(request)
+        finally:
+            token_admission.release()
+
+    async def _handoff(request:Request):
         if request.headers.get('content-type','').split(';')[0]!='application/json':
             raise HTTPException(415,'JSON only')
         # Strict bound BEFORE reading request content into memory. Content-Length
@@ -306,11 +317,15 @@ def build_app(settings:AppSettings|None=None)->FastAPI:
             raise HTTPException(413,'token handoff body too large')
         chunks=[]
         size=0
-        async for chunk in request.stream():
-            size+=len(chunk)
-            if size>2048:
-                raise HTTPException(413,'token handoff body too large')
-            chunks.append(chunk)
+        try:
+            async with asyncio.timeout(3):
+                async for chunk in request.stream():
+                    size+=len(chunk)
+                    if size>2048:
+                        raise HTTPException(413,'token handoff body too large')
+                    chunks.append(chunk)
+        except TimeoutError:
+            raise HTTPException(408,'token handoff body unavailable') from None
         raw=b''.join(chunks)
         now=datetime.now(IST)
         ts=request.headers.get('x-relay-timestamp','')

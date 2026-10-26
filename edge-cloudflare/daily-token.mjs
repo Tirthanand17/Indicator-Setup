@@ -2,6 +2,7 @@
  * No environment lookup, storage, network, logging or broker SDK here.
  * Compatible with cloud_alerts.security.signature and token_sender.py.
  */
+import {readBoundedBody} from './ingress.mjs';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const DAY_MS = 86_400_000;
@@ -25,21 +26,11 @@ export function expiryForSignedSecond(second) {
 export async function boundedRelayBody(request) {
   if (request.headers.get('content-type')?.toLowerCase() !== 'application/json' || !request.body ||
       Number(request.headers.get('content-length') ?? '0') > 2048) throw new RelayRejected();
-  const reader = request.body.getReader();
-  const chunks = []; let size = 0;
   try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 2048) throw new RelayRejected();
-      chunks.push(value);
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
-  if (size === 0) throw new RelayRejected();
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return { raw: bytes, body: decoder.decode(bytes) };
+    const bytes = await readBoundedBody(request.body, 2048);
+    if (bytes.length === 0) throw new RelayRejected();
+    return {raw: bytes, body: decoder.decode(bytes)};
+  } catch {throw new RelayRejected();}
 }
 
 export async function verifyDailyRelay(request, env, nowMs = Date.now()) {

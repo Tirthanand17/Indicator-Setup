@@ -27,6 +27,13 @@ calendar and future-revision migration/activation are not verified. The score
 and completed-task count therefore remain unchanged. Task 14 can proceed
 independently while that publication/review prerequisite remains outstanding.
 
+Task 14 now has public Worker admission budgets, shared body-read deadlines,
+stricter TLS/internal-query routing, legacy relay limits, native state-preservation
+evidence and a redacted scan of all then-reachable local Git history. It remains
+partial because deployed perimeter, account IAM/logs and remote-only history
+coverage are unverified. No additional acceptance point or completed-task count
+is claimed. Task 15 is the next account-evidence stage.
+
 The audit baseline was 19/41. Eight newly satisfied checks are the current
 JavaScript dependency advisory scan and correct emergency-halt behavior for
 the tested in-flight market/dispatch boundaries, and the automated CI/lint gate
@@ -146,11 +153,19 @@ additional point. This score measures evidence, not hours of work remaining.
     2027 data and revision migration/activation remain outstanding.
     [Sources, procedure, validation and limits](CALENDAR_MAINTENANCE.md).
 
-Validation: **358 JavaScript/extension/quality-runner tests and 33 native
-workerd/SQLite tests pass**. Local WSL Python: **779 pass, two skips** (one
+14. **Ingress and history review (partial):** separate public login/relay/read
+    admission budgets before DO lookup, whole-body deadlines and cancellation,
+    strict Worker internal TLS/query handling, legacy relay attempt/concurrency
+    limits and redacted local reachable-history scanning. Actual perimeter,
+    IAM, external logs and remote-only coverage remain unverified.
+    [Policies, evidence, limitations and remaining account checks](INGRESS_AND_SECRET_HISTORY.md).
+
+Validation: **365 JavaScript/extension/quality-runner tests and 34 native
+workerd/SQLite tests pass**, including preservation of the reconciliation
+413 size-error contract. Local WSL Python: **783 pass, two skips** (one
 platform-specific and cross-language parity because Linux Node is absent);
 combined CI must run the parity regression with both runtimes available.
-Python type baseline passes for 50 source files; ESLint and Ruff pass;
+Python type baseline passes for 51 source files; ESLint and Ruff pass;
 disabled-template preflight passes; current npm advisory scan is clean.
 New regressions cover late quote completion after halt, no dispatch after halt,
 durable rejection of claims after restart, settlement of already-started sends,
@@ -175,8 +190,8 @@ dispatch after an authenticated halt. All outbound test traffic is synthetic.
 | 11 | Token, outage, heartbeat and quota operational alerts | Implemented; read-only health, persistent external watchdog and opt-in notifications tested |
 | 12 | Unverifiable-position reconciliation | Implemented explicit owner zero-credit accounting; local native recovery/reconciliation drill verified |
 | 13 | Future calendar and exceptional-session maintenance | Tooling implemented and locally verified; official 2027 data and revision activation pending |
-| 14 | Public ingress hardening; history/IAM/log verification | Next independent task |
-| 15 | Inert Free-only cloud identity/deployment verification | Account/deployment evidence required |
+| 14 | Public ingress hardening; history/IAM/log verification | Source controls and local history review implemented; deployed perimeter/IAM/logs and remote coverage pending |
+| 15 | Inert Free-only cloud identity/deployment verification | Next; account/deployment evidence required |
 | 16 | Actual secure daily token handoff lifecycle | Owner handoff and cloud access required |
 | 17 | Five live acceptance gates | Pending |
 | 18 | Actual cloud resource/cost measurements | Deployment and telemetry required |

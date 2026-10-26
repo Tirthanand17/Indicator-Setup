@@ -1,5 +1,6 @@
 /** Complete observed-paper snapshot. Credentials and executable alarms excluded. */
 import {auditPaperLedger} from './paper-ledger.mjs';
+import {readBoundedBody} from './ingress.mjs';
 import {auditReadOnlyBridge} from './readonly-paper-bridge.mjs';
 import {auditPaperDelivery} from './paper-delivery.mjs';
 import {observedPortfolioMetrics} from './observed-portfolio.mjs';
@@ -189,10 +190,9 @@ export async function restoreObservedArchiveToEmpty(storage,{nowMs,...options}={
 }
 
 export async function readObservedArchiveJSON(stream) {
-  if(!stream)fail('MISSING_BODY');const reader=stream.getReader(),chunks=[];let length=0;
-  try {while(true){const {done,value}=await reader.read();if(done)break;
-    length+=value.byteLength;if(length>MAX_OBSERVED_SEALED_BYTES){await reader.cancel();fail('SIZE_LIMIT');}chunks.push(value);}
-  } finally {reader.releaseLock();}
-  const joined=new Uint8Array(length);let offset=0;for(const chunk of chunks){joined.set(chunk,offset);offset+=chunk.length;}
+  if(!stream)fail('MISSING_BODY');
+  let joined;
+  try {joined=await readBoundedBody(stream,MAX_OBSERVED_SEALED_BYTES);}
+  catch (error) {fail(error?.message==='BODY_TOO_LARGE'?'SIZE_LIMIT':'BODY_UNAVAILABLE');}
   try {return JSON.parse(decoder.decode(joined));}catch{fail('INVALID_JSON');}
 }

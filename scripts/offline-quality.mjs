@@ -39,7 +39,7 @@ export function runQuality(args,{source=process.env,run=spawnSync,log=console.lo
     ['Disabled template preflight',node,['edge-cloudflare/offline-preflight.mjs']],
     ['Native SQLite tests',node,['--test','edge-cloudflare/runtime/*.test.mjs']]);
   if(args[0]!=='--js') checks.push(
-    ['Python lint',python,['-m','ruff','check','cloud-alerts','edge-cloudflare','--config','ruff.toml']],
+    ['Python lint',python,['-m','ruff','check','cloud-alerts','edge-cloudflare','scripts','--config','ruff.toml']],
     ['Python types',python,['-m','mypy','--config-file','cloud-alerts/mypy.ini','cloud-alerts/cloud_alerts']],
     ['Python tests',python,['-m','pytest','-q','cloud-alerts/tests']],
     ['Python dependency advisories',python,['-m','pip_audit','-r','cloud-alerts/requirements-quality.txt','--progress-spinner','off']]);

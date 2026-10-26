@@ -1,5 +1,6 @@
 /** Owner suppression of uncertainty. No sender, retry, acceptance or resume. */
 import {auditPaperLedger} from './paper-ledger.mjs';
+import {readBoundedBody} from './ingress.mjs';
 import {auditPaperDelivery,paperDeliverySummary,suppressAmbiguousDelivery} from './paper-delivery.mjs';
 import {validState} from './runtime-state.mjs';
 
@@ -65,11 +66,9 @@ export function reconcileUncertainDelivery(ledger,journal,context,input) {
     deliveryAttempted:false,schedulerResumed:false,phoneDeliveredVerified:false}};
 }
 export async function readReconciliationJSON(stream) {
-  if(!stream)fail('BODY_REQUIRED');const reader=stream.getReader(),chunks=[];let length=0;
-  try {while(true){const {done,value}=await reader.read();if(done)break;
-    length+=value.byteLength;if(length>MAX_RECONCILIATION_BYTES){await reader.cancel();fail('BODY_TOO_LARGE');}chunks.push(value);}
-  }finally{reader.releaseLock();}
-  const bytes=new Uint8Array(length);let offset=0;
-  for(const c of chunks){bytes.set(c,offset);offset+=c.byteLength;}
+  if(!stream)fail('BODY_REQUIRED');
+  let bytes;
+  try {bytes=await readBoundedBody(stream,MAX_RECONCILIATION_BYTES);}
+  catch (error) {fail(error?.message==='BODY_TOO_LARGE'?'BODY_TOO_LARGE':'BODY_UNAVAILABLE');}
   try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{fail('INVALID_JSON');}
 }

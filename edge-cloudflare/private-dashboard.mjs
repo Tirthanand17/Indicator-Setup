@@ -1,5 +1,6 @@
 /** Phase20: disabled-by-default private paper dashboard. No broker/network calls. */
 import { auditPaperLedger, paperLedgerSummary } from './paper-ledger.mjs';
+import {readBoundedBody} from './ingress.mjs';
 import { auditSyntheticSession } from './synthetic-session.mjs';
 import { portfolioValuation } from './portfolio-valuation.mjs';
 import { privateReadOnlySnapshot } from './readonly-dashboard.mjs';
@@ -162,21 +163,8 @@ const cookieOptions = value => `${COOKIE}=${value}; Path=/; Secure; HttpOnly; Sa
 
 async function boundedForm(request) {
   if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/x-www-form-urlencoded') return null;
-  const reader = request.body?.getReader();
-  if (!reader) return null;
-  let bytes = 0, parts = [];
   try {
-    while (true) {
-      const {done,value}=await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > 1024) { await reader.cancel(); return null; }
-      parts.push(value);
-    }
-  } finally { reader.releaseLock(); }
-  const buffer = new Uint8Array(bytes);let offset = 0;
-  for (const part of parts) { buffer.set(part, offset); offset += part.byteLength; }
-  try {
+    const buffer = await readBoundedBody(request.body, 1024);
     const form = new URLSearchParams(new TextDecoder('utf-8',{fatal:true}).decode(buffer));
     if ([...form.keys()].length !== 1 || !form.has('key')) return null;
     return form.get('key');

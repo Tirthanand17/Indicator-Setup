@@ -1,4 +1,5 @@
 import {validState,validMarketObservation} from './runtime-state.mjs';
+import {createIngressAdmission,readBoundedBody} from './ingress.mjs';
 import {assertObservedWriter,observedRetentionReport} from './observed-lifecycle.mjs';
 import {migrateObservedLifecycle} from './observed-lifecycle-ops.mjs';
 import {deliveryReconciliationView,reconcileUncertainDelivery,readReconciliationJSON} from './delivery-reconciliation.mjs';
@@ -82,13 +83,24 @@ async function authorizedOperations(request,env) {
 }
 
 
-export default {
+const admitIngress = createIngressAdmission();
+const worker = {
   async fetch(request, env) {
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url), path = url.pathname;
+    if (url.protocol !== 'https:' || url.username || url.password ||
+        path.startsWith('/internal/') && url.search !== '') return reply({error:'Not found'},404);
     const dashboardRoute = isPrivateDashboardPath(path) &&
       env.OFFLINE_PRIVATE_DASHBOARD_ENABLED === 'true' &&
       (env.OFFLINE_PAPER_LEDGER_ENABLED === 'true' ||
        env.OFFLINE_PAPER_BRIDGE_ENABLED === 'true');
+    if (dashboardRoute) {
+      const readable = ['/paper/dashboard','/paper/assets/dashboard.css','/paper/assets/dashboard.js',
+        '/paper/assets/readonly.js','/paper/api/summary','/paper/api/trades','/paper/api/daily',
+        '/paper/api/portfolio','/paper/api/readonly'];
+      if (!(request.method === 'GET' && readable.includes(path) ||
+          request.method === 'POST' && ['/paper/login','/paper/logout'].includes(path)) ||
+          !path.startsWith('/paper/api/') && url.search !== '') return reply({error:'Not found'},404);
+    }
     const tokenRoute = path === '/internal/token' && request.method === 'POST';
     const positionReconciliationRoute=path==='/internal/readonly-paper/reconcile'&&
       new URL(request.url).protocol==='https:'&&new URL(request.url).search===''&&
@@ -123,10 +135,20 @@ export default {
     }
     if (tokenRoute && (env.READONLY_MARKET_RUNTIME_ENABLED !== 'true' ||
         new URL(request.url).protocol !== 'https:')) return reply({ error: 'Not found' }, 404);
-    const id = env.MARKET_SESSION.idFromName('nifty-paper-session-v1');
-    return env.MARKET_SESSION.get(id).fetch(request);
+    const category = tokenRoute ? 'relay' : dashboardRoute ?
+      (path === '/paper/login' && request.method === 'POST' ? 'login' : 'dashboard') : null;
+    const admission = category ? admitIngress(category) : null;
+    if (admission && !admission.accepted) {
+      const response = reply({error:'Request budget exceeded'},429);
+      response.headers.set('Retry-After', String(admission.retryAfter)); return response;
+    }
+    try {
+      const id = env.MARKET_SESSION.idFromName('nifty-paper-session-v1');
+      return await env.MARKET_SESSION.get(id).fetch(request);
+    } finally {admission?.release?.();}
   },
 };
+export default worker;
 
 export class MarketSession {
   constructor(ctx, env) {
@@ -164,7 +186,9 @@ export class MarketSession {
   }
 
   async fetch(request) {
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url), path = url.pathname;
+    if (url.protocol !== 'https:' || url.username || url.password ||
+        path.startsWith('/internal/') && url.search !== '') return reply({error:'Not found'},404);
     if(path==='/internal/operations') {
       if(request.method!=='GET'||new URL(request.url).protocol!=='https:'||new URL(request.url).search!==''||
         this.env.OFFLINE_OPERATIONAL_HEALTH_ENABLED!=='true'||!await authorizedOperations(request,this.env))return reply({error:'Not found'},404);
@@ -315,14 +339,8 @@ export class MarketSession {
       // workerd represents even an empty forwarded POST with a body stream.
       // Inspect at most the first chunk, never buffer arbitrary upload content.
       if (request.body !== null) {
-        const reader = request.body.getReader();
-        try {
-          const first = await reader.read();
-          if (!first.done) {
-            await reader.cancel();
-            return reply({ error: 'Body forbidden' }, 400);
-          }
-        } finally { reader.releaseLock(); }
+        try {await readBoundedBody(request.body, 0);}
+        catch {return reply({ error: 'Body forbidden or unavailable' }, 400);}
       }
       const now = Date.now();
       if (isEmergencyHalt) {
